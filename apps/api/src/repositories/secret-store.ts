@@ -19,6 +19,20 @@ const PROVIDER_LABEL: Record<AiProviderId, string> = {
   openai: "OpenAI",
 };
 
+export interface R2Credentials {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+}
+
+const R2_KEYS = {
+  accountId: "r2_account_id",
+  accessKeyId: "r2_access_key_id",
+  secretAccessKey: "r2_secret_access_key",
+  bucket: "r2_bucket",
+} as const satisfies Record<keyof R2Credentials, string>;
+
 export class SqliteSecretStore {
   private readonly db: Db;
   private readonly crypto: SecretCrypto;
@@ -54,6 +68,32 @@ export class SqliteSecretStore {
     this.db.insert(secrets).values({ key: ACTIVE_PROVIDER_KEY, value: provider })
       .onConflictDoUpdate({ target: secrets.key, set: { value: provider } })
       .run();
+  }
+
+  hasR2Credentials(): boolean {
+    return (Object.keys(R2_KEYS) as (keyof R2Credentials)[]).every((field) => this.hasKey(R2_KEYS[field]));
+  }
+
+  getR2Credentials(): R2Credentials | null {
+    const accountId = this.getKey(R2_KEYS.accountId);
+    const accessKeyId = this.getKey(R2_KEYS.accessKeyId);
+    const secretAccessKey = this.getKey(R2_KEYS.secretAccessKey);
+    const bucket = this.getKey(R2_KEYS.bucket);
+    if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
+    return { accountId, accessKeyId, secretAccessKey, bucket };
+  }
+
+  setR2Credentials(credentials: R2Credentials): void {
+    for (const field of Object.keys(R2_KEYS) as (keyof R2Credentials)[]) {
+      if (!credentials[field].trim()) throw new Error("R2 자격증명을 모두 입력해야 합니다.");
+    }
+    for (const field of Object.keys(R2_KEYS) as (keyof R2Credentials)[]) {
+      this.setKey(R2_KEYS[field], credentials[field]);
+    }
+  }
+
+  deleteR2Credentials(): void {
+    for (const key of Object.values(R2_KEYS)) this.deleteKey(key);
   }
 
   private hasKey(key: string): boolean {

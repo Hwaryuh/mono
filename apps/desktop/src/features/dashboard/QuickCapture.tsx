@@ -7,8 +7,8 @@ import { Link } from "react-router";
 import { useMediaStore } from "../../infrastructure/media/media-store-context";
 import type { DashboardRepository } from "./dashboard-repository";
 
-// 편집 중에는 원본(data URL)을 메모리에만 들고, 제출 시 media 저장소에 저장하고 mediaId만 넘긴다.
-type PendingMedia = { name: string; mimeType: string; size: number; dataUrl: string };
+// 편집 중에는 원본(File+미리보기 data URL)을 메모리에만 들고, 제출 시 R2에 업로드하고 mediaId만 넘긴다.
+type PendingMedia = { name: string; mimeType: string; size: number; dataUrl: string; file: File };
 
 const moduleMeta: Record<PlatformModuleId, { name: string; color: string; icon: IconName }> = {
   todo: { name: "할 일", color: "oklch(0.539 0.082 160.129)", icon: "todo" },
@@ -60,7 +60,7 @@ function captureImageOf(file: File) {
         reject(new Error("사진을 읽지 못했습니다."));
         return;
       }
-      resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result });
+      resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result, file });
     };
     reader.readAsDataURL(file);
   });
@@ -75,7 +75,7 @@ function captureVideoOf(file: File) {
         reject(new Error("영상을 읽지 못했습니다."));
         return;
       }
-      resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result });
+      resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result, file });
     };
     reader.readAsDataURL(file);
   });
@@ -99,9 +99,9 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
   const mediaStore = useMediaStore();
   const captureMutation = useMutation({
     mutationFn: async (pending: { raw: string; images: PendingMedia[]; videos: PendingMedia[] }) => {
-      const persist = async ({ dataUrl, ...meta }: PendingMedia) => {
+      const persist = async ({ dataUrl: _dataUrl, file, ...meta }: PendingMedia) => {
         const mediaId = crypto.randomUUID();
-        await mediaStore.save(mediaId, dataUrl);
+        await mediaStore.save(mediaId, file);
         return { ...meta, mediaId };
       };
       // 이미지는 dataUrl을 실어 보낸다 — 서버가 캡처 분석(Gemini)에만 쓰고 영속화하지 않는다.

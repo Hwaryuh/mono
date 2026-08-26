@@ -16,12 +16,20 @@ import type { TodoRepository } from "../features/todo/todo-repository";
 import { AppShell } from "../shell/AppShell";
 import { RouteErrorScreen } from "./RouteErrorScreen";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
+import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
+import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
 
-export function createAppRouter(dashboardRepository: DashboardRepository, inboxRepository: InboxRepository, todoRepository: TodoRepository, routineRepository: RoutineRepository, calendarRepository: CalendarRepository, scrapRepository: ScrapRepository, ledgerRepository: LedgerRepository, aiSettingsStore: AiSettingsStore = new InMemoryAiSettingsStore()) {
+export function createAppRouter(
+  dashboardRepository: DashboardRepository, inboxRepository: InboxRepository, todoRepository: TodoRepository, routineRepository: RoutineRepository,
+  calendarRepository: CalendarRepository, scrapRepository: ScrapRepository, ledgerRepository: LedgerRepository,
+  aiSettingsStore: AiSettingsStore = new InMemoryAiSettingsStore(),
+  mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(),
+  r2SettingsStore: R2SettingsStore = new InMemoryR2SettingsStore(),
+) {
   return createHashRouter([
     {
       path: "/",
-      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} routineRepository={routineRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} />,
+      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} r2SettingsStore={r2SettingsStore} routineRepository={routineRepository} todoRepository={todoRepository} />,
       errorElement: <RouteErrorScreen />,
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },

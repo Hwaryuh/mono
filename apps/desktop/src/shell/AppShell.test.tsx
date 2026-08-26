@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createMockInboxRepository } from "../infrastructure/mock/mock-inbox-repository";
 import type { InboxRepository } from "../features/inbox/inbox-repository";
 import { InMemoryMediaStore, type MediaStore } from "../infrastructure/media/media-store";
+import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
 import { MediaStoreProvider } from "../infrastructure/media/media-store-context";
 import { createMockTodoRepository } from "../infrastructure/mock/mock-todo-repository";
 import { createMockRoutineRepository } from "../infrastructure/mock/mock-routine-repository";
@@ -25,7 +26,7 @@ import type { DashboardRepository } from "../features/dashboard/dashboard-reposi
 import { ACCENT_COLOR_STORAGE_KEY } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 
-function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository()) {
+function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const todoRepository = createMockTodoRepository();
   return render(
@@ -33,7 +34,7 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
       <MediaStoreProvider value={mediaStore}>
         <MemoryRouter initialEntries={["/dashboard"]}>
           <Routes>
-            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} routineRepository={routineRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} />}>
+            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} todoRepository={todoRepository} />}>
               <Route path="dashboard" element={<div>대시보드 경로</div>} />
               <Route path="inbox" element={<div>수집함 경로</div>} />
               <Route path="todo" element={<TodoPage repository={todoRepository} />} />
@@ -194,8 +195,8 @@ describe("AppShell", () => {
     await waitFor(() => expect(within(geminiSection).getByText("키 없음")).toBeInTheDocument());
   });
 
-  async function openStoragePanel(mediaStore: MediaStore, inboxRepository?: InboxRepository) {
-    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, mediaStore, inboxRepository);
+  async function openStoragePanel(mediaMaintenance: MediaMaintenance) {
+    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mediaMaintenance);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
     fireEvent.click(within(settingsModal).getByRole("button", { name: "저장공간" }));
@@ -203,37 +204,32 @@ describe("AppShell", () => {
   }
 
   it("저장공간 설정에서 미사용 미디어를 확인한 뒤 정리한다", async () => {
-    const mediaStore = new InMemoryMediaStore();
-    await mediaStore.save("orphan-1", "12345");
-    await mediaStore.save("orphan-2", "123");
-    const section = await openStoragePanel(mediaStore);
+    const mediaMaintenance = new InMemoryMediaMaintenance({ count: 2, bytes: 1024 });
+    const section = await openStoragePanel(mediaMaintenance);
     expect(within(section).getByText("확인 필요")).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
-    expect(await within(section).findByText(`2개 · ${1}KB`)).toBeInTheDocument();
+    expect(await within(section).findByText("2개 · 1KB")).toBeInTheDocument();
     // 확인 단계는 아무것도 지우지 않는다.
-    expect(await mediaStore.load("orphan-1")).toBe("12345");
+    expect(await mediaMaintenance.orphanUsage()).toEqual({ count: 2, bytes: 1024 });
 
     fireEvent.click(within(section).getByRole("button", { name: "정리" }));
     expect(await within(section).findByText("미디어 2개를 삭제했습니다.")).toBeInTheDocument();
-    expect(await mediaStore.load("orphan-1")).toBeNull();
+    expect(await mediaMaintenance.orphanUsage()).toEqual({ count: 0, bytes: 0 });
   });
 
-  it("참조 목록을 못 받으면 오류만 알리고 미디어를 지우지 않는다", async () => {
-    const mediaStore = new InMemoryMediaStore();
-    await mediaStore.save("orphan-1", "12345");
-    const brokenInbox: InboxRepository = {
-      ...createMockInboxRepository(),
-      getSnapshot: () => Promise.reject(new Error("API 서버에 연결할 수 없습니다.")),
+  it("확인이 실패하면 오류만 알리고 정리 버튼을 비활성 상태로 둔다", async () => {
+    const brokenMaintenance: MediaMaintenance = {
+      orphanUsage: () => Promise.reject(new Error("API 서버에 연결할 수 없습니다.")),
+      gc: () => Promise.reject(new Error("사용되지 않음")),
     };
-    const section = await openStoragePanel(mediaStore, brokenInbox);
+    const section = await openStoragePanel(brokenMaintenance);
 
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
 
     expect(await within(section).findByRole("alert")).toHaveTextContent("API 서버에 연결할 수 없습니다.");
     expect(within(section).getByText("확인 필요")).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: "정리" })).toBeDisabled();
-    expect(await mediaStore.load("orphan-1")).toBe("12345");
   });
 
   it("사이드바 링크로 수집함 경로를 연다", async () => {

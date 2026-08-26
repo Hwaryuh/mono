@@ -10,7 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1119.0",
     "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^10.1.1",
     "@mono/contracts": "0.1.0",
     "@mono/domain": "0.1.0",
     "better-sqlite3": "^11.10.0",

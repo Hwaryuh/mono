@@ -9,13 +9,15 @@ import { RouterProvider } from "react-router";
 import { createAppRouter } from "./app/router";
 import { createHttpRepositories } from "./infrastructure/http/http-repositories";
 import { HttpAiSettingsStore } from "./infrastructure/http/http-ai-settings-store";
+import { HttpMediaMaintenance } from "./infrastructure/http/http-media-maintenance";
+import { HttpMediaStore } from "./infrastructure/http/http-media-store";
+import { HttpR2SettingsStore } from "./infrastructure/http/http-r2-settings-store";
 import { MediaStoreProvider } from "./infrastructure/media/media-store-context";
-import { TauriMediaStore } from "./infrastructure/media/media-store";
 import "@mono/ui/tokens.css";
 import "@mono/ui/styles.css";
 import "./styles/global.css";
 
-const mediaStore = new TauriMediaStore();
+const mediaStore = new HttpMediaStore();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,7 +44,10 @@ async function start() {
     scrapRepository,
     ledgerRepository,
   } = createHttpRepositories();
-  const router = createAppRouter(dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository, new HttpAiSettingsStore());
+  const router = createAppRouter(
+    dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository,
+    new HttpAiSettingsStore(), new HttpMediaMaintenance(), new HttpR2SettingsStore(),
+  );
 
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

@@ -8,13 +8,12 @@ import type { InboxRepository } from "../features/inbox/inbox-repository";
 import type { TodoRepository } from "../features/todo/todo-repository";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
-import type { ScrapRepository } from "../features/scrap/scrap-repository";
-import { useMediaStore } from "../infrastructure/media/media-store-context";
-import { referencedMediaIds } from "../infrastructure/media/referenced-media-ids";
 import { useNavigate } from "react-router";
 import { currentIsoDate, koreanDateLabel, koreanMonthLabel } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
+import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
+import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
 
 type NavigationItem = {
   to: string;
@@ -43,6 +42,8 @@ const settingsSections: SettingsSectionDefinition[] = [
 
 const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(window.localStorage);
 const defaultAiSettingsStore = new InMemoryAiSettingsStore();
+const defaultMediaMaintenance = new InMemoryMediaMaintenance();
+const defaultR2SettingsStore = new InMemoryR2SettingsStore();
 
 const routeMeta: Record<string, { title: string; subtitle: string; icon: IconName; action?: string }> = {
   "/dashboard": { title: "대시보드", subtitle: "", icon: "grid" },
@@ -54,7 +55,13 @@ const routeMeta: Record<string, { title: string; subtitle: string; icon: IconNam
   "/ledger": { title: "가계부", subtitle: "", icon: "wallet", action: "지출 추가" },
 };
 
-export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository }: { aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository; scrapRepository: ScrapRepository }) {
+export function AppShell({
+  aiSettingsStore = defaultAiSettingsStore, dashboardRepository, inboxRepository, mediaMaintenance = defaultMediaMaintenance,
+  r2SettingsStore = defaultR2SettingsStore, todoRepository, routineRepository, calendarRepository,
+}: {
+  aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; mediaMaintenance?: MediaMaintenance;
+  r2SettingsStore?: R2SettingsStore; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
@@ -241,14 +248,14 @@ export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRe
       <SettingsModal
         accentColor={accentColor}
         aiSettingsStore={aiSettingsStore}
-        inboxRepository={inboxRepository}
+        mediaMaintenance={mediaMaintenance}
         onClose={() => setSettingsOpen(false)}
         onAccentColorChange={setAccentColor}
         onReducedMotionChange={setReducedMotion}
         onThemeChange={setTheme}
         open={settingsOpen}
+        r2SettingsStore={r2SettingsStore}
         reducedMotion={reducedMotion}
-        scrapRepository={scrapRepository}
         theme={theme}
       />
       <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
@@ -259,7 +266,7 @@ export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRe
   );
 }
 
-function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, reducedMotion, onReducedMotionChange, aiSettingsStore, inboxRepository, scrapRepository }: {
+function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, reducedMotion, onReducedMotionChange, aiSettingsStore, mediaMaintenance, r2SettingsStore }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
@@ -269,8 +276,8 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
   reducedMotion: boolean;
   onReducedMotionChange: (reducedMotion: boolean) => void;
   aiSettingsStore: AiSettingsStore;
-  inboxRepository: InboxRepository;
-  scrapRepository: ScrapRepository;
+  mediaMaintenance: MediaMaintenance;
+  r2SettingsStore: R2SettingsStore;
 }) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance");
   return (
@@ -334,7 +341,10 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
           {activeSection === "ai" && <AiSettingsPanel store={aiSettingsStore} />}
 
           {activeSection === "storage" && (
-            <StorageSettingsPanel inboxRepository={inboxRepository} scrapRepository={scrapRepository} />
+            <>
+              <StorageSettingsPanel mediaMaintenance={mediaMaintenance} />
+              <R2CredentialsSection store={r2SettingsStore} />
+            </>
           )}
 
           {activeSection === "about" && (
@@ -354,17 +364,10 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
 }
 
 /**
- * 미사용 미디어 정리. 사진·영상 바이트는 이 PC에만 있고 참조는 서버에만 있어서, 참조 목록을
- * 못 받은 채로 지우면 살아 있는 미디어가 날아간다. 그래서 자동 실행 대신 수동 2단계로 둔다.
- * 1) 확인: 서버 참조 목록을 받아 삭제 대상 개수·용량만 계산한다(지우지 않는다).
- * 2) 정리: 참조 목록을 다시 받아 그 기준으로 지운다 — 확인 이후 추가된 미디어를 지우지 않으려고.
- * 어느 단계든 스냅샷 조회가 실패하면 던져서 삭제까지 가지 않는다.
+ * 미사용 미디어 정리. R2 참조 여부는 서버가 자체 DB(수집함·스크랩)로 계산하므로 클라이언트는
+ * 확인·정리 버튼만 누르면 된다 — keepIds를 직접 모아 넘기던 예전 방식은 없앴다.
  */
-function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
-  inboxRepository: InboxRepository;
-  scrapRepository: ScrapRepository;
-}) {
-  const mediaStore = useMediaStore();
+function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMaintenance }) {
   const [usage, setUsage] = useState<{ count: number; bytes: number } | null>(null);
   const [pending, setPending] = useState<"scan" | "clean" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -385,7 +388,7 @@ function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
 
   return (
     <>
-      <SettingsHeading description="이 기기에 남은 사진·영상 파일을 관리합니다." title="저장공간" />
+      <SettingsHeading description="R2에 남은 사진·영상 파일을 관리합니다." title="저장공간" />
       <section aria-label="미사용 미디어 정리" className="settings-group settings-ai">
         <header>
           <strong>미사용 미디어</strong>
@@ -397,8 +400,7 @@ function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
             {usage === null ? "확인 필요" : usage.count === 0 ? "없음" : `${usage.count}개 · ${formatMediaSize(usage.bytes)}`}
           </strong>
           <Button loading={pending === "scan"} onClick={() => void run("scan", async () => {
-            const keepIds = await referencedMediaIds(inboxRepository, scrapRepository);
-            const scanned = await mediaStore.orphanUsage(keepIds);
+            const scanned = await mediaMaintenance.orphanUsage();
             setUsage(scanned);
             if (scanned.count === 0) setMessage("정리할 미디어가 없습니다.");
           })} type="button">확인</Button>
@@ -406,8 +408,7 @@ function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
             disabled={!usage || usage.count === 0}
             loading={pending === "clean"}
             onClick={() => void run("clean", async () => {
-              const keepIds = await referencedMediaIds(inboxRepository, scrapRepository);
-              const deleted = await mediaStore.gc(keepIds);
+              const deleted = await mediaMaintenance.gc();
               setUsage({ count: 0, bytes: 0 });
               setMessage(`미디어 ${deleted}개를 삭제했습니다.`);
             })}
@@ -419,11 +420,85 @@ function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
         </div>
         {message && <p className="settings-ai__message" role="status">{message}</p>}
         {error && <p className="settings-ai__error" role="alert">{error}</p>}
-        <p className="settings-ai__notice-text">
-          삭제한 파일은 되돌릴 수 없습니다. API 서버에 연결하지 못하면 참조 목록을 확인할 수 없어 아무것도 지우지 않습니다.
-        </p>
+        <p className="settings-ai__notice-text">삭제한 파일은 되돌릴 수 없습니다.</p>
       </section>
     </>
+  );
+}
+
+function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
+  const [accountId, setAccountId] = useState("");
+  const [accessKeyId, setAccessKeyId] = useState("");
+  const [secretAccessKey, setSecretAccessKey] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [hasCredentials, setHasCredentials] = useState<boolean | null>(null);
+  const [pending, setPending] = useState<"save" | "test" | "delete" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    store.hasCredentials()
+      .then((configured) => { if (active) setHasCredentials(configured); })
+      .catch((cause: unknown) => { if (active) setError(messageOf(cause)); });
+    return () => { active = false; };
+  }, [store]);
+
+  async function run(action: "save" | "test" | "delete", operation: () => Promise<void>) {
+    setPending(action);
+    setMessage(null);
+    setError(null);
+    try {
+      await operation();
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  const canSave = accountId.trim().length > 0 && accessKeyId.trim().length > 0 && secretAccessKey.trim().length > 0 && bucket.trim().length > 0;
+
+  return (
+    <section aria-label="R2 자격증명 설정" className="settings-group settings-ai">
+      <header>
+        <strong>Cloudflare R2</strong>
+        <span>사진·영상은 이 자격증명으로 R2 버킷에 저장됩니다. 서버에 암호화되어 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
+      </header>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        void run("save", async () => {
+          await store.setCredentials({ accountId, accessKeyId, secretAccessKey, bucket });
+          setAccountId("");
+          setAccessKeyId("");
+          setSecretAccessKey("");
+          setBucket("");
+          setHasCredentials(true);
+          setMessage("R2 자격증명을 저장했습니다.");
+        });
+      }}>
+        <Input aria-label="계정 ID" autoComplete="off" onChange={(event) => setAccountId(event.target.value)} placeholder="계정 ID" value={accountId} />
+        <Input aria-label="액세스 키 ID" autoComplete="off" onChange={(event) => setAccessKeyId(event.target.value)} placeholder="액세스 키 ID" type="password" value={accessKeyId} />
+        <Input aria-label="시크릿 액세스 키" autoComplete="off" onChange={(event) => setSecretAccessKey(event.target.value)} placeholder="시크릿 액세스 키" type="password" value={secretAccessKey} />
+        <Input aria-label="버킷 이름" autoComplete="off" onChange={(event) => setBucket(event.target.value)} placeholder="버킷 이름" value={bucket} />
+        <Button disabled={!canSave} loading={pending === "save"} type="submit" variant="primary">저장</Button>
+      </form>
+      <div className="settings-ai__status">
+        <span>상태</span>
+        <strong>{hasCredentials === null ? "확인 중" : hasCredentials ? "설정됨" : "설정 안 됨"}</strong>
+        <Button disabled={!hasCredentials} loading={pending === "test"} onClick={() => void run("test", async () => {
+          await store.testConnection();
+          setMessage("R2 연결에 성공했습니다.");
+        })} type="button">연결 테스트</Button>
+        <Button disabled={!hasCredentials} loading={pending === "delete"} onClick={() => void run("delete", async () => {
+          await store.deleteCredentials();
+          setHasCredentials(false);
+          setMessage("R2 자격증명을 삭제했습니다.");
+        })} type="button">삭제</Button>
+      </div>
+      {message && <p className="settings-ai__message" role="status">{message}</p>}
+      {error && <p className="settings-ai__error" role="alert">{error}</p>}
+    </section>
   );
 }
 

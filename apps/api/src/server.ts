@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import Fastify from "fastify";
 import { ZodError } from "zod";
 import { createDb, type Db } from "./db/client.ts";
@@ -7,7 +8,9 @@ import { SqliteDashboardRepository } from "./repositories/dashboard-repository.t
 import { GeminiCaptureAnalysisProvider } from "./repositories/gemini-capture-analysis-provider.ts";
 import { SqliteInboxRepository } from "./repositories/inbox-repository.ts";
 import { SqliteLedgerRepository } from "./repositories/ledger-repository.ts";
+import { MediaReferenceRepository } from "./repositories/media-reference-repository.ts";
 import { OpenAiCaptureAnalysisProvider } from "./repositories/openai-capture-analysis-provider.ts";
+import { R2MediaStore } from "./repositories/r2-media-store.ts";
 import { SqliteRoutineRepository } from "./repositories/routine-repository.ts";
 import { SqliteScrapRepository } from "./repositories/scrap-repository.ts";
 import { SqliteSecretStore } from "./repositories/secret-store.ts";
@@ -18,9 +21,15 @@ import { registerCalendarRoutes } from "./routes/calendar.ts";
 import { registerDashboardRoutes } from "./routes/dashboard.ts";
 import { registerInboxRoutes } from "./routes/inbox.ts";
 import { registerLedgerRoutes } from "./routes/ledger.ts";
+import { registerMediaCredentialRoutes } from "./routes/media-credentials.ts";
+import { registerMediaRoutes } from "./routes/media.ts";
 import { registerRoutineRoutes } from "./routes/routine.ts";
 import { registerScrapRoutes } from "./routes/scrap.ts";
 import { registerTodoRoutes } from "./routes/todo.ts";
+
+// 영상 100MB 캡처 업로드에 여유를 둔 상한. JSON 라우트의 CAPTURE_BODY_LIMIT_BYTES와 별개로
+// /media POST 라우트에만 개별 적용한다(멀티파트 전역 기본값).
+const MEDIA_UPLOAD_LIMIT_BYTES = 105 * 1024 * 1024;
 
 // 캡처는 사진 data URL을 본문에 실어 보낸다. 데스크톱 QuickCapture 상한이 원본 13MB이고
 // base64가 약 4/3로 팽창하므로 17.4MB + JSON 여유를 잡는다. Fastify 기본 1MB로는 사진 캡처가
@@ -40,6 +49,7 @@ export function buildServer(db: Db = createDb()) {
       "http://tauri.localhost",
     ],
   });
+  app.register(multipart, { limits: { fileSize: MEDIA_UPLOAD_LIMIT_BYTES, files: 1 } });
 
   // ponytail: 인증 스텁. localhost 단계는 통과. 인터넷 노출 배포 결정 시 실제 인증으로 교체(§5).
   app.addHook("onRequest", async () => {});
@@ -56,12 +66,16 @@ export function buildServer(db: Db = createDb()) {
   const openaiProvider = new OpenAiCaptureAnalysisProvider(() => secretStore.getApiKey("openai"));
   const captureProviders = { gemini: geminiProvider, openai: openaiProvider };
   const analysisProvider = new SelectableCaptureAnalysisProvider(secretStore, captureProviders);
+  const mediaStore = new R2MediaStore(secretStore);
+  const mediaReferences = new MediaReferenceRepository(db);
 
   registerTodoRoutes(app, new SqliteTodoRepository(db));
   registerLedgerRoutes(app, new SqliteLedgerRepository(db));
   registerRoutineRoutes(app, new SqliteRoutineRepository(db));
   registerCalendarRoutes(app, new SqliteCalendarRepository(db));
   registerScrapRoutes(app, new SqliteScrapRepository(db));
+  registerMediaRoutes(app, mediaStore, mediaReferences);
+  registerMediaCredentialRoutes(app, secretStore, mediaStore);
   registerInboxRoutes(app, new SqliteInboxRepository(db));
   registerDashboardRoutes(app, new SqliteDashboardRepository(db, analysisProvider));
   registerAiRoutes(app, secretStore, captureProviders);
