@@ -164,4 +164,24 @@ describe("dashboard routes", () => {
 
     await app.close();
   });
+
+  // 회귀: Fastify 기본 bodyLimit(1MB)이면 사진을 붙인 캡처가 전부 413("Request body is too large")으로
+  // 떨어진다. 데스크톱 QuickCapture는 원본 13MB까지 허용하므로 서버가 그만큼 받아야 한다.
+  it("사진 data URL을 실은 큰 캡처 본문을 받는다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+
+    const base64 = "A".repeat(8 * 1024 * 1024);
+    const captured = await app.inject({
+      method: "POST",
+      url: "/dashboard/capture",
+      payload: {
+        raw: "영수증",
+        images: [{ name: "a.png", mimeType: "image/png", size: 6_000_000, mediaId: "m1", dataUrl: `data:image/png;base64,${base64}` }],
+      },
+    });
+    expect(captured.statusCode).toBe(201);
+
+    await app.close();
+  });
 });
