@@ -20,5 +20,5 @@
     { "path": "../../packages/domain" },
     { "path": "../../packages/contracts" }
   ],
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }

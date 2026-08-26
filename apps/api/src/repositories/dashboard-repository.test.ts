@@ -1,4 +1,3 @@
-import { existsSync, rmSync } from "node:fs";
 import { currentIsoDate } from "@mono/domain";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDb, type Db } from "../db/client.ts";
@@ -111,7 +110,6 @@ describe("capture 이미지 dataUrl 처리", () => {
 
 describe("Gemini 캡처 분류 연동(HTTP)", () => {
   afterEach(() => {
-    if (existsSync("mono.secret.key")) rmSync("mono.secret.key");
     vi.unstubAllGlobals();
   });
 

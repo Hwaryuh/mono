@@ -1,20 +1,15 @@
-import { existsSync, rmSync } from "node:fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createDb, type Db } from "../db/client.ts";
 import { SecretCrypto } from "../security/secret-crypto.ts";
 import { SqliteSecretStore } from "./secret-store.ts";
 
-const keyPath = "test-secret.key";
-
+// 키 파일 경로는 test/setup.ts가 파일마다 고유한 임시 디렉터리로 지정하고 정리한다.
 function freshStore(): SqliteSecretStore {
   const db: Db = createDb(":memory:");
-  return new SqliteSecretStore(db, new SecretCrypto(keyPath));
+  return new SqliteSecretStore(db, new SecretCrypto());
 }
 
 describe("SqliteSecretStore", () => {
-  afterEach(() => {
-    if (existsSync(keyPath)) rmSync(keyPath);
-  });
 
   it("키가 없으면 hasGeminiApiKey는 false, getGeminiApiKey는 null이다", () => {
     const store = freshStore();

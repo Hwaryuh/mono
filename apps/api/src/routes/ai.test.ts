@@ -1,4 +1,3 @@
-import { existsSync, rmSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDb, type Db } from "../db/client.ts";
 import { buildServer } from "../server.ts";
@@ -9,7 +8,6 @@ function freshDb(): Db {
 
 describe("ai routes", () => {
   afterEach(() => {
-    if (existsSync("mono.secret.key")) rmSync("mono.secret.key");
     vi.unstubAllGlobals();
   });
 

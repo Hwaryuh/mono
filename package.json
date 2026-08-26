@@ -9,7 +9,7 @@
   "scripts": {
     "branding:sync": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-windows-branding.ps1",
     "build": "npm run build --workspace @mono/desktop",
-    "test": "npm run test --workspace @mono/desktop",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b",
     "predesktop:dev": "npm run branding:sync",
     "desktop:dev": "npm run tauri --workspace @mono/desktop -- dev",
