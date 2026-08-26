@@ -11,3 +11,6 @@ apps/desktop/src-tauri/gen/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# 비밀 정보 복호화 마스터 키(architecture-decisions.md §5). 절대 커밋하지 않는다.
+*.secret.key
