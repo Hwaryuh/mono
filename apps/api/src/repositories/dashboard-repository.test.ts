@@ -5,6 +5,7 @@ import { inboxItems } from "../db/schema.ts";
 import { buildServer } from "../server.ts";
 import type { CaptureAnalysisProvider } from "./capture-analysis-provider.ts";
 import { SqliteDashboardRepository } from "./dashboard-repository.ts";
+import { SqliteInboxRepository } from "./inbox-repository.ts";
 import { SqliteLedgerRepository } from "./ledger-repository.ts";
 import { SqliteRoutineRepository } from "./routine-repository.ts";
 import { SqliteTodoRepository } from "./todo-repository.ts";
@@ -61,6 +62,25 @@ describe("SqliteDashboardRepository", () => {
     await repo.capture({ raw: "테스트 캡처" });
     const snapshot = await repo.getSnapshot();
     expect(snapshot.pendingCaptureCount).toBe(0); // failed는 pending·processing이 아니다
+  });
+
+  // 회귀: catch(() => null)이 provider가 던진 실제 원인을 버리고 "Gemini 분석에 실패했습니다"로
+  // 항상 고정 표시했다 - OpenAI를 써도 Gemini 탓을 했다. 실제 에러 메시지가 그대로 보존돼야 한다.
+  it("분석 실패 시 provider가 던진 실제 원인을 수집함 필드에 남긴다", async () => {
+    const failingProvider: CaptureAnalysisProvider = {
+      analyze: async () => {
+        throw new Error("OpenAI API 요청 실패(401): invalid api key");
+      },
+    };
+    const repoWithFailingProvider = new SqliteDashboardRepository(db, failingProvider);
+
+    await repoWithFailingProvider.capture({ raw: "테스트 캡처" });
+
+    const inboxSnapshot = await new SqliteInboxRepository(db).getSnapshot();
+    expect(inboxSnapshot.items[0]).toMatchObject({ status: "failed" });
+    expect(inboxSnapshot.items[0].fields).toEqual([
+      { label: "원인", value: "OpenAI API 요청 실패(401): invalid api key" },
+    ]);
   });
 
   it("toggleTask가 루틴 occurrence와 일반 할 일을 모두 처리한다", async () => {

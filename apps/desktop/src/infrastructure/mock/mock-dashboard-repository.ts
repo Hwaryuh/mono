@@ -119,19 +119,24 @@ class MockDashboardRepository implements DashboardRepository {
     const videos = parsed.videos ?? [];
     const hasVideo = videos.length > 0;
     const raw = parsed.raw || (hasVideo ? videos[0].name : `사진 ${images.length}장`);
-    let analysis: Awaited<ReturnType<CaptureAnalysisProvider["analyze"]>> | null;
-    try {
-      analysis = hasVideo ? {
-          target: "scrap" as const,
-          confidence: 1,
-          fields: [
-            { label: "제목", value: raw },
-            { label: "메모", value: parsed.raw },
-            { label: "라벨", value: "수집" },
-          ],
-        } : await this.analysisProvider.analyze({ raw, images });
-    } catch {
-      analysis = null;
+    let analysis: Awaited<ReturnType<CaptureAnalysisProvider["analyze"]>> | null = null;
+    let analysisErrorMessage = "AI 분석에 실패했습니다. AI 설정과 네트워크를 확인하세요.";
+    if (hasVideo) {
+      analysis = {
+        target: "scrap",
+        confidence: 1,
+        fields: [
+          { label: "제목", value: raw },
+          { label: "메모", value: parsed.raw },
+          { label: "라벨", value: "수집" },
+        ],
+      };
+    } else {
+      try {
+        analysis = await this.analysisProvider.analyze({ raw, images });
+      } catch (cause) {
+        analysisErrorMessage = cause instanceof Error ? cause.message : String(cause);
+      }
     }
 
     if (analysis) {
@@ -150,7 +155,7 @@ class MockDashboardRepository implements DashboardRepository {
         status: analysis ? "pending" : "failed",
         pinned: hasVideo,
         receivedAt: "방금",
-        fields: analysis?.fields ?? [{ label: "분석", value: "Gemini 분석에 실패했습니다. AI 설정과 네트워크를 확인하세요." }],
+        fields: analysis?.fields ?? [{ label: "원인", value: analysisErrorMessage }],
         images: images.length > 0 ? images : undefined,
         videos: hasVideo ? videos : undefined,
       },

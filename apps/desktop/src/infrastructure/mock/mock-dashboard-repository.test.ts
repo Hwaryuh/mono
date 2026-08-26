@@ -59,6 +59,8 @@ describe("MockDashboardRepository", () => {
       confidence: 0,
       status: "failed",
     });
+    // 회귀: provider가 던진 실제 원인 대신 "Gemini 분석에 실패했습니다"로 항상 고정 표시했었다.
+    expect(state.inbox.items[0].fields).toEqual([{ label: "원인", value: "network" }]);
   });
 
   it("할 일 완료 상태를 바꾼다", async () => {
