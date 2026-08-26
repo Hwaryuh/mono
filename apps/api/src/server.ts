@@ -67,11 +67,3 @@ export function buildServer(db: Db = createDb()) {
   registerAiRoutes(app, secretStore, captureProviders);
   return app;
 }
-
-// node --experimental-strip-types src/server.ts 로 직접 실행할 때만 listen.
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("server.ts")) {
-  const port = Number(process.env.PORT ?? 4174);
-  buildServer().listen({ port, host: "127.0.0.1" })
-    .then((address) => console.log(`mono api listening on ${address}`))
-    .catch((error) => { console.error(error); process.exit(1); });
-}

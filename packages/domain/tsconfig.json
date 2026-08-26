@@ -3,6 +3,7 @@
     "composite": true,
     "declaration": true,
     "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,

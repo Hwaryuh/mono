@@ -11,7 +11,7 @@ export {
   koreanDateLabel,
   koreanMonthLabel,
   type WeekdayStyle,
-} from "./date";
+} from "./date.ts";
 
 export {
   hexToOklch,
@@ -20,4 +20,4 @@ export {
   parseOklchColor,
   relativeLuminanceOfColor,
   type OklchColor,
-} from "./color";
+} from "./color.ts";

@@ -13,7 +13,7 @@
     "typecheck": "tsc -b",
     "predesktop:dev": "npm run branding:sync",
     "desktop:dev": "npm run tauri --workspace @mono/desktop -- dev",
-    "predesktop:build": "npm run branding:sync",
+    "predesktop:build": "npm run branding:sync && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-api-sidecar.ps1",
     "desktop:build": "npm run tauri --workspace @mono/desktop -- build",
     "postdesktop:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/export-desktop-release.ps1"
   },

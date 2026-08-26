@@ -1,5 +1,7 @@
+mod api_sidecar;
 mod media_store;
 
+use api_sidecar::ApiSidecar;
 use media_store::SqliteMediaStore;
 use tauri::Manager;
 
@@ -45,7 +47,7 @@ fn gc_media(
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_directory = app
@@ -54,8 +56,16 @@ pub fn run() {
                 .map_err(|error| format!("앱 데이터 경로 확인 실패: {error}"))?;
             std::fs::create_dir_all(&data_directory)
                 .map_err(|error| format!("앱 데이터 디렉터리 생성 실패: {error}"))?;
+
             let store = SqliteMediaStore::open(&data_directory.join("mono.sqlite3"))?;
             app.manage(store);
+
+            let sidecar = ApiSidecar::spawn(
+                &data_directory.join("mono.sqlite"),
+                &data_directory.join("mono.secret.key"),
+            );
+            app.manage(sidecar);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -65,6 +75,14 @@ pub fn run() {
             orphan_media_stats,
             gc_media
         ])
-        .run(tauri::generate_context!())
-        .expect("Tauri 데스크톱 앱 실행 실패");
+        .build(tauri::generate_context!())
+        .expect("Tauri 데스크톱 앱 빌드 실패");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            if let Some(sidecar) = app_handle.try_state::<ApiSidecar>() {
+                sidecar.shutdown();
+            }
+        }
+    });
 }
