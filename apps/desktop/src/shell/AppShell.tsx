@@ -3,11 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import type { DashboardRepository } from "../features/dashboard/dashboard-repository";
-import { dashboardQueryKey, QuickCapture } from "../features/dashboard/QuickCapture";
+import { dashboardQueryKey, formatMediaSize, QuickCapture } from "../features/dashboard/QuickCapture";
 import type { InboxRepository } from "../features/inbox/inbox-repository";
 import type { TodoRepository } from "../features/todo/todo-repository";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
+import type { ScrapRepository } from "../features/scrap/scrap-repository";
+import { useMediaStore } from "../infrastructure/media/media-store-context";
+import { referencedMediaIds } from "../infrastructure/media/referenced-media-ids";
 import { useNavigate } from "react-router";
 import { currentIsoDate, koreanDateLabel, koreanMonthLabel } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
@@ -22,7 +25,7 @@ type NavigationItem = {
 };
 
 type Theme = "light" | "dark";
-type SettingsSectionId = "appearance" | "ai" | "accessibility" | "about";
+type SettingsSectionId = "appearance" | "ai" | "accessibility" | "storage" | "about";
 
 interface SettingsSectionDefinition {
   id: SettingsSectionId;
@@ -34,6 +37,7 @@ const settingsSections: SettingsSectionDefinition[] = [
   { id: "appearance", label: "화면", icon: "sun" },
   { id: "ai", label: "AI", icon: "sparkles" },
   { id: "accessibility", label: "접근성", icon: "todo" },
+  { id: "storage", label: "저장공간", icon: "layers" },
   { id: "about", label: "정보", icon: "note" },
 ];
 
@@ -50,7 +54,7 @@ const routeMeta: Record<string, { title: string; subtitle: string; icon: IconNam
   "/ledger": { title: "가계부", subtitle: "", icon: "wallet", action: "지출 추가" },
 };
 
-export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository }: { aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository }) {
+export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository }: { aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository; scrapRepository: ScrapRepository }) {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
@@ -237,12 +241,14 @@ export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRe
       <SettingsModal
         accentColor={accentColor}
         aiSettingsStore={aiSettingsStore}
+        inboxRepository={inboxRepository}
         onClose={() => setSettingsOpen(false)}
         onAccentColorChange={setAccentColor}
         onReducedMotionChange={setReducedMotion}
         onThemeChange={setTheme}
         open={settingsOpen}
         reducedMotion={reducedMotion}
+        scrapRepository={scrapRepository}
         theme={theme}
       />
       <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
@@ -253,7 +259,7 @@ export function AppShell({ aiSettingsStore = defaultAiSettingsStore, dashboardRe
   );
 }
 
-function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, reducedMotion, onReducedMotionChange, aiSettingsStore }: {
+function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, reducedMotion, onReducedMotionChange, aiSettingsStore, inboxRepository, scrapRepository }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
@@ -263,6 +269,8 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
   reducedMotion: boolean;
   onReducedMotionChange: (reducedMotion: boolean) => void;
   aiSettingsStore: AiSettingsStore;
+  inboxRepository: InboxRepository;
+  scrapRepository: ScrapRepository;
 }) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance");
   return (
@@ -325,6 +333,10 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
 
           {activeSection === "ai" && <AiSettingsPanel store={aiSettingsStore} />}
 
+          {activeSection === "storage" && (
+            <StorageSettingsPanel inboxRepository={inboxRepository} scrapRepository={scrapRepository} />
+          )}
+
           {activeSection === "about" && (
             <>
               <SettingsHeading description="현재 설치된 앱과 데이터 처리 정보를 확인합니다." title="정보" />
@@ -338,6 +350,80 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
         </section>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * 미사용 미디어 정리. 사진·영상 바이트는 이 PC에만 있고 참조는 서버에만 있어서, 참조 목록을
+ * 못 받은 채로 지우면 살아 있는 미디어가 날아간다. 그래서 자동 실행 대신 수동 2단계로 둔다.
+ * 1) 확인: 서버 참조 목록을 받아 삭제 대상 개수·용량만 계산한다(지우지 않는다).
+ * 2) 정리: 참조 목록을 다시 받아 그 기준으로 지운다 — 확인 이후 추가된 미디어를 지우지 않으려고.
+ * 어느 단계든 스냅샷 조회가 실패하면 던져서 삭제까지 가지 않는다.
+ */
+function StorageSettingsPanel({ inboxRepository, scrapRepository }: {
+  inboxRepository: InboxRepository;
+  scrapRepository: ScrapRepository;
+}) {
+  const mediaStore = useMediaStore();
+  const [usage, setUsage] = useState<{ count: number; bytes: number } | null>(null);
+  const [pending, setPending] = useState<"scan" | "clean" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(action: "scan" | "clean", operation: () => Promise<void>) {
+    setPending(action);
+    setMessage(null);
+    setError(null);
+    try {
+      await operation();
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <>
+      <SettingsHeading description="이 기기에 남은 사진·영상 파일을 관리합니다." title="저장공간" />
+      <section aria-label="미사용 미디어 정리" className="settings-group settings-ai">
+        <header>
+          <strong>미사용 미디어</strong>
+          <span>수집함과 스크랩 어느 항목도 참조하지 않는 사진·영상입니다. 항목을 지워도 파일은 남아 있습니다.</span>
+        </header>
+        <div className="settings-ai__status">
+          <span>정리 대상</span>
+          <strong>
+            {usage === null ? "확인 필요" : usage.count === 0 ? "없음" : `${usage.count}개 · ${formatMediaSize(usage.bytes)}`}
+          </strong>
+          <Button loading={pending === "scan"} onClick={() => void run("scan", async () => {
+            const keepIds = await referencedMediaIds(inboxRepository, scrapRepository);
+            const scanned = await mediaStore.orphanUsage(keepIds);
+            setUsage(scanned);
+            if (scanned.count === 0) setMessage("정리할 미디어가 없습니다.");
+          })} type="button">확인</Button>
+          <Button
+            disabled={!usage || usage.count === 0}
+            loading={pending === "clean"}
+            onClick={() => void run("clean", async () => {
+              const keepIds = await referencedMediaIds(inboxRepository, scrapRepository);
+              const deleted = await mediaStore.gc(keepIds);
+              setUsage({ count: 0, bytes: 0 });
+              setMessage(`미디어 ${deleted}개를 삭제했습니다.`);
+            })}
+            type="button"
+            variant="danger"
+          >
+            정리
+          </Button>
+        </div>
+        {message && <p className="settings-ai__message" role="status">{message}</p>}
+        {error && <p className="settings-ai__error" role="alert">{error}</p>}
+        <p className="settings-ai__notice-text">
+          삭제한 파일은 되돌릴 수 없습니다. API 서버에 연결하지 못하면 참조 목록을 확인할 수 없어 아무것도 지우지 않습니다.
+        </p>
+      </section>
+    </>
   );
 }
 

@@ -21,7 +21,7 @@ export function createAppRouter(dashboardRepository: DashboardRepository, inboxR
   return createHashRouter([
     {
       path: "/",
-      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} routineRepository={routineRepository} todoRepository={todoRepository} />,
+      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} routineRepository={routineRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} />,
       errorElement: <RouteErrorScreen />,
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },

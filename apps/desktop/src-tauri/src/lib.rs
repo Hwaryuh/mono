@@ -29,6 +29,14 @@ fn delete_media(store: tauri::State<'_, SqliteMediaStore>, id: String) -> Result
 }
 
 #[tauri::command]
+fn orphan_media_stats(
+    store: tauri::State<'_, SqliteMediaStore>,
+    keep_ids: Vec<String>,
+) -> Result<(i64, i64), String> {
+    store.orphan_media_stats(&keep_ids)
+}
+
+#[tauri::command]
 fn gc_media(
     store: tauri::State<'_, SqliteMediaStore>,
     keep_ids: Vec<String>,
@@ -54,6 +62,7 @@ pub fn run() {
             save_media,
             load_media,
             delete_media,
+            orphan_media_stats,
             gc_media
         ])
         .run(tauri::generate_context!())

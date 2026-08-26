@@ -68,26 +68,46 @@ impl SqliteMediaStore {
         Ok(())
     }
 
+    /// 정리 대상 미디어의 (개수, 총 바이트). 지우지 않는다 — 설정 화면 미리보기용이다.
+    pub fn orphan_media_stats(&self, keep_ids: &[String]) -> Result<(i64, i64), String> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| "SQLite 저장소 잠금이 손상되었습니다.".to_owned())?;
+        let sql = format!(
+            "SELECT COUNT(*), COALESCE(SUM(LENGTH(data_url)), 0) FROM media{}",
+            orphan_filter(keep_ids.len())
+        );
+        connection
+            .query_row(&sql, rusqlite::params_from_iter(keep_ids), |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .map_err(|error| format!("SQLite 미디어 통계 조회 실패: {error}"))
+    }
+
     /// 어떤 항목도 참조하지 않는 미디어를 지운다. keep_ids에 없는 행은 전부 삭제하고 삭제된 개수를 반환한다.
     pub fn gc_media(&self, keep_ids: &[String]) -> Result<usize, String> {
         let connection = self
             .connection
             .lock()
             .map_err(|_| "SQLite 저장소 잠금이 손상되었습니다.".to_owned())?;
-        if keep_ids.is_empty() {
-            return connection
-                .execute("DELETE FROM media", [])
-                .map_err(|error| format!("SQLite 미디어 GC 실패: {error}"));
-        }
-        let placeholders = std::iter::repeat("?")
-            .take(keep_ids.len())
-            .collect::<Vec<_>>()
-            .join(",");
-        let sql = format!("DELETE FROM media WHERE id NOT IN ({placeholders})");
+        let sql = format!("DELETE FROM media{}", orphan_filter(keep_ids.len()));
         connection
             .execute(&sql, rusqlite::params_from_iter(keep_ids))
             .map_err(|error| format!("SQLite 미디어 GC 실패: {error}"))
     }
+}
+
+/// keep_ids에 없는 행만 고르는 WHERE 절. 빈 목록이면 전체가 대상이라 절 자체가 없다.
+fn orphan_filter(keep_count: usize) -> String {
+    if keep_count == 0 {
+        return String::new();
+    }
+    let placeholders = std::iter::repeat("?")
+        .take(keep_count)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(" WHERE id NOT IN ({placeholders})")
 }
 
 // 마이그레이션은 append-only다. 1번이 만드는 platform_state 테이블은 더 이상 쓰지 않지만
@@ -182,6 +202,35 @@ mod tests {
 
         store.delete_media("m-1").expect("미디어 삭제");
         assert_eq!(store.load_media("m-1").expect("삭제 후 읽기"), None);
+    }
+
+    #[test]
+    fn orphan_media_stats_counts_without_deleting() {
+        let directory = tempdir().expect("임시 디렉터리 생성");
+        let store = SqliteMediaStore::open(&directory.path().join("mono.sqlite3"))
+            .expect("SQLite 저장소 생성");
+        store.save_media("keep", "1234").expect("저장");
+        store.save_media("orphan-1", "12345").expect("저장");
+        store.save_media("orphan-2", "123").expect("저장");
+
+        let (count, bytes) = store
+            .orphan_media_stats(&["keep".to_owned()])
+            .expect("통계 조회");
+
+        assert_eq!(count, 2);
+        assert_eq!(bytes, 8);
+        // 조회는 아무것도 지우지 않는다.
+        assert!(store.load_media("orphan-1").expect("읽기").is_some());
+    }
+
+    #[test]
+    fn orphan_media_stats_with_empty_keep_list_counts_everything() {
+        let directory = tempdir().expect("임시 디렉터리 생성");
+        let store = SqliteMediaStore::open(&directory.path().join("mono.sqlite3"))
+            .expect("SQLite 저장소 생성");
+        store.save_media("a", "1234").expect("저장");
+
+        assert_eq!(store.orphan_media_stats(&[]).expect("통계 조회"), (1, 4));
     }
 
     #[test]
