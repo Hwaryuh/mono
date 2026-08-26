@@ -52,9 +52,10 @@ export function buildServer(db: Db = createDb()) {
   });
 
   const secretStore = new SqliteSecretStore(db);
-  const geminiProvider = new GeminiCaptureAnalysisProvider(() => secretStore.getGeminiApiKey());
-  const openaiProvider = new OpenAiCaptureAnalysisProvider(() => secretStore.getOpenaiApiKey());
-  const analysisProvider = new SelectableCaptureAnalysisProvider(secretStore, { gemini: geminiProvider, openai: openaiProvider });
+  const geminiProvider = new GeminiCaptureAnalysisProvider(() => secretStore.getApiKey("gemini"));
+  const openaiProvider = new OpenAiCaptureAnalysisProvider(() => secretStore.getApiKey("openai"));
+  const captureProviders = { gemini: geminiProvider, openai: openaiProvider };
+  const analysisProvider = new SelectableCaptureAnalysisProvider(secretStore, captureProviders);
 
   registerTodoRoutes(app, new SqliteTodoRepository(db));
   registerLedgerRoutes(app, new SqliteLedgerRepository(db));
@@ -63,7 +64,7 @@ export function buildServer(db: Db = createDb()) {
   registerScrapRoutes(app, new SqliteScrapRepository(db));
   registerInboxRoutes(app, new SqliteInboxRepository(db));
   registerDashboardRoutes(app, new SqliteDashboardRepository(db, analysisProvider));
-  registerAiRoutes(app, secretStore, geminiProvider, openaiProvider);
+  registerAiRoutes(app, secretStore, captureProviders);
   return app;
 }
 

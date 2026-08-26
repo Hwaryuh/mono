@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDb, type Db } from "../db/client.ts";
+import { AI_PROVIDER_IDS, type AiProviderId } from "../repositories/secret-store.ts";
 import { buildServer } from "../server.ts";
 
 function freshDb(): Db {
   return createDb(":memory:");
 }
 
-describe("ai routes", () => {
+describe.each(AI_PROVIDER_IDS)("ai routes(%s)", (provider: AiProviderId) => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -15,24 +16,24 @@ describe("ai routes", () => {
     const app = buildServer(freshDb());
     await app.ready();
 
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/gemini-key" })).body)).toEqual({ hasKey: false });
+    expect(JSON.parse((await app.inject({ method: "GET", url: `/ai/keys/${provider}` })).body)).toEqual({ hasKey: false });
 
-    const set = await app.inject({ method: "POST", url: "/ai/gemini-key", payload: { apiKey: "gk-test" } });
+    const set = await app.inject({ method: "POST", url: `/ai/keys/${provider}`, payload: { apiKey: "test-key" } });
     expect(set.statusCode).toBe(201);
 
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/gemini-key" })).body)).toEqual({ hasKey: true });
+    expect(JSON.parse((await app.inject({ method: "GET", url: `/ai/keys/${provider}` })).body)).toEqual({ hasKey: true });
 
-    const del = await app.inject({ method: "DELETE", url: "/ai/gemini-key" });
+    const del = await app.inject({ method: "DELETE", url: `/ai/keys/${provider}` });
     expect(del.statusCode).toBe(200);
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/gemini-key" })).body)).toEqual({ hasKey: false });
+    expect(JSON.parse((await app.inject({ method: "GET", url: `/ai/keys/${provider}` })).body)).toEqual({ hasKey: false });
 
     await app.close();
   });
 
-  it("빈 키 설정은 422/400으로 거부한다", async () => {
+  it("빈 키 설정은 400으로 거부한다", async () => {
     const app = buildServer(freshDb());
     await app.ready();
-    const response = await app.inject({ method: "POST", url: "/ai/gemini-key", payload: { apiKey: "  " } });
+    const response = await app.inject({ method: "POST", url: `/ai/keys/${provider}`, payload: { apiKey: "  " } });
     expect(response.statusCode).toBe(400);
     await app.close();
   });
@@ -40,9 +41,9 @@ describe("ai routes", () => {
   it("키 없이 test 호출하면 명확한 에러를 준다", async () => {
     const app = buildServer(freshDb());
     await app.ready();
-    const response = await app.inject({ method: "POST", url: "/ai/gemini-key/test" });
+    const response = await app.inject({ method: "POST", url: `/ai/keys/${provider}/test` });
     expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body).error).toContain("Gemini API 키가 설정되지 않았습니다.");
+    expect(JSON.parse(response.body).error).toContain("API 키가 설정되지 않았습니다.");
     await app.close();
   });
 
@@ -52,28 +53,21 @@ describe("ai routes", () => {
     const app = buildServer(freshDb());
     await app.ready();
 
-    await app.inject({ method: "POST", url: "/ai/gemini-key", payload: { apiKey: "gk-test" } });
-    const response = await app.inject({ method: "POST", url: "/ai/gemini-key/test" });
+    await app.inject({ method: "POST", url: `/ai/keys/${provider}`, payload: { apiKey: "test-key" } });
+    const response = await app.inject({ method: "POST", url: `/ai/keys/${provider}/test` });
 
     expect(response.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalled();
     await app.close();
   });
+});
 
-  it("OpenAI 키도 같은 방식으로 설정·조회·삭제한다", async () => {
+describe("ai routes", () => {
+  it("알 수 없는 provider의 키 경로는 거부한다", async () => {
     const app = buildServer(freshDb());
     await app.ready();
-
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: false });
-
-    const set = await app.inject({ method: "POST", url: "/ai/openai-key", payload: { apiKey: "sk-test" } });
-    expect(set.statusCode).toBe(201);
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: true });
-
-    const del = await app.inject({ method: "DELETE", url: "/ai/openai-key" });
-    expect(del.statusCode).toBe(200);
-    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: false });
-
+    const response = await app.inject({ method: "GET", url: "/ai/keys/claude" });
+    expect(response.statusCode).toBe(400);
     await app.close();
   });
 

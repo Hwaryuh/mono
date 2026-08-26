@@ -3,11 +3,21 @@ import type { Db } from "../db/client.ts";
 import { secrets } from "../db/schema.ts";
 import { SecretCrypto } from "../security/secret-crypto.ts";
 
-const GEMINI_KEY = "gemini_api_key";
-const OPENAI_KEY = "openai_api_key";
 const ACTIVE_PROVIDER_KEY = "active_ai_provider";
 
 export type AiProviderId = "gemini" | "openai";
+
+export const AI_PROVIDER_IDS = ["gemini", "openai"] as const satisfies readonly AiProviderId[];
+
+const PROVIDER_STORAGE_KEY: Record<AiProviderId, string> = {
+  gemini: "gemini_api_key",
+  openai: "openai_api_key",
+};
+
+const PROVIDER_LABEL: Record<AiProviderId, string> = {
+  gemini: "Gemini",
+  openai: "OpenAI",
+};
 
 export class SqliteSecretStore {
   private readonly db: Db;
@@ -18,36 +28,21 @@ export class SqliteSecretStore {
     this.crypto = crypto;
   }
 
-  hasGeminiApiKey(): boolean {
-    return this.hasKey(GEMINI_KEY);
+  hasApiKey(provider: AiProviderId): boolean {
+    return this.hasKey(PROVIDER_STORAGE_KEY[provider]);
   }
 
-  getGeminiApiKey(): string | null {
-    return this.getKey(GEMINI_KEY);
+  getApiKey(provider: AiProviderId): string | null {
+    return this.getKey(PROVIDER_STORAGE_KEY[provider]);
   }
 
-  setGeminiApiKey(apiKey: string): void {
-    this.setKey(GEMINI_KEY, apiKey, "Gemini API 키를 입력해야 합니다.");
+  setApiKey(provider: AiProviderId, apiKey: string): void {
+    if (!apiKey.trim()) throw new Error(`${PROVIDER_LABEL[provider]} API 키를 입력해야 합니다.`);
+    this.setKey(PROVIDER_STORAGE_KEY[provider], apiKey);
   }
 
-  deleteGeminiApiKey(): void {
-    this.deleteKey(GEMINI_KEY);
-  }
-
-  hasOpenaiApiKey(): boolean {
-    return this.hasKey(OPENAI_KEY);
-  }
-
-  getOpenaiApiKey(): string | null {
-    return this.getKey(OPENAI_KEY);
-  }
-
-  setOpenaiApiKey(apiKey: string): void {
-    this.setKey(OPENAI_KEY, apiKey, "OpenAI API 키를 입력해야 합니다.");
-  }
-
-  deleteOpenaiApiKey(): void {
-    this.deleteKey(OPENAI_KEY);
+  deleteApiKey(provider: AiProviderId): void {
+    this.deleteKey(PROVIDER_STORAGE_KEY[provider]);
   }
 
   getActiveProvider(): AiProviderId {
@@ -70,8 +65,7 @@ export class SqliteSecretStore {
     return row ? this.crypto.decrypt(row.value) : null;
   }
 
-  private setKey(key: string, apiKey: string, emptyMessage: string): void {
-    if (!apiKey.trim()) throw new Error(emptyMessage);
+  private setKey(key: string, apiKey: string): void {
     const value = this.crypto.encrypt(apiKey);
     this.db.insert(secrets).values({ key, value })
       .onConflictDoUpdate({ target: secrets.key, set: { value } })

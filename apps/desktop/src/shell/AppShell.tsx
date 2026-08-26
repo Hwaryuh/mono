@@ -493,31 +493,14 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
         {providerError && <p className="settings-ai__error" role="alert">{providerError}</p>}
       </section>
 
-      <ApiKeySection
-        deleteKey={() => store.deleteGeminiApiKey()}
-        hasKey={() => store.hasGeminiApiKey()}
-        provider="gemini"
-        setKey={(apiKey) => store.setGeminiApiKey(apiKey)}
-        testConnection={() => store.testGeminiConnection()}
-      />
-      <ApiKeySection
-        deleteKey={() => store.deleteOpenaiApiKey()}
-        hasKey={() => store.hasOpenaiApiKey()}
-        provider="openai"
-        setKey={(apiKey) => store.setOpenaiApiKey(apiKey)}
-        testConnection={() => store.testOpenaiConnection()}
-      />
+      {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
+        <ApiKeySection key={provider} provider={provider} store={store} />
+      ))}
     </>
   );
 }
 
-function ApiKeySection({ provider, hasKey: checkHasKey, setKey, deleteKey, testConnection }: {
-  provider: AiProviderId;
-  hasKey: () => Promise<boolean>;
-  setKey: (apiKey: string) => Promise<void>;
-  deleteKey: () => Promise<void>;
-  testConnection: () => Promise<void>;
-}) {
+function ApiKeySection({ provider, store }: { provider: AiProviderId; store: AiSettingsStore }) {
   const meta = providerMeta[provider];
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -527,11 +510,11 @@ function ApiKeySection({ provider, hasKey: checkHasKey, setKey, deleteKey, testC
 
   useEffect(() => {
     let active = true;
-    checkHasKey()
+    store.hasApiKey(provider)
       .then((configured) => { if (active) setHasKey(configured); })
       .catch((cause: unknown) => { if (active) setError(messageOf(cause)); });
     return () => { active = false; };
-  }, [checkHasKey]);
+  }, [provider, store]);
 
   async function run(action: "save" | "test" | "delete", operation: () => Promise<void>) {
     setPending(action);
@@ -555,7 +538,7 @@ function ApiKeySection({ provider, hasKey: checkHasKey, setKey, deleteKey, testC
       <form onSubmit={(event) => {
         event.preventDefault();
         void run("save", async () => {
-          await setKey(apiKey);
+          await store.setApiKey(provider, apiKey);
           setApiKey("");
           setHasKey(true);
           setMessage("API 키를 저장했습니다.");
@@ -575,11 +558,11 @@ function ApiKeySection({ provider, hasKey: checkHasKey, setKey, deleteKey, testC
         <span>상태</span>
         <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
         <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
-          await testConnection();
+          await store.testConnection(provider);
           setMessage(`${meta.label} 연결에 성공했습니다.`);
         })} type="button">연결 테스트</Button>
         <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
-          await deleteKey();
+          await store.deleteApiKey(provider);
           setHasKey(false);
           setMessage("API 키를 삭제했습니다.");
         })} type="button">삭제</Button>

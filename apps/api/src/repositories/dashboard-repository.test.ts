@@ -156,7 +156,7 @@ describe("Gemini 캡처 분류 연동(HTTP)", () => {
 
     const app = buildServer(freshDb());
     await app.ready();
-    await app.inject({ method: "POST", url: "/ai/gemini-key", payload: { apiKey: "gk-test" } });
+    await app.inject({ method: "POST", url: "/ai/keys/gemini", payload: { apiKey: "gk-test" } });
 
     await app.inject({ method: "POST", url: "/dashboard/capture", payload: { raw: "기획안 검토하기" } });
     const snapshot = JSON.parse((await app.inject({ method: "GET", url: "/inbox/snapshot" })).body);

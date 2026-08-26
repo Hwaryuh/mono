@@ -1,55 +1,40 @@
 export type AiProviderId = "gemini" | "openai";
 
+export const AI_PROVIDER_IDS = ["gemini", "openai"] as const satisfies readonly AiProviderId[];
+
 export interface AiSettingsStore {
-  hasGeminiApiKey(): Promise<boolean>;
-  setGeminiApiKey(apiKey: string): Promise<void>;
-  deleteGeminiApiKey(): Promise<void>;
-  testGeminiConnection(): Promise<void>;
-  hasOpenaiApiKey(): Promise<boolean>;
-  setOpenaiApiKey(apiKey: string): Promise<void>;
-  deleteOpenaiApiKey(): Promise<void>;
-  testOpenaiConnection(): Promise<void>;
+  hasApiKey(provider: AiProviderId): Promise<boolean>;
+  setApiKey(provider: AiProviderId, apiKey: string): Promise<void>;
+  deleteApiKey(provider: AiProviderId): Promise<void>;
+  testConnection(provider: AiProviderId): Promise<void>;
   getActiveProvider(): Promise<AiProviderId>;
   setActiveProvider(provider: AiProviderId): Promise<void>;
 }
 
+const PROVIDER_LABEL: Record<AiProviderId, string> = {
+  gemini: "Gemini",
+  openai: "OpenAI",
+};
+
 export class InMemoryAiSettingsStore implements AiSettingsStore {
-  private geminiKey: string | null = null;
-  private openaiKey: string | null = null;
+  private keys: Record<AiProviderId, string | null> = { gemini: null, openai: null };
   private activeProvider: AiProviderId = "gemini";
 
-  async hasGeminiApiKey(): Promise<boolean> {
-    return this.geminiKey !== null;
+  async hasApiKey(provider: AiProviderId): Promise<boolean> {
+    return this.keys[provider] !== null;
   }
 
-  async setGeminiApiKey(apiKey: string): Promise<void> {
-    if (!apiKey.trim()) throw new Error("Gemini API 키를 입력해야 합니다.");
-    this.geminiKey = apiKey;
+  async setApiKey(provider: AiProviderId, apiKey: string): Promise<void> {
+    if (!apiKey.trim()) throw new Error(`${PROVIDER_LABEL[provider]} API 키를 입력해야 합니다.`);
+    this.keys[provider] = apiKey;
   }
 
-  async deleteGeminiApiKey(): Promise<void> {
-    this.geminiKey = null;
+  async deleteApiKey(provider: AiProviderId): Promise<void> {
+    this.keys[provider] = null;
   }
 
-  async testGeminiConnection(): Promise<void> {
-    if (this.geminiKey === null) throw new Error("Gemini API 키가 설정되지 않았습니다.");
-  }
-
-  async hasOpenaiApiKey(): Promise<boolean> {
-    return this.openaiKey !== null;
-  }
-
-  async setOpenaiApiKey(apiKey: string): Promise<void> {
-    if (!apiKey.trim()) throw new Error("OpenAI API 키를 입력해야 합니다.");
-    this.openaiKey = apiKey;
-  }
-
-  async deleteOpenaiApiKey(): Promise<void> {
-    this.openaiKey = null;
-  }
-
-  async testOpenaiConnection(): Promise<void> {
-    if (this.openaiKey === null) throw new Error("OpenAI API 키가 설정되지 않았습니다.");
+  async testConnection(provider: AiProviderId): Promise<void> {
+    if (this.keys[provider] === null) throw new Error(`${PROVIDER_LABEL[provider]} API 키가 설정되지 않았습니다.`);
   }
 
   async getActiveProvider(): Promise<AiProviderId> {

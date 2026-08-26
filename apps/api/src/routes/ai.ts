@@ -1,56 +1,44 @@
 import type { FastifyInstance } from "fastify";
-import type { GeminiCaptureAnalysisProvider } from "../repositories/gemini-capture-analysis-provider.ts";
-import type { OpenAiCaptureAnalysisProvider } from "../repositories/openai-capture-analysis-provider.ts";
-import type { AiProviderId, SqliteSecretStore } from "../repositories/secret-store.ts";
+import { AI_PROVIDER_IDS, type AiProviderId, type SqliteSecretStore } from "../repositories/secret-store.ts";
+
+interface TestableCaptureAnalysisProvider {
+  testConnection(): Promise<void>;
+}
+
+function requireProviderId(value: unknown): AiProviderId {
+  if (typeof value === "string" && (AI_PROVIDER_IDS as readonly string[]).includes(value)) return value as AiProviderId;
+  throw new Error("알 수 없는 AI provider입니다.");
+}
 
 export function registerAiRoutes(
   app: FastifyInstance,
   secretStore: SqliteSecretStore,
-  geminiProvider: GeminiCaptureAnalysisProvider,
-  openaiProvider: OpenAiCaptureAnalysisProvider,
+  providers: Record<AiProviderId, TestableCaptureAnalysisProvider>,
 ) {
-  app.get("/ai/gemini-key", async () => ({ hasKey: secretStore.hasGeminiApiKey() }));
+  app.get<{ Params: { provider: string } }>("/ai/keys/:provider", async (request) => {
+    return { hasKey: secretStore.hasApiKey(requireProviderId(request.params.provider)) };
+  });
 
-  app.post("/ai/gemini-key", async (request, reply) => {
-    const { apiKey } = request.body as { apiKey: string };
-    secretStore.setGeminiApiKey(apiKey);
+  app.post<{ Params: { provider: string }; Body: { apiKey: string } }>("/ai/keys/:provider", async (request, reply) => {
+    secretStore.setApiKey(requireProviderId(request.params.provider), request.body.apiKey);
     return reply.code(201).send({ ok: true });
   });
 
-  app.delete("/ai/gemini-key", async () => {
-    secretStore.deleteGeminiApiKey();
+  app.delete<{ Params: { provider: string } }>("/ai/keys/:provider", async (request) => {
+    secretStore.deleteApiKey(requireProviderId(request.params.provider));
     return { ok: true };
   });
 
-  app.post("/ai/gemini-key/test", async () => {
-    await geminiProvider.testConnection();
-    return { ok: true };
-  });
-
-  app.get("/ai/openai-key", async () => ({ hasKey: secretStore.hasOpenaiApiKey() }));
-
-  app.post("/ai/openai-key", async (request, reply) => {
-    const { apiKey } = request.body as { apiKey: string };
-    secretStore.setOpenaiApiKey(apiKey);
-    return reply.code(201).send({ ok: true });
-  });
-
-  app.delete("/ai/openai-key", async () => {
-    secretStore.deleteOpenaiApiKey();
-    return { ok: true };
-  });
-
-  app.post("/ai/openai-key/test", async () => {
-    await openaiProvider.testConnection();
+  app.post<{ Params: { provider: string } }>("/ai/keys/:provider/test", async (request) => {
+    const provider = requireProviderId(request.params.provider);
+    await providers[provider].testConnection();
     return { ok: true };
   });
 
   app.get("/ai/provider", async () => ({ provider: secretStore.getActiveProvider() }));
 
-  app.post("/ai/provider", async (request) => {
-    const { provider } = request.body as { provider: AiProviderId };
-    if (provider !== "gemini" && provider !== "openai") throw new Error("알 수 없는 AI provider입니다.");
-    secretStore.setActiveProvider(provider);
+  app.post<{ Body: { provider: string } }>("/ai/provider", async (request) => {
+    secretStore.setActiveProvider(requireProviderId(request.body.provider));
     return { ok: true };
   });
 }
