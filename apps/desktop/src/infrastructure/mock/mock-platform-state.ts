@@ -43,34 +43,6 @@ export type MockPlatformState = {
   nextLedgerCategoryId: number;
 };
 
-/** 상태가 현재 참조 중인 mediaId 전부. 미디어 GC가 지우면 안 되는 목록이다. */
-export function referencedMediaIds(state: MockPlatformState): Set<string> {
-  const ids = new Set<string>();
-  for (const item of state.inbox.items) {
-    item.images?.forEach((image) => ids.add(image.mediaId));
-    item.videos?.forEach((video) => ids.add(video.mediaId));
-  }
-  for (const scrap of state.scrap.items) {
-    if (scrap.mediaId) ids.add(scrap.mediaId);
-  }
-  return ids;
-}
-
-function requireStateObject(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("저장된 플랫폼 상태가 객체가 아닙니다.");
-  }
-  return value as Record<string, unknown>;
-}
-
-function requireCounter(state: Record<string, unknown>, key: keyof MockPlatformState) {
-  const value = state[key];
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
-    throw new Error(`저장된 플랫폼 상태의 ${key} 값이 올바르지 않습니다.`);
-  }
-  return value;
-}
-
 function occurrence(routineId: string, occurrenceDate: string, done = true): RoutineOccurrence {
   return {
     id: `routine-occurrence:${routineId}:${occurrenceDate}`,
@@ -88,42 +60,6 @@ const dashboardStateSchema = dashboardSnapshotSchema.omit({
   scraps: true,
   monthlyExpense: true,
 });
-
-export function parseMockPlatformState(value: unknown): MockPlatformState {
-  const state = requireStateObject(value);
-  const todo = todoSnapshotSchema.parse(state.todo);
-  const routineValue = requireStateObject(state.routine);
-  const routine = routineSnapshotSchema.parse({
-    today: todo.today,
-    labels: todo.labels,
-    items: routineValue.items,
-    occurrences: routineValue.occurrences,
-  });
-
-  return {
-    stateVersion: STATE_VERSION,
-    dashboard: dashboardStateSchema.parse(state.dashboard),
-    inbox: inboxSnapshotSchema.parse(state.inbox),
-    ledger: ledgerSnapshotSchema.parse(state.ledger),
-    todo,
-    calendar: calendarSnapshotSchema.parse(state.calendar),
-    scrap: scrapSnapshotSchema.parse(state.scrap),
-    routine: {
-      items: routine.items,
-      occurrences: routine.occurrences,
-    },
-    nextCaptureId: requireCounter(state, "nextCaptureId"),
-    nextTodoId: requireCounter(state, "nextTodoId"),
-    nextTodoLabelId: requireCounter(state, "nextTodoLabelId"),
-    nextRoutineId: requireCounter(state, "nextRoutineId"),
-    nextCalendarId: requireCounter(state, "nextCalendarId"),
-    nextCalendarCategoryId: requireCounter(state, "nextCalendarCategoryId"),
-    nextScrapId: requireCounter(state, "nextScrapId"),
-    nextScrapCommentId: requireCounter(state, "nextScrapCommentId"),
-    nextLedgerId: requireCounter(state, "nextLedgerId"),
-    nextLedgerCategoryId: requireCounter(state, "nextLedgerCategoryId"),
-  };
-}
 
 function createDashboardState(): MockPlatformState["dashboard"] {
   return dashboardStateSchema.parse({

@@ -3,11 +3,11 @@ use std::{path::Path, sync::Mutex, time::Duration};
 
 const CURRENT_SCHEMA_VERSION: i64 = 2;
 
-pub struct SqlitePlatformStateStore {
+pub struct SqliteMediaStore {
     connection: Mutex<Connection>,
 }
 
-impl SqlitePlatformStateStore {
+impl SqliteMediaStore {
     pub fn open(path: &Path) -> Result<Self, String> {
         let mut connection = Connection::open(path)
             .map_err(|error| format!("SQLite 데이터베이스 열기 실패: {error}"))?;
@@ -22,44 +22,6 @@ impl SqlitePlatformStateStore {
         Ok(Self {
             connection: Mutex::new(connection),
         })
-    }
-
-    pub fn load(&self) -> Result<Option<String>, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "SQLite 저장소 잠금이 손상되었습니다.".to_owned())?;
-        connection
-            .query_row(
-                "SELECT payload FROM platform_state WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(|error| format!("SQLite 상태 읽기 실패: {error}"))
-    }
-
-    pub fn save(&self, payload: &str) -> Result<(), String> {
-        let mut connection = self
-            .connection
-            .lock()
-            .map_err(|_| "SQLite 저장소 잠금이 손상되었습니다.".to_owned())?;
-        let transaction = connection
-            .transaction()
-            .map_err(|error| format!("SQLite 저장 트랜잭션 시작 실패: {error}"))?;
-        transaction
-            .execute(
-                "INSERT INTO platform_state (id, payload, updated_at)
-                 VALUES (1, ?1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-                 ON CONFLICT(id) DO UPDATE SET
-                   payload = excluded.payload,
-                   updated_at = excluded.updated_at",
-                params![payload],
-            )
-            .map_err(|error| format!("SQLite 상태 저장 실패: {error}"))?;
-        transaction
-            .commit()
-            .map_err(|error| format!("SQLite 저장 커밋 실패: {error}"))
     }
 
     // ponytail: 미디어를 data URL(base64) TEXT로 저장한다. 상태 blob에서 분리하는 게 핵심.
@@ -106,7 +68,7 @@ impl SqlitePlatformStateStore {
         Ok(())
     }
 
-    /// 상태(state)가 더 이상 참조하지 않는 미디어를 지운다. keep_ids에 없는 행은 전부 삭제하고 삭제된 개수를 반환한다.
+    /// 어떤 항목도 참조하지 않는 미디어를 지운다. keep_ids에 없는 행은 전부 삭제하고 삭제된 개수를 반환한다.
     pub fn gc_media(&self, keep_ids: &[String]) -> Result<usize, String> {
         let connection = self
             .connection
@@ -128,6 +90,9 @@ impl SqlitePlatformStateStore {
     }
 }
 
+// 마이그레이션은 append-only다. 1번이 만드는 platform_state 테이블은 더 이상 쓰지 않지만
+// (상태 원본은 API 서버로 옮겼다 — architecture-decisions.md §9), 기존 설치본의 버전 사슬을
+// 끊지 않으려고 그대로 둔다. 정리하려면 3번 마이그레이션에서 DROP TABLE 한다.
 fn migrate(connection: &mut Connection) -> Result<(), String> {
     connection
         .execute_batch(
@@ -196,55 +161,13 @@ fn migrate(connection: &mut Connection) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::SqlitePlatformStateStore;
+    use super::SqliteMediaStore;
     use tempfile::tempdir;
-
-    #[test]
-    fn migrates_empty_database_and_starts_without_seed() {
-        let directory = tempdir().expect("임시 디렉터리 생성");
-        let store = SqlitePlatformStateStore::open(&directory.path().join("mono.sqlite3"))
-            .expect("SQLite 저장소 생성");
-
-        assert_eq!(store.load().expect("초기 상태 읽기"), None);
-    }
-
-    #[test]
-    fn saved_state_survives_store_reopen() {
-        let directory = tempdir().expect("임시 디렉터리 생성");
-        let path = directory.path().join("mono.sqlite3");
-        let payload = r#"{"inbox":{"items":[{"id":"inbox-restart"}]}}"#;
-
-        {
-            let store = SqlitePlatformStateStore::open(&path).expect("첫 저장소 열기");
-            store.save(payload).expect("상태 저장");
-        }
-
-        let reopened = SqlitePlatformStateStore::open(&path).expect("저장소 다시 열기");
-        assert_eq!(
-            reopened.load().expect("재실행 상태 읽기").as_deref(),
-            Some(payload)
-        );
-    }
-
-    #[test]
-    fn latest_save_replaces_single_source_state_atomically() {
-        let directory = tempdir().expect("임시 디렉터리 생성");
-        let store = SqlitePlatformStateStore::open(&directory.path().join("mono.sqlite3"))
-            .expect("SQLite 저장소 생성");
-
-        store.save(r#"{"revision":1}"#).expect("첫 상태 저장");
-        store.save(r#"{"revision":2}"#).expect("둘째 상태 저장");
-
-        assert_eq!(
-            store.load().expect("최신 상태 읽기").as_deref(),
-            Some(r#"{"revision":2}"#)
-        );
-    }
 
     #[test]
     fn media_round_trips_and_deletes() {
         let directory = tempdir().expect("임시 디렉터리 생성");
-        let store = SqlitePlatformStateStore::open(&directory.path().join("mono.sqlite3"))
+        let store = SqliteMediaStore::open(&directory.path().join("mono.sqlite3"))
             .expect("SQLite 저장소 생성");
 
         assert_eq!(store.load_media("m-1").expect("빈 미디어 읽기"), None);
@@ -264,7 +187,7 @@ mod tests {
     #[test]
     fn gc_media_removes_only_unreferenced_rows() {
         let directory = tempdir().expect("임시 디렉터리 생성");
-        let store = SqlitePlatformStateStore::open(&directory.path().join("mono.sqlite3"))
+        let store = SqliteMediaStore::open(&directory.path().join("mono.sqlite3"))
             .expect("SQLite 저장소 생성");
         store
             .save_media("keep", "data:image/png;base64,AAAA")
@@ -283,7 +206,7 @@ mod tests {
     #[test]
     fn gc_media_with_empty_keep_list_removes_everything() {
         let directory = tempdir().expect("임시 디렉터리 생성");
-        let store = SqlitePlatformStateStore::open(&directory.path().join("mono.sqlite3"))
+        let store = SqliteMediaStore::open(&directory.path().join("mono.sqlite3"))
             .expect("SQLite 저장소 생성");
         store
             .save_media("orphan-1", "data:image/png;base64,AAAA")
