@@ -4,8 +4,11 @@
 
 ## 개발 명령
 
+데스크톱 화면은 전부 API 서버에서 데이터를 가져온다 — 아래 둘을 각자 터미널에서 띄운다.
+
 ```powershell
 npm install
+npm run dev --workspace @mono/api    # 127.0.0.1:4174
 npm run desktop:dev
 ```
 
@@ -30,3 +33,4 @@ npm run desktop:build
 - [아키텍처 결정](.refs/architecture-decisions.md)
 - [PC 데스크톱 구현 인계](.refs/desktop-implementation-handoff.md)
 - [디자인 인계 안내](.designs/README.md)
+- [API 서버](apps/api/README.md)

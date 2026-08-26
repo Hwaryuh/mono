@@ -261,7 +261,7 @@
 - 수동 동기화만 필요하면 `npm run branding:sync`를 실행한다.
 - `app-icon.svg`와 `icons/icon.ico`를 직접 편집하지 않는다.
 
-## 현재 주요 경계
+## 현재 주요 경계 (2026-08-21 기준, 이후 상태는 아래 "이후 진행" 참고)
 
 ```text
 DashboardRepository
@@ -277,18 +277,28 @@ LedgerRepository
 - 서버나 영속 저장소를 React 컴포넌트에 직접 붙이지 않는다.
 - 화면 동작 하나를 감싸기 위한 서비스·인터페이스는 추가하지 않는다.
 
-## 다음 권장 작업
+## 다음 권장 작업 (2026-08-21 기준)
 
 PC 데스크톱의 수집함, 할 일, 루틴, 일정, 스크랩, 가계부와 Dashboard 연결은 완료됐다. 이후 작업도 현재 일곱 저장소 경계와 공유 상태 파생 규칙을 유지해야 한다.
 
 - 추가 화면 구현보다 현재 단일 원본·파생 snapshot 구조를 보존한다.
 - 서버·SQLite 전환 전에는 현재 mock 저장소 경계 밖에 영속화 코드를 넣지 않는다.
 
-## 이후 남은 범위
+## 이후 남은 범위 (2026-08-21 기준 — 서버·SQLite·AI는 이후 진행에서 완료됨)
 
 - 현재 명시된 PC 데스크톱 모듈 화면의 placeholder는 남아 있지 않다.
 - 서버, SQLite 영속화, 실제 AI 분류는 구현하지 않았다.
 - iOS와 모바일 웹은 현재 범위가 아니다.
+
+## 이후 진행 (2026-08-26~27)
+
+이 문서는 2026-08-21 시점 스냅샷이다. 그 이후 다음이 완료돼 위 세 섹션의 "서버·SQLite·AI 미구현", "일곱 경계는 메모리 mock" 서술은 더 이상 맞지 않는다. 자세한 경계별 현황은 [apps/api/README.md](../apps/api/README.md)를 원본으로 본다.
+
+- **서버·SQLite 영속화**: `apps/api`에 Fastify + Drizzle + better-sqlite3로 일곱 경계 전부 구현. 데스크톱은 mock 대신 이 API를 HTTP로 호출한다(`createHttpRepositories`). mock 저장소는 테스트 전용으로만 남았다.
+- **AI 캡처 분류**: Gemini·OpenAI 중 설정에서 고른 provider로 실제 분류. API 키는 서버에 AES-256-GCM 암호화 저장.
+- **패키징**: `release/mono-desktop.exe`가 API 서버를 Node 사이드카로 자체 번들해, 이 PC에 Node가 없어도 단독 실행된다(루트 README "패키징" 절).
+- **설정 화면**: AI provider 선택·API 키 관리, 저장공간(미사용 미디어 정리) 패널 추가.
+- 안 된 것: 파일 저장소(`FileStore`), 백업 정책, iOS. `.refs/architecture-decisions.md` §9 "아직 결정하지 않은 사항" 그대로 유효.
 
 ## 검증 명령
 
@@ -360,8 +370,8 @@ apps/desktop/src-tauri/tauri.conf.json
 
 ## 다음 세션 시작 기준
 
-- 먼저 이 문서와 `.refs/architecture-decisions.md`를 UTF-8로 읽는다.
-- 현재 코드와 18개 파일 87개 통과 테스트를 source of truth로 삼는다.
-- 수집함, 할 일, 루틴, 일정, 스크랩, 가계부, 공유 mock 상태, occurrence 연결을 재구현하거나 대규모 리팩터링하지 않는다.
+- 먼저 이 문서(특히 위 "이후 진행")와 `.refs/architecture-decisions.md`, `apps/api/README.md`를 UTF-8로 읽는다.
+- 테스트 파일·통과 개수는 이 문서가 아니라 `npm test` 실행 결과를 source of truth로 삼는다(여기 적힌 "18개 파일 87개"는 2026-08-21 desktop 전용 수치로 이미 낡았다 — 이후 서버 테스트가 추가됐고 desktop 쪽도 늘었다).
+- 수집함, 할 일, 루틴, 일정, 스크랩, 가계부, occurrence 연결을 재구현하거나 대규모 리팩터링하지 않는다. 공유 상태는 이제 mock이 아니라 API SQLite가 원본이다.
 - Dashboard의 `monthlyExpense`는 ledger 원본 상태에서 파생한다. 대시보드 전용 복제 상태를 다시 만들지 않는다.
 - 새 기능도 현재 저장소 경계와 단일 원본·파생 스냅샷 원칙을 유지한다.
