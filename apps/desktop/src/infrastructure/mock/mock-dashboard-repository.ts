@@ -133,7 +133,17 @@ class MockDashboardRepository implements DashboardRepository {
       };
     } else {
       try {
-        analysis = await this.analysisProvider.analyze({ raw, images });
+        analysis = await this.analysisProvider.analyze({
+          raw,
+          images,
+          context: {
+            today: this.state.todo.today,
+            todoLabels: this.state.todo.labels.map((label) => label.name),
+            calendarCategories: this.state.calendar.categories.map((category) => category.name),
+            ledgerCategories: this.state.ledger.categories.map((category) => category.name),
+            scrapTags: this.state.scrap.tags,
+          },
+        });
       } catch (cause) {
         analysisErrorMessage = cause instanceof Error ? cause.message : String(cause);
       }

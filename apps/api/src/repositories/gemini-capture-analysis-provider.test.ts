@@ -58,6 +58,23 @@ describe("GeminiCaptureAnalysisProvider", () => {
     expect(payload.contents[0].parts[1].inlineData).toEqual({ mimeType: "image/png", data: "AAAA" });
   });
 
+  it("context를 주면 유저 라벨 목록과 today를 systemInstruction에 주입한다", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, geminiBody({ target: "todo", confidence: 0.9, fields: [{ label: "제목", value: "x" }] })));
+    const provider = new GeminiCaptureAnalysisProvider(() => "gk-test");
+
+    await provider.analyze({
+      raw: "장보기",
+      images: [],
+      context: { today: "2026-08-27", todoLabels: ["집안일", "업무"], calendarCategories: ["약속"], ledgerCategories: ["식비"], scrapTags: ["요리"] },
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const systemPrompt = JSON.parse(init.body as string).systemInstruction.parts[0].text as string;
+    expect(systemPrompt).toContain("2026-08-27");
+    expect(systemPrompt).toContain("집안일, 업무");
+    expect(systemPrompt).toContain("식비");
+  });
+
   it("사진 총 용량이 18MB를 넘으면 요청 전에 거부한다", async () => {
     const provider = new GeminiCaptureAnalysisProvider(() => "gk-test");
     const huge = "A".repeat(19 * 1024 * 1024);

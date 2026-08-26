@@ -61,6 +61,23 @@ describe("OpenAiCaptureAnalysisProvider", () => {
     expect(userMessage.content[1]).toEqual({ type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } });
   });
 
+  it("context를 주면 유저 라벨 목록과 today를 시스템 프롬프트에 주입한다", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, chatCompletionBody({ target: "todo", confidence: 0.9, fields: [{ label: "제목", value: "x" }] })));
+    const provider = new OpenAiCaptureAnalysisProvider(() => "sk-test");
+
+    await provider.analyze({
+      raw: "장보기",
+      images: [],
+      context: { today: "2026-08-27", todoLabels: ["집안일", "업무"], calendarCategories: ["약속"], ledgerCategories: ["식비"], scrapTags: ["요리"] },
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const systemPrompt = JSON.parse(init.body as string).messages[0].content as string;
+    expect(systemPrompt).toContain("2026-08-27");
+    expect(systemPrompt).toContain("집안일, 업무");
+    expect(systemPrompt).toContain("식비");
+  });
+
   it("사진 총 용량이 18MB를 넘으면 요청 전에 거부한다", async () => {
     const provider = new OpenAiCaptureAnalysisProvider(() => "sk-test");
     const huge = "A".repeat(19 * 1024 * 1024);

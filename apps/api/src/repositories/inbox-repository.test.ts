@@ -51,6 +51,18 @@ describe("SqliteInboxRepository", () => {
     expect((await repo.getSnapshot()).items[0].status).toBe("approved");
   });
 
+  it("라벨명이 공백·대소문자만 달라도 유저 라벨로 매칭한다", async () => {
+    const todoRepo = new SqliteTodoRepository(db);
+    await todoRepo.createLabel({ name: "집안일", color: "#b03a55" });
+    await todoRepo.createLabel({ name: "업무", color: "#3a55b0" });
+    seedInboxRow(db, { fieldsJson: JSON.stringify([{ label: "제목", value: "장보기" }, { label: "라벨", value: " 집안 일 " }]) });
+
+    await repo.approve("inbox-1");
+    const snapshot = await todoRepo.getSnapshot();
+    const home = snapshot.labels.find((label) => label.name === "집안일")!;
+    expect(snapshot.items[0].labelId).toBe(home.id);
+  });
+
   it("매칭 라벨이 없으면 work 라벨로, work도 없으면 첫 라벨로 대체한다", async () => {
     const todoRepo = new SqliteTodoRepository(db);
     await todoRepo.createLabel({ name: "기타라벨", color: "#000000" });

@@ -3,7 +3,7 @@ import { captureInputSchema, dashboardSnapshotSchema, type CaptureInput, type Le
 import { currentIsoDate, koreanDateLabel } from "@mono/domain";
 import { desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.ts";
-import { dashboardCaptures, inboxItems, todoItems } from "../db/schema.ts";
+import { calendarCategories, dashboardCaptures, inboxItems, ledgerCategories, scrapTags, todoItems, todoLabels } from "../db/schema.ts";
 import { nullCaptureAnalysisProvider, type CaptureAnalysisProvider } from "./capture-analysis-provider.ts";
 import { SqliteCalendarRepository } from "./calendar-repository.ts";
 import { SqliteLedgerRepository } from "./ledger-repository.ts";
@@ -131,7 +131,7 @@ export class SqliteDashboardRepository {
       analysis = { target: "scrap", confidence: 1, fields: [{ label: "제목", value: raw }, { label: "메모", value: parsed.raw }, { label: "라벨", value: "수집" }] };
     } else {
       try {
-        analysis = await this.analysisProvider.analyze({ raw, images });
+        analysis = await this.analysisProvider.analyze({ raw, images, context: this.buildAnalysisContext() });
       } catch (cause) {
         analysisErrorMessage = cause instanceof Error ? cause.message : String(cause);
       }
@@ -157,6 +157,18 @@ export class SqliteDashboardRepository {
       imagesJson: images.length > 0 ? JSON.stringify(images.map(({ dataUrl: _dataUrl, ...meta }) => meta)) : null,
       videosJson: hasVideo ? JSON.stringify(videos) : null,
     }).run();
+  }
+
+  // AI가 라벨을 지어내지 않고 유저의 기존 목록에서 고르게 grounding 컨텍스트를 만든다.
+  // 이름 목록만 필요하므로 무거운 getSnapshot 대신 라벨/분류/태그 테이블을 직접 읽는다.
+  private buildAnalysisContext() {
+    return {
+      today: currentIsoDate(),
+      todoLabels: this.db.select({ name: todoLabels.name }).from(todoLabels).all().map((row) => row.name),
+      calendarCategories: this.db.select({ name: calendarCategories.name }).from(calendarCategories).all().map((row) => row.name),
+      ledgerCategories: this.db.select({ name: ledgerCategories.name }).from(ledgerCategories).all().map((row) => row.name),
+      scrapTags: this.db.select({ tag: scrapTags.tag }).from(scrapTags).all().map((row) => row.tag),
+    };
   }
 
   async toggleTask(taskId: string): Promise<void> {

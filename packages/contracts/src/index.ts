@@ -112,6 +112,18 @@ export const captureAnalysisResultSchema = z.object({
 
 export type CaptureAnalysisResult = z.infer<typeof captureAnalysisResultSchema>;
 
+// AI 분석에 주입하는 유저 데이터 컨텍스트. 모델이 라벨을 지어내지 않고 기존 목록에서 고르게,
+// 상대 날짜를 today 기준으로 환산하게 grounding한다. names만 실어 토큰을 아낀다.
+export const captureAnalysisContextSchema = z.object({
+  today: z.string(),
+  todoLabels: z.array(z.string()),
+  calendarCategories: z.array(z.string()),
+  ledgerCategories: z.array(z.string()),
+  scrapTags: z.array(z.string()),
+});
+
+export type CaptureAnalysisContext = z.infer<typeof captureAnalysisContextSchema>;
+
 export const inboxItemSchema = z.object({
   id: z.string(),
   source: z.enum(["text", "url", "image", "video"]),

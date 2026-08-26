@@ -1,4 +1,4 @@
-import type { CaptureAnalysisResult, CaptureImage } from "@mono/contracts";
+import type { CaptureAnalysisContext, CaptureAnalysisResult, CaptureImage } from "@mono/contracts";
 import type { CaptureAnalysisProvider } from "./capture-analysis-provider.ts";
 import type { AiProviderId, SqliteSecretStore } from "./secret-store.ts";
 
@@ -12,7 +12,7 @@ export class SelectableCaptureAnalysisProvider implements CaptureAnalysisProvide
     this.providers = providers;
   }
 
-  analyze(input: { raw: string; images: CaptureImage[] }): Promise<CaptureAnalysisResult> {
+  analyze(input: { raw: string; images: CaptureImage[]; context?: CaptureAnalysisContext }): Promise<CaptureAnalysisResult> {
     return this.providers[this.secretStore.getActiveProvider()].analyze(input);
   }
 }

@@ -31,6 +31,18 @@ function labelValue(fields: InboxField[]) {
   return fieldValue(fields, "라벨") || fieldValue(fields, "분류") || fieldValue(fields, "태그");
 }
 
+// AI가 골라준 라벨명을 유저 라벨과 대조할 때 공백·대소문자 차이는 무시한다. AI에 기존 목록을
+// 주입해도 "집안 일" vs "집안일" 같은 사소한 편차가 기본버킷 낙하를 유발하는 걸 막는다.
+function normalizeName(name: string): string {
+  return name.replace(/\s+/g, "").toLowerCase();
+}
+
+function findByName<T extends { name: string }>(candidates: T[], target: string): T | undefined {
+  if (target.trim().length === 0) return undefined;
+  const wanted = normalizeName(target);
+  return candidates.find((candidate) => normalizeName(candidate.name) === wanted);
+}
+
 type InboxRow = typeof inboxItems.$inferSelect;
 
 function toItem(row: InboxRow) {
@@ -115,7 +127,7 @@ export class SqliteInboxRepository {
   private approveToTodo(row: InboxRow, fields: InboxField[]) {
     const labelName = labelValue(fields);
     const labels = this.db.select().from(todoLabels).orderBy(asc(todoLabels.orderIndex)).all();
-    const label = labels.find((candidate) => candidate.name === labelName) ?? labels.find((candidate) => candidate.id === "work") ?? labels[0];
+    const label = findByName(labels, labelName) ?? labels.find((candidate) => candidate.id === "work") ?? labels[0];
     if (!label) throw new Error("할 일 라벨이 없어 승인할 수 없습니다. 먼저 라벨을 만드세요.");
     const due = fieldValue(fields, "마감");
     const dateMatch = due.match(/\d{4}-\d{2}-\d{2}/);
@@ -139,7 +151,7 @@ export class SqliteInboxRepository {
   private approveToCalendar(row: InboxRow, fields: InboxField[]) {
     const categoryName = labelValue(fields);
     const categories = this.db.select().from(calendarCategories).orderBy(asc(calendarCategories.orderIndex)).all();
-    const category = categories.find((candidate) => candidate.name === categoryName) ?? categories.find((candidate) => candidate.id === "hobby") ?? categories[0];
+    const category = findByName(categories, categoryName) ?? categories.find((candidate) => candidate.id === "hobby") ?? categories[0];
     if (!category) throw new Error("일정 분류가 없어 승인할 수 없습니다. 먼저 분류를 만드세요.");
     const schedule = fieldValue(fields, "일시");
     const dates = schedule.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
@@ -183,7 +195,7 @@ export class SqliteInboxRepository {
   private approveToLedger(row: InboxRow, fields: InboxField[]) {
     const categoryName = labelValue(fields);
     const categories = this.db.select().from(ledgerCategories).orderBy(asc(ledgerCategories.orderIndex)).all();
-    const category = categories.find((candidate) => candidate.name === categoryName)
+    const category = findByName(categories, categoryName)
       ?? categories.find((candidate) => candidate.id === LEDGER_OTHER_CATEGORY_ID)
       ?? categories[0];
     if (!category) throw new Error("가계부 분류가 없어 승인할 수 없습니다.");
