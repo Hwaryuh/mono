@@ -361,7 +361,7 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
   });
   const status = statusOf(item, snapshot.today);
   const dueText = item.done
-    ? `완료: ${item.completedAt ?? "방금"}`
+    ? `완료: ${item.completedAt ? formatCompletedAt(item.completedAt) : "방금"}`
     : !item.dueDate
       ? "기한 없음"
       : item.dueDate === snapshot.today
@@ -385,6 +385,14 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
 function formatDate(date: string) {
   const [, month, day] = date.split("-");
   return `${Number(month)}/${Number(day)}`;
+}
+
+function formatCompletedAt(value: string) {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value; // mock의 사람이 읽는 문자열("방금" 등)은 그대로 둔다
+  const date = new Date(parsed);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function daysBetween(from: string, to: string) {
