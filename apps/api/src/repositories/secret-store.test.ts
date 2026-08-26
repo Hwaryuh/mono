@@ -1,5 +1,5 @@
 import { existsSync, rmSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createDb, type Db } from "../db/client.ts";
 import { SecretCrypto } from "../security/secret-crypto.ts";
 import { SqliteSecretStore } from "./secret-store.ts";
@@ -47,5 +47,32 @@ describe("SqliteSecretStore", () => {
     store.deleteGeminiApiKey();
     expect(store.hasGeminiApiKey()).toBe(false);
     expect(store.getGeminiApiKey()).toBeNull();
+  });
+
+  it("OpenAI 키는 Gemini 키와 독립적으로 저장·삭제된다", () => {
+    const store = freshStore();
+    store.setGeminiApiKey("gk-test");
+    store.setOpenaiApiKey("sk-test");
+
+    expect(store.getGeminiApiKey()).toBe("gk-test");
+    expect(store.getOpenaiApiKey()).toBe("sk-test");
+
+    store.deleteOpenaiApiKey();
+    expect(store.hasOpenaiApiKey()).toBe(false);
+    expect(store.getGeminiApiKey()).toBe("gk-test");
+  });
+
+  it("OpenAI 키도 빈 문자열은 거부한다", () => {
+    const store = freshStore();
+    expect(() => store.setOpenaiApiKey(" ")).toThrow("OpenAI API 키를 입력해야 합니다.");
+  });
+
+  it("활성 provider는 기본 gemini이고, 설정한 값을 그대로 돌려준다", () => {
+    const store = freshStore();
+    expect(store.getActiveProvider()).toBe("gemini");
+    store.setActiveProvider("openai");
+    expect(store.getActiveProvider()).toBe("openai");
+    store.setActiveProvider("gemini");
+    expect(store.getActiveProvider()).toBe("gemini");
   });
 });

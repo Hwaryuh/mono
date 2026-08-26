@@ -61,4 +61,42 @@ describe("ai routes", () => {
     expect(fetchMock).toHaveBeenCalled();
     await app.close();
   });
+
+  it("OpenAI 키도 같은 방식으로 설정·조회·삭제한다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+
+    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: false });
+
+    const set = await app.inject({ method: "POST", url: "/ai/openai-key", payload: { apiKey: "sk-test" } });
+    expect(set.statusCode).toBe(201);
+    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: true });
+
+    const del = await app.inject({ method: "DELETE", url: "/ai/openai-key" });
+    expect(del.statusCode).toBe(200);
+    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/openai-key" })).body)).toEqual({ hasKey: false });
+
+    await app.close();
+  });
+
+  it("provider 기본값은 gemini고, openai로 전환·조회된다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+
+    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/provider" })).body)).toEqual({ provider: "gemini" });
+
+    const set = await app.inject({ method: "POST", url: "/ai/provider", payload: { provider: "openai" } });
+    expect(set.statusCode).toBe(200);
+    expect(JSON.parse((await app.inject({ method: "GET", url: "/ai/provider" })).body)).toEqual({ provider: "openai" });
+
+    await app.close();
+  });
+
+  it("알 수 없는 provider는 거부한다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+    const response = await app.inject({ method: "POST", url: "/ai/provider", payload: { provider: "claude" } });
+    expect(response.statusCode).toBe(400);
+    await app.close();
+  });
 });

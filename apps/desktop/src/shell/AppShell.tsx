@@ -11,7 +11,7 @@ import type { CalendarRepository } from "../features/calendar/calendar-repositor
 import { useNavigate } from "react-router";
 import { currentIsoDate, koreanDateLabel, koreanMonthLabel } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
-import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
+import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 
 type NavigationItem = {
   to: string;
@@ -341,7 +341,98 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
   );
 }
 
+const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string; keySource: string; dataNotice: string; model: string }> = {
+  gemini: {
+    label: "Gemini",
+    keyPlaceholder: "Google AI Studio API 키",
+    keySource: "Google AI Studio",
+    dataNotice: "분류할 텍스트와 사진은 Google Gemini API로 전송됩니다. 무료 등급에서는 Google 정책에 따라 제출 데이터가 제품 개선에 사용될 수 있습니다.",
+    model: "gemini-2.5-flash-lite",
+  },
+  openai: {
+    label: "OpenAI",
+    keyPlaceholder: "OpenAI API 키",
+    keySource: "OpenAI Platform",
+    dataNotice: "분류할 텍스트와 사진은 OpenAI API로 전송됩니다.",
+    model: "gpt-5-nano",
+  },
+};
+
 function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
+  const [activeProvider, setActiveProviderState] = useState<AiProviderId | null>(null);
+  const [providerPending, setProviderPending] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    store.getActiveProvider()
+      .then((provider) => { if (active) setActiveProviderState(provider); })
+      .catch((cause: unknown) => { if (active) setProviderError(messageOf(cause)); });
+    return () => { active = false; };
+  }, [store]);
+
+  async function selectProvider(provider: AiProviderId) {
+    setProviderPending(true);
+    setProviderError(null);
+    try {
+      await store.setActiveProvider(provider);
+      setActiveProviderState(provider);
+    } catch (cause) {
+      setProviderError(messageOf(cause));
+    } finally {
+      setProviderPending(false);
+    }
+  }
+
+  return (
+    <>
+      <SettingsHeading description="빠른 캡처의 텍스트와 사진을 분류할 AI 모델을 고릅니다." title="AI" />
+      <section className="settings-group">
+        <header><strong>사용할 모델</strong><span>API 키를 설정한 쪽을 선택하세요.</span></header>
+        <div aria-label="AI provider" className="settings-theme-options" role="radiogroup">
+          {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
+            <button
+              aria-checked={activeProvider === provider}
+              disabled={providerPending}
+              key={provider}
+              onClick={() => void selectProvider(provider)}
+              role="radio"
+              type="button"
+            >
+              <span>{providerMeta[provider].label}</span>
+              <span>{providerMeta[provider].model}</span>
+            </button>
+          ))}
+        </div>
+        {providerError && <p className="settings-ai__error" role="alert">{providerError}</p>}
+      </section>
+
+      <ApiKeySection
+        deleteKey={() => store.deleteGeminiApiKey()}
+        hasKey={() => store.hasGeminiApiKey()}
+        provider="gemini"
+        setKey={(apiKey) => store.setGeminiApiKey(apiKey)}
+        testConnection={() => store.testGeminiConnection()}
+      />
+      <ApiKeySection
+        deleteKey={() => store.deleteOpenaiApiKey()}
+        hasKey={() => store.hasOpenaiApiKey()}
+        provider="openai"
+        setKey={(apiKey) => store.setOpenaiApiKey(apiKey)}
+        testConnection={() => store.testOpenaiConnection()}
+      />
+    </>
+  );
+}
+
+function ApiKeySection({ provider, hasKey: checkHasKey, setKey, deleteKey, testConnection }: {
+  provider: AiProviderId;
+  hasKey: () => Promise<boolean>;
+  setKey: (apiKey: string) => Promise<void>;
+  deleteKey: () => Promise<void>;
+  testConnection: () => Promise<void>;
+}) {
+  const meta = providerMeta[provider];
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [pending, setPending] = useState<"save" | "test" | "delete" | null>(null);
@@ -350,11 +441,11 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
 
   useEffect(() => {
     let active = true;
-    store.hasGeminiApiKey()
+    checkHasKey()
       .then((configured) => { if (active) setHasKey(configured); })
       .catch((cause: unknown) => { if (active) setError(messageOf(cause)); });
     return () => { active = false; };
-  }, [store]);
+  }, [checkHasKey]);
 
   async function run(action: "save" | "test" | "delete", operation: () => Promise<void>) {
     setPending(action);
@@ -370,54 +461,47 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
   }
 
   return (
-    <>
-      <SettingsHeading description="Gemini가 빠른 캡처의 텍스트와 사진을 분류합니다." title="AI" />
-      <section className="settings-group settings-ai">
-        <header>
-          <strong>Gemini API 키</strong>
-          <span>Windows 자격 증명 관리자에 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
-        </header>
-        <form onSubmit={(event) => {
-          event.preventDefault();
-          void run("save", async () => {
-            await store.setGeminiApiKey(apiKey);
-            setApiKey("");
-            setHasKey(true);
-            setMessage("API 키를 저장했습니다.");
-          });
-        }}>
-          <Input
-            aria-label="Gemini API 키"
-            autoComplete="off"
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder={hasKey ? "새 키로 교체" : "Google AI Studio API 키"}
-            type="password"
-            value={apiKey}
-          />
-          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">저장</Button>
-        </form>
-        <div className="settings-ai__status">
-          <span>상태</span>
-          <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
-          <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
-            await store.testGeminiConnection();
-            setMessage("Gemini 연결에 성공했습니다.");
-          })} type="button">연결 테스트</Button>
-          <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
-            await store.deleteGeminiApiKey();
-            setHasKey(false);
-            setMessage("API 키를 삭제했습니다.");
-          })} type="button">삭제</Button>
-        </div>
-        {message && <p className="settings-ai__message" role="status">{message}</p>}
-        {error && <p className="settings-ai__error" role="alert">{error}</p>}
-      </section>
-      <section className="settings-group settings-ai__notice">
-        <strong>데이터 전송</strong>
-        <p>분류할 텍스트와 사진은 Google Gemini API로 전송됩니다. 무료 등급에서는 Google 정책에 따라 제출 데이터가 제품 개선에 사용될 수 있습니다.</p>
-        <p>모델: gemini-2.5-flash-lite</p>
-      </section>
-    </>
+    <section aria-label={`${meta.label} API 키 설정`} className="settings-group settings-ai">
+      <header>
+        <strong>{meta.label} API 키</strong>
+        <span>서버에 암호화되어 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
+      </header>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        void run("save", async () => {
+          await setKey(apiKey);
+          setApiKey("");
+          setHasKey(true);
+          setMessage("API 키를 저장했습니다.");
+        });
+      }}>
+        <Input
+          aria-label={`${meta.label} API 키`}
+          autoComplete="off"
+          onChange={(event) => setApiKey(event.target.value)}
+          placeholder={hasKey ? "새 키로 교체" : meta.keyPlaceholder}
+          type="password"
+          value={apiKey}
+        />
+        <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">저장</Button>
+      </form>
+      <div className="settings-ai__status">
+        <span>상태</span>
+        <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
+        <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
+          await testConnection();
+          setMessage(`${meta.label} 연결에 성공했습니다.`);
+        })} type="button">연결 테스트</Button>
+        <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
+          await deleteKey();
+          setHasKey(false);
+          setMessage("API 키를 삭제했습니다.");
+        })} type="button">삭제</Button>
+      </div>
+      {message && <p className="settings-ai__message" role="status">{message}</p>}
+      {error && <p className="settings-ai__error" role="alert">{error}</p>}
+      <p className="settings-ai__notice-text">{meta.dataNotice} 모델: {meta.model}</p>
+    </section>
   );
 }
 

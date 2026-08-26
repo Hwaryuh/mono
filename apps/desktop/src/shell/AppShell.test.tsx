@@ -176,16 +176,17 @@ describe("AppShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
     fireEvent.click(within(settingsModal).getByRole("button", { name: "AI" }));
-    await waitFor(() => expect(within(settingsModal).getByText("키 없음")).toBeInTheDocument());
+    const geminiSection = within(settingsModal).getByRole("region", { name: "Gemini API 키 설정" });
+    await waitFor(() => expect(within(geminiSection).getByText("키 없음")).toBeInTheDocument());
 
-    fireEvent.change(within(settingsModal).getByLabelText("Gemini API 키"), { target: { value: "test-key" } });
-    fireEvent.click(within(settingsModal).getByRole("button", { name: "저장" }));
-    await waitFor(() => expect(within(settingsModal).getByText("키 저장됨")).toBeInTheDocument());
+    fireEvent.change(within(geminiSection).getByLabelText("Gemini API 키"), { target: { value: "test-key" } });
+    fireEvent.click(within(geminiSection).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(within(geminiSection).getByText("키 저장됨")).toBeInTheDocument());
 
-    fireEvent.click(within(settingsModal).getByRole("button", { name: "연결 테스트" }));
-    expect(await within(settingsModal).findByText("Gemini 연결에 성공했습니다.")).toBeInTheDocument();
-    fireEvent.click(within(settingsModal).getByRole("button", { name: "삭제" }));
-    await waitFor(() => expect(within(settingsModal).getByText("키 없음")).toBeInTheDocument());
+    fireEvent.click(within(geminiSection).getByRole("button", { name: "연결 테스트" }));
+    expect(await within(geminiSection).findByText("Gemini 연결에 성공했습니다.")).toBeInTheDocument();
+    fireEvent.click(within(geminiSection).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(within(geminiSection).getByText("키 없음")).toBeInTheDocument());
   });
 
   it("사이드바 링크로 수집함 경로를 연다", async () => {

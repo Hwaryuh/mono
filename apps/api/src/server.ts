@@ -7,9 +7,11 @@ import { SqliteDashboardRepository } from "./repositories/dashboard-repository.t
 import { GeminiCaptureAnalysisProvider } from "./repositories/gemini-capture-analysis-provider.ts";
 import { SqliteInboxRepository } from "./repositories/inbox-repository.ts";
 import { SqliteLedgerRepository } from "./repositories/ledger-repository.ts";
+import { OpenAiCaptureAnalysisProvider } from "./repositories/openai-capture-analysis-provider.ts";
 import { SqliteRoutineRepository } from "./repositories/routine-repository.ts";
 import { SqliteScrapRepository } from "./repositories/scrap-repository.ts";
 import { SqliteSecretStore } from "./repositories/secret-store.ts";
+import { SelectableCaptureAnalysisProvider } from "./repositories/selectable-capture-analysis-provider.ts";
 import { SqliteTodoRepository } from "./repositories/todo-repository.ts";
 import { registerAiRoutes } from "./routes/ai.ts";
 import { registerCalendarRoutes } from "./routes/calendar.ts";
@@ -45,7 +47,9 @@ export function buildServer(db: Db = createDb()) {
   });
 
   const secretStore = new SqliteSecretStore(db);
-  const analysisProvider = new GeminiCaptureAnalysisProvider(() => secretStore.getGeminiApiKey());
+  const geminiProvider = new GeminiCaptureAnalysisProvider(() => secretStore.getGeminiApiKey());
+  const openaiProvider = new OpenAiCaptureAnalysisProvider(() => secretStore.getOpenaiApiKey());
+  const analysisProvider = new SelectableCaptureAnalysisProvider(secretStore, { gemini: geminiProvider, openai: openaiProvider });
 
   registerTodoRoutes(app, new SqliteTodoRepository(db));
   registerLedgerRoutes(app, new SqliteLedgerRepository(db));
@@ -54,7 +58,7 @@ export function buildServer(db: Db = createDb()) {
   registerScrapRoutes(app, new SqliteScrapRepository(db));
   registerInboxRoutes(app, new SqliteInboxRepository(db));
   registerDashboardRoutes(app, new SqliteDashboardRepository(db, analysisProvider));
-  registerAiRoutes(app, secretStore, analysisProvider);
+  registerAiRoutes(app, secretStore, geminiProvider, openaiProvider);
   return app;
 }
 

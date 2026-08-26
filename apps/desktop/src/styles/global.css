@@ -296,7 +296,8 @@ li {
 .settings-ai__message { color: var(--color-text-muted); }
 .settings-ai__error { color: var(--color-danger, oklch(0.55 0.2 25)); }
 .settings-ai__notice > strong { color: var(--color-text); font-size: 12px; }
-.settings-ai__notice > p { margin: 8px 0 0; color: var(--color-text-faint); font-size: 10.5px; line-height: 1.55; }
+.settings-ai__notice > p,
+.settings-ai__notice-text { margin: 8px 0 0; color: var(--color-text-faint); font-size: 10.5px; line-height: 1.55; }
 html[data-reduced-motion="true"] .ui-morphing-icon__line { transition-duration: 0ms; }
 html[data-reduced-motion="true"] .ui-modal,
 html[data-reduced-motion="true"] .ui-drawer { animation: none; }
