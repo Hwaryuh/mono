@@ -1,0 +1,13 @@
+node_modules/
+dist/
+target/
+release/
+*.log
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/
+apps/desktop/src-tauri/gen/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

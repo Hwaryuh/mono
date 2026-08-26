@@ -1,0 +1,272 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { describe, expect, it } from "vitest";
+import { createMockInboxRepository } from "../infrastructure/mock/mock-inbox-repository";
+import { createMockTodoRepository } from "../infrastructure/mock/mock-todo-repository";
+import { createMockRoutineRepository } from "../infrastructure/mock/mock-routine-repository";
+import { createMockCalendarRepository } from "../infrastructure/mock/mock-calendar-repository";
+import { createMockScrapRepository } from "../infrastructure/mock/mock-scrap-repository";
+import { TodoPage } from "../features/todo/TodoPage";
+import { AppShell } from "./AppShell";
+import type { RoutineRepository } from "../features/routine/routine-repository";
+import type { CalendarRepository } from "../features/calendar/calendar-repository";
+import { CalendarPage } from "../features/calendar/CalendarPage";
+import { ScrapPage } from "../features/scrap/ScrapPage";
+import type { ScrapRepository } from "../features/scrap/scrap-repository";
+import { LedgerPage } from "../features/ledger/LedgerPage";
+import { createMockLedgerRepository } from "../infrastructure/mock/mock-ledger-repository";
+import type { LedgerRepository } from "../features/ledger/ledger-repository";
+import { createMockDashboardRepository } from "../infrastructure/mock/mock-dashboard-repository";
+import type { DashboardRepository } from "../features/dashboard/dashboard-repository";
+import { ACCENT_COLOR_STORAGE_KEY } from "./accent-color-preference";
+import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
+
+function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const todoRepository = createMockTodoRepository();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={createMockInboxRepository()} routineRepository={routineRepository} todoRepository={todoRepository} />}>
+            <Route path="dashboard" element={<div>대시보드 경로</div>} />
+            <Route path="inbox" element={<div>수집함 경로</div>} />
+            <Route path="todo" element={<TodoPage repository={todoRepository} />} />
+            <Route path="calendar" element={<CalendarPage repository={calendarRepository} />} />
+            <Route path="scrap" element={<ScrapPage repository={scrapRepository} />} />
+            <Route path="ledger" element={<LedgerPage repository={ledgerRepository} />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("AppShell", () => {
+  it("사이드바 검색을 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
+    const { container } = renderShell();
+    expect(container.querySelector(".sidebar__search")).not.toBeInTheDocument();
+    const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
+    collapseButton.focus();
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+
+    const modal = await screen.findByRole("dialog", { name: "빠른 캡처" });
+    const input = within(modal).getByRole("textbox", { name: "빠른 캡처" });
+    await waitFor(() => expect(input).toHaveFocus());
+    fireEvent.change(input, { target: { value: "어디서든 기록하기" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(within(modal).getByText("어디서든 기록하기")).toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "빠른 캡처" })).not.toBeInTheDocument());
+    expect(collapseButton).toHaveFocus();
+  });
+
+  it("Ctrl+K 빠른 캡처에서 사진과 텍스트를 구성한 뒤 화살표로 제출한다", async () => {
+    renderShell();
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    const modal = await screen.findByRole("dialog", { name: "빠른 캡처" });
+    const dropZone = within(modal).getByRole("region", { name: "빠른 캡처 드롭 영역" });
+    const linkDataTransfer = {
+      dropEffect: "none",
+      files: [],
+      getData: (type: string) => type === "text/uri-list" ? "https://example.com/reference" : "Reference",
+      types: ["text/uri-list", "text/plain"],
+    };
+
+    fireEvent.drop(dropZone, {
+      dataTransfer: {
+        dropEffect: "none",
+        files: [new File(["image"], "reference.png", { type: "image/png" })],
+        getData: () => "",
+        types: ["Files"],
+      },
+    });
+    expect(await within(modal).findByRole("img", { name: "reference.png" })).toBeInTheDocument();
+
+    fireEvent.drop(dropZone, { dataTransfer: linkDataTransfer });
+    const input = within(modal).getByRole("textbox", { name: "빠른 캡처" });
+    expect(input).toHaveValue("https://example.com/reference");
+    expect(within(modal).queryByText("https://example.com/reference")).not.toBeInTheDocument();
+
+    fireEvent.click(within(modal).getByRole("button", { name: "분류 요청" }));
+    await waitFor(() => expect(within(modal).getByText("https://example.com/reference")).toBeInTheDocument());
+  });
+
+  it("상단바에 별도 테마 전환 버튼을 표시하지 않는다", () => {
+    renderShell();
+
+    expect(screen.queryByRole("button", { name: "다크 테마" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "라이트 테마" })).not.toBeInTheDocument();
+  });
+
+  it("사이드바를 56px 축소 상태로 전환한다", () => {
+    const { container } = renderShell();
+
+    const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
+    expect(within(collapseButton).queryByText("사이드바 축소")).not.toBeInTheDocument();
+    fireEvent.click(collapseButton);
+
+    expect(container.querySelector(".app-shell")).toHaveClass("app-shell--collapsed");
+    expect(screen.getByRole("button", { name: "사이드바 확장" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "설정 열기" })).not.toBeInTheDocument();
+  });
+
+  it("좌측 설정 아이콘을 닫기 아이콘으로 morph하고 설정 패널을 제어한다", async () => {
+    const { container } = renderShell();
+    const settingsButton = screen.getByRole("button", { name: "설정 열기" });
+    const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
+    const footer = container.querySelector(".sidebar__footer")!;
+    expect(footer.firstElementChild).toBe(settingsButton);
+    expect(footer.lastElementChild).toBe(collapseButton);
+    const settingsLines = Array.from(settingsButton.querySelectorAll<SVGLineElement>("svg line"));
+    const settingsTransforms = settingsLines.map((line) => line.style.transform);
+    expect(settingsLines).toHaveLength(3);
+
+    settingsButton.focus();
+    fireEvent.click(settingsButton);
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    expect(settingsModal.querySelector(".settings-modal")).toBeInTheDocument();
+    const closeLines = Array.from(screen.getByRole("button", { name: "설정 닫기" }).querySelectorAll<SVGLineElement>("svg line"));
+    expect(closeLines).toHaveLength(3);
+    expect(closeLines[0]).toBe(settingsLines[0]);
+    expect(closeLines.map((line) => line.style.transform)).not.toEqual(settingsTransforms);
+    expect(closeLines[2]).toHaveAttribute("opacity", "0");
+    fireEvent.click(screen.getByRole("radio", { name: "다크" }));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "접근성" }));
+    fireEvent.click(within(settingsModal).getByRole("checkbox", { name: "애니메이션 줄이기" }));
+    expect(document.documentElement.dataset.reducedMotion).toBe("true");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    const reopenedButton = await screen.findByRole("button", { name: "설정 열기" });
+    await waitFor(() => expect(reopenedButton).toHaveFocus());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument());
+  });
+
+  it("설정에서 강조색을 바꾸고 다음 실행에 복원한다", async () => {
+    const firstRender = renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "강조색" }));
+    const colorPicker = within(settingsModal).getByRole("dialog", { name: "강조색 선택" });
+
+    fireEvent.change(within(colorPicker).getByRole("textbox", { name: "HEX 색상" }), {
+      target: { value: "#F4D35E" },
+    });
+
+    await waitFor(() => expect(document.documentElement).toHaveStyle({
+      "--color-accent": "oklch(0.873 0.14 93.538)",
+      "--color-accent-foreground": "oklch(0.222 0.002 106.554)",
+    }));
+    expect(localStorage.getItem(ACCENT_COLOR_STORAGE_KEY)).toBe("oklch(0.873 0.14 93.538)");
+
+    firstRender.unmount();
+    document.documentElement.style.removeProperty("--color-accent");
+    renderShell();
+
+    await waitFor(() => expect(document.documentElement).toHaveStyle({ "--color-accent": "oklch(0.873 0.14 93.538)" }));
+  });
+
+  it("설정에서 Gemini API 키를 저장하고 연결 확인 후 삭제한다", async () => {
+    const store = new InMemoryAiSettingsStore();
+    renderShell(undefined, undefined, undefined, undefined, undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "AI" }));
+    await waitFor(() => expect(within(settingsModal).getByText("키 없음")).toBeInTheDocument());
+
+    fireEvent.change(within(settingsModal).getByLabelText("Gemini API 키"), { target: { value: "test-key" } });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(within(settingsModal).getByText("키 저장됨")).toBeInTheDocument());
+
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "연결 테스트" }));
+    expect(await within(settingsModal).findByText("Gemini 연결에 성공했습니다.")).toBeInTheDocument();
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(within(settingsModal).getByText("키 없음")).toBeInTheDocument());
+  });
+
+  it("사이드바 링크로 수집함 경로를 연다", async () => {
+    renderShell();
+
+    fireEvent.click(screen.getByRole("link", { name: /수집함/ }));
+
+    expect(await screen.findByText("수집함 경로")).toBeInTheDocument();
+    expect(screen.queryByText("AI 분류 결과를 확인하고 승인합니다")).not.toBeInTheDocument();
+  });
+
+  it("할 일 상단 액션으로 새 할 일 Modal을 연다", async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
+    const createButton = await screen.findByRole("button", { name: "새 할 일" });
+    createButton.focus();
+    fireEvent.click(createButton);
+
+    const modal = await screen.findByRole("dialog", { name: "새 할 일" });
+    expect(within(modal).getByRole("textbox", { name: /제목/ })).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(createButton).toHaveFocus());
+  });
+
+  it("사이드바 루틴 배지를 공유 상태에서 파생한다", async () => {
+    const routineRepository = createMockRoutineRepository();
+    await routineRepository.create({ title: "추가 루틴", labelId: "health", days: [3], endDate: null });
+    renderShell(routineRepository);
+
+    expect(await screen.findByRole("link", { name: /루틴 4/ })).toBeInTheDocument();
+  });
+
+  it("사이드바 일정 배지와 상단 액션을 일정 원본에서 연결한다", async () => {
+    const calendarRepository = createMockCalendarRepository();
+    await calendarRepository.create({ title: "오늘 추가 일정", startDate: "2026-08-05", startTime: "23:00", endDate: "2026-08-05", endTime: "23:30", location: "", categoryId: "work", note: "" });
+    renderShell(createMockRoutineRepository(), calendarRepository);
+
+    const calendarLink = await screen.findByRole("link", { name: /일정 4/ });
+    fireEvent.click(calendarLink);
+    const createButton = await screen.findByRole("button", { name: "새 일정" });
+    createButton.focus();
+    fireEvent.click(createButton);
+    expect(await screen.findByRole("dialog", { name: "새 일정" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(createButton).toHaveFocus());
+  });
+
+  it("사이드바 스크랩 링크에서 상단 스크랩 추가 액션을 연결한다", async () => {
+    renderShell();
+
+    const scrapLink = await screen.findByRole("link", { name: "스크랩" });
+    fireEvent.click(scrapLink);
+    const createButton = await screen.findByRole("button", { name: "스크랩 추가" });
+    createButton.focus();
+    fireEvent.click(createButton);
+    expect(await screen.findByRole("dialog", { name: "스크랩 추가" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(createButton).toHaveFocus());
+  });
+
+  it("가계부 상단 액션에서 Escape·취소·생성 후 focus를 복귀한다", async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("link", { name: "가계부" }));
+    const createButton = await screen.findByRole("button", { name: "지출 추가" });
+    createButton.focus();
+    fireEvent.click(createButton);
+
+    expect(await screen.findByRole("dialog", { name: "지출 추가" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(createButton).toHaveFocus());
+
+    fireEvent.click(createButton);
+    let modal = await screen.findByRole("dialog", { name: "지출 추가" });
+    fireEvent.click(within(modal).getByRole("button", { name: "취소" }));
+    await waitFor(() => expect(createButton).toHaveFocus());
+
+    fireEvent.click(createButton);
+    modal = await screen.findByRole("dialog", { name: "지출 추가" });
+    fireEvent.change(within(modal).getByRole("textbox", { name: "항목" }), { target: { value: "교통비" } });
+    fireEvent.change(within(modal).getByRole("textbox", { name: "금액" }), { target: { value: "1,500" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(createButton).toHaveFocus());
+  });
+});

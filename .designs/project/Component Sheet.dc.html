@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+@font-face{font-family:'SUIT Variable';src:url('https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/variable/woff2/SUIT-Variable.woff2') format('woff2-variations');font-weight:100 900;font-display:swap}
+:root{--bg:#f6f6f5;--surface:#fff;--surface2:#fafaf9;--fg:#1b1b1a;--fg2:#5c5c58;--fg3:#8e8e88;--bd:#e4e4e1;--bd2:#d3d3ce;--hover:#f1f1ef;--ac:#3f5bd9;--acfg:#fff;--acw:#eceffc;--warn:#b0700f;--danger:#c0392b;--r:6px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'SUIT Variable','SUIT',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+a{color:var(--ac);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+@keyframes sk{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes pop{from{transform:translateY(8px) scale(.99);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes slidein{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;width:1240px;padding:20px 20px 60px;display:flex;flex-direction:column;gap:16px;position:relative">
+
+  <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 14px;background:var(--surface);border:1px solid var(--bd);border-radius:8px">
+    <div style="display:flex;flex-direction:column;gap:1px;padding-right:16px;border-right:1px solid var(--bd)">
+      <span style="font-size:12.5px;font-weight:700;letter-spacing:-.01em">컴포넌트 시트</span>
+      <span style="font-size:10.5px;color:var(--fg3)">공통 컴포넌트 · 변형 · 상태 인벤토리</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <span style="font-size:10.5px;color:var(--fg3)">테마</span>
+      <button onClick="{{ toggleTheme }}" style="border:1px solid var(--bd);background:var(--surface2);font-size:11px;padding:5px 11px;border-radius:6px;color:var(--fg2)" style-hover="background:var(--hover)">{{ themeLabel }}</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <span style="font-size:10.5px;color:var(--fg3)">강조색</span>
+      <sc-for list="{{ accents }}" as="a" hint-placeholder-count="5">
+        <button onClick="{{ a.pick }}" title="{{ a.name }}" style="width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,.15);background:{{ a.hex }};padding:0"></button>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <span style="font-size:10.5px;color:var(--fg3)">둥글기</span>
+      <button onClick="{{ cycleRadius }}" style="border:1px solid var(--bd);background:var(--surface2);font-size:11px;padding:5px 11px;border-radius:6px;color:var(--fg2)" style-hover="background:var(--hover)">{{ radiusLabel }}</button>
+    </div>
+    <a href="./Platform Wireframe.dc.html" style="margin-left:auto;font-size:11px;display:flex;align-items:center;gap:5px">
+      앱 와이어프레임으로
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">버튼 체계 · 상태</div>
+    <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ btnRows }}" as="r" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:78px;flex:none;font-size:10.5px;color:var(--fg3)">{{ r.name }}</span>
+          <sc-for list="{{ r.items }}" as="b" hint-placeholder-count="4">
+            <button style="border:{{ b.bd }};background:{{ b.bg }};color:{{ b.fg }};font-size:11.5px;font-weight:600;height:28px;padding:0 12px;border-radius:var(--r);opacity:{{ b.op }};display:flex;align-items:center;gap:6px">{{ b.label }}</button>
+          </sc-for>
+        </div>
+      </sc-for>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:78px;flex:none;font-size:10.5px;color:var(--fg3)">아이콘 · FAB</span>
+        <span style="width:28px;height:28px;border:1px solid var(--bd2);background:var(--surface2);border-radius:var(--r);display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg2)" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>
+        </span>
+        <span style="width:38px;height:38px;border-radius:50%;background:var(--ac);display:flex;align-items:center;justify-content:center;box-shadow:0 5px 14px rgba(0,0,0,.16)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--acfg)" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </span>
+        <span style="display:flex">
+          <span style="border:0;background:var(--ac);color:var(--acfg);font-size:11.5px;font-weight:600;height:28px;padding:0 11px;border-radius:var(--r) 0 0 var(--r);display:flex;align-items:center">캡처</span>
+          <span style="border-left:1px solid rgba(255,255,255,.28);background:var(--ac);color:var(--acfg);height:28px;width:22px;border-radius:0 var(--r) var(--r) 0;display:flex;align-items:center;justify-content:center">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </span>
+        </span>
+        <span style="font-size:10.5px;color:var(--fg3)">분할 버튼 · 드롭다운</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">입력 · 표시</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:11px">
+        <span style="font-size:10.5px;color:var(--fg3)">텍스트 · 여러 줄 · 금액</span>
+        <input value="설거지 하기" style="height:30px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:11.5px" />
+        <textarea rows="2" style="padding:8px 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:11.5px;resize:none">여러 줄 메모. 자료 카드의 본문에 쓰입니다.</textarea>
+        <div style="display:flex;gap:8px">
+          <input value="3" style="width:64px;height:30px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:11.5px" />
+          <input value="₩ 16,000" style="flex:1;height:30px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:11.5px" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 9px;border:1px solid var(--ac);border-radius:var(--r);background:var(--surface)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="1.7"><path d="M11 4a7 7 0 100 14 7 7 0 000-14zM16.5 16.5L20 20"/></svg>
+          <span style="font-size:11.5px;color:var(--fg)">포커스 상태</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:9px;border:1px dashed var(--bd2);border-radius:var(--r);background:var(--surface2)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="1.6"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"/></svg>
+          <span style="font-size:11px;color:var(--fg3)">파일 · 이미지 드롭 영역</span>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:11px">
+        <span style="font-size:10.5px;color:var(--fg3)">선택기</span>
+        <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2)">
+          <span style="width:9px;height:9px;border-radius:50%;background:#d94f4f"></span>
+          <span style="font-size:11.5px">집안일</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="1.8" style="margin-left:auto"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="7">
+            <span style="width:20px;height:20px;border-radius:5px;background:{{ s.hex }};border:{{ s.bd }}"></span>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ iconPicks }}" as="i" hint-placeholder-count="6">
+            <span style="width:26px;height:26px;border-radius:var(--r);border:1px solid {{ i.bd }};background:{{ i.bg }};display:flex;align-items:center;justify-content:center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--fg2)" stroke-width="1.5"><path d="{{ i.d }}"/></svg>
+            </span>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <sc-for list="{{ dowPicks }}" as="d" hint-placeholder-count="7">
+            <button onClick="{{ d.toggle }}" style="width:26px;height:26px;border-radius:50%;border:1px solid {{ d.bd }};background:{{ d.bg }};color:{{ d.fg }};font-size:11px;font-weight:600;padding:0">{{ d.name }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:34px;height:19px;border-radius:12px;background:var(--ac);padding:2px;display:flex;justify-content:flex-end"><span style="width:15px;height:15px;border-radius:50%;background:#fff"></span></span>
+          <span style="width:34px;height:19px;border-radius:12px;background:var(--bd2);padding:2px;display:flex"><span style="width:15px;height:15px;border-radius:50%;background:#fff"></span></span>
+          <span style="width:18px;height:18px;border-radius:5px;border:1.5px solid var(--ac);background:var(--ac);display:flex;align-items:center;justify-content:center">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--acfg)" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+          </span>
+          <span style="width:18px;height:18px;border-radius:5px;border:1.5px solid var(--bd2)"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="flex:1;height:3px;border-radius:2px;background:var(--hover);position:relative">
+            <div style="width:58%;height:100%;background:var(--ac);border-radius:2px"></div>
+            <span style="position:absolute;left:58%;top:-5.5px;width:13px;height:13px;margin-left:-6px;border-radius:50%;background:var(--surface);border:1.5px solid var(--ac)"></span>
+          </div>
+          <span style="font-size:10.5px;color:var(--fg3)">배율 1.1×</span>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:11px">
+        <span style="font-size:10.5px;color:var(--fg3)">표시 요소</span>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:10.5px;border:1px solid var(--bd);border-radius:20px;padding:2px 8px;color:var(--fg2)">집안일</span>
+          <span style="font-size:10.5px;border:1px solid var(--ac);background:var(--acw);border-radius:20px;padding:2px 8px">업무</span>
+          <span style="font-size:10.5px;background:var(--ac);color:var(--acfg);border-radius:20px;padding:2px 8px">선택됨</span>
+          <span style="font-size:10.5px;border:1px solid var(--warn);color:var(--warn);border-radius:3px;padding:2px 7px">검토 권장</span>
+          <span style="font-size:10.5px;border:1px solid var(--danger);color:var(--danger);border-radius:3px;padding:2px 7px">지연</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="position:relative;width:30px;height:30px;border-radius:50%;background:conic-gradient(var(--ac) 0 92%, var(--hover) 92% 100%);display:flex;align-items:center;justify-content:center">
+              <span style="width:22px;height:22px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:800">92</span>
+            </span>
+            <span style="font-size:10.5px;color:var(--fg3)">확신도 링</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--fg3)"><span>확신도</span><span>61%</span></div>
+            <div style="height:4px;border-radius:3px;background:var(--hover);overflow:hidden"><div style="width:61%;height:100%;background:var(--warn)"></div></div>
+          </div>
+        </div>
+        <div style="position:relative;align-self:flex-start;font-size:10.5px;background:var(--fg);color:var(--bg);padding:5px 8px;border-radius:5px">툴팁 · 합주 · 12:00–14:00</div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding:8px 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface)">
+          <span style="font-size:11px;font-weight:600">토스트 · 할 일에 저장했습니다</span>
+          <span style="font-size:10px;color:var(--ac)">되돌리기</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">변형 A — 수집함 카드 3종</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <sc-for list="{{ inboxVariants }}" as="v" hint-placeholder-count="3">
+        <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:11px;font-weight:700">{{ v.name }}</span>
+            <span style="font-size:10px;color:var(--fg3)">{{ v.note }}</span>
+          </div>
+          <div style="border:1px solid var(--bd);border-radius:6px;background:var(--surface2);padding:10px;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:11.5px;line-height:1.45">{{ v.raw }}</span>
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;border:1px solid var(--bd2);background:{{ v.soft }};border-radius:20px;padding:3px 9px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="{{ v.color }}" stroke-width="1.7"><path d="{{ v.d }}"/></svg>{{ v.target }}
+              </span>
+              <span style="font-size:10px;color:{{ v.confFg }};border:1px solid {{ v.confBd }};border-radius:3px;padding:1px 6px">{{ v.conf }}</span>
+            </div>
+            <div style="height:4px;border-radius:3px;background:var(--hover);overflow:hidden"><div style="width:{{ v.pct }}%;height:100%;background:{{ v.barBg }}"></div></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">변형 B — 항목 카드 3종</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <sc-for list="{{ taskVariants }}" as="v" hint-placeholder-count="3">
+        <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:11px;font-weight:700">{{ v.name }}</span>
+            <span style="font-size:10px;color:var(--fg3)">{{ v.note }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;background:{{ v.bg }};border:{{ v.bd }};border-left:{{ v.bar }};border-radius:var(--r);padding:{{ v.pad }}">
+            <sc-if value="{{ v.leftCb }}" hint-placeholder-val="{{ false }}">
+              <span style="width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid var(--bd2)"></span>
+            </sc-if>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:12px;font-weight:500">{{ v.title }}</span>
+                <sc-if value="{{ v.badge }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:9.5px;color:var(--fg3);border:1px solid var(--bd2);border-radius:3px;padding:0 4px">{{ v.badgeText }}</span>
+                </sc-if>
+              </div>
+              <div style="display:flex;gap:7px;align-items:center">
+                <span style="font-size:10.5px;color:{{ v.subFg }}">{{ v.sub }}</span>
+                <span style="font-size:10px;color:var(--fg3);border:1px solid var(--bd);border-radius:20px;padding:0 6px">{{ v.label }}</span>
+              </div>
+            </div>
+            <span style="width:20px;height:20px;flex:none;border-radius:5px;border:1.5px solid var(--bd2)"></span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">변형 C — 오버레이: 모달 vs 드로어</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:11px;font-weight:700">중앙 모달</span>
+          <span style="font-size:10px;color:var(--fg3)">짧은 확인 · 흐름 차단</span>
+          <button onClick="{{ openModal }}" style="margin-left:auto;border:1px solid var(--bd);background:transparent;color:var(--fg2);font-size:10.5px;height:24px;padding:0 9px;border-radius:var(--r)">열기</button>
+        </div>
+        <div style="height:150px;border-radius:6px;background:var(--hover);border:1px solid var(--bd);position:relative;overflow:hidden">
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:66%;height:74%;background:var(--surface);border:1px solid var(--bd2);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:5px">
+            <div style="height:7px;width:44%;border-radius:3px;background:var(--bd2)"></div>
+            <div style="height:5px;width:100%;border-radius:3px;background:var(--bd)"></div>
+            <div style="height:5px;width:86%;border-radius:3px;background:var(--bd)"></div>
+            <div style="margin-top:auto;display:flex;gap:5px;justify-content:flex-end"><div style="height:11px;width:32px;border-radius:3px;background:var(--bd)"></div><div style="height:11px;width:38px;border-radius:3px;background:var(--ac)"></div></div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:11px;font-weight:700">드로어</span>
+          <span style="font-size:10px;color:var(--fg3)">목록 맥락 유지 · 연속 편집</span>
+          <button onClick="{{ openDrawer }}" style="margin-left:auto;border:1px solid var(--bd);background:transparent;color:var(--fg2);font-size:10.5px;height:24px;padding:0 9px;border-radius:var(--r)">열기</button>
+        </div>
+        <div style="height:150px;border-radius:6px;background:var(--hover);border:1px solid var(--bd);position:relative;overflow:hidden">
+          <div style="position:absolute;right:0;top:0;bottom:0;width:44%;background:var(--surface);border-left:1px solid var(--bd2);padding:8px;display:flex;flex-direction:column;gap:5px">
+            <div style="height:7px;width:54%;border-radius:3px;background:var(--bd2)"></div>
+            <div style="height:5px;width:100%;border-radius:3px;background:var(--bd)"></div>
+            <div style="height:5px;width:80%;border-radius:3px;background:var(--bd)"></div>
+            <div style="margin-top:auto;height:13px;width:100%;border-radius:3px;background:var(--ac)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">변형 D — 사이드바 밀도 3종</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <sc-for list="{{ sbVariants }}" as="v" hint-placeholder-count="3">
+        <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:11px;font-weight:700">{{ v.name }}</span>
+            <span style="font-size:10px;color:var(--fg3)">{{ v.note }}</span>
+          </div>
+          <div style="border:1px solid var(--bd);border-radius:6px;background:var(--surface2);padding:7px;display:flex;flex-direction:column;gap:{{ v.gap }}px">
+            <sc-for list="{{ v.rows }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:6px;height:{{ v.h }}px;padding:0 6px;border-radius:4px;background:{{ r.bg }}">
+                <sc-if value="{{ r.isTitle }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;color:var(--fg3)">{{ r.label }}</span>
+                </sc-if>
+                <sc-if value="{{ r.isItem }}" hint-placeholder-val="{{ true }}">
+                  <span style="width:10px;height:10px;border-radius:3px;border:1px solid var(--bd2);flex:none"></span>
+                  <span style="font-size:10px;color:var(--fg2)">{{ r.label }}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--fg3);text-transform:uppercase">상태 세트</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      <sc-for list="{{ stateCards }}" as="s" hint-placeholder-count="8">
+        <div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:8px 11px;border-bottom:1px solid var(--bd);background:var(--surface2);display:flex;align-items:center;gap:6px">
+            <span style="font-size:10.5px;font-weight:700">{{ s.name }}</span>
+            <span style="margin-left:auto;font-size:9.5px;color:var(--fg3)">{{ s.tag }}</span>
+          </div>
+          <div style="flex:1;min-height:168px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+            <sc-if value="{{ s.skeleton }}" hint-placeholder-val="{{ false }}">
+              <div style="width:100%;display:flex;flex-direction:column;gap:7px;animation:sk 1.4s infinite">
+                <div style="height:9px;width:80%;border-radius:3px;background:var(--hover)"></div>
+                <div style="height:9px;width:100%;border-radius:3px;background:var(--hover)"></div>
+                <div style="height:9px;width:62%;border-radius:3px;background:var(--hover)"></div>
+                <div style="height:9px;width:90%;border-radius:3px;background:var(--hover)"></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ s.icon }}" hint-placeholder-val="{{ true }}">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="{{ s.stroke }}" stroke-width="1.4" stroke-linecap="round"><path d="{{ s.d }}"/></svg>
+              <span style="font-size:11.5px;font-weight:600;line-height:1.4">{{ s.title }}</span>
+              <span style="font-size:10.5px;color:var(--fg3);line-height:1.5">{{ s.body }}</span>
+              <sc-if value="{{ s.action }}" hint-placeholder-val="{{ false }}">
+                <button style="margin-top:2px;border:{{ s.aBd }};background:{{ s.aBg }};color:{{ s.aFg }};font-size:11px;font-weight:600;height:26px;padding:0 11px;border-radius:var(--r)">{{ s.action }}</button>
+              </sc-if>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;background:rgba(15,15,14,.4);display:flex;align-items:center;justify-content:center;padding:30px">
+      <div style="width:420px;background:var(--surface);border:1px solid var(--bd2);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;animation:pop .14s ease;box-shadow:0 20px 60px rgba(0,0,0,.22)">
+        <div style="display:flex;align-items:center;gap:9px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.6"><path d="M12 4l9 16H3zM12 10v4.5M12 17.4v.4"/></svg>
+          <span style="font-size:13px;font-weight:700">이 자료를 삭제할까요?</span>
+        </div>
+        <span style="font-size:11.5px;color:var(--fg2);line-height:1.55">달아 둔 댓글 4개도 함께 사라집니다. 되돌릴 수 없습니다.</span>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onClick="{{ closeAll }}" style="border:1px solid var(--bd2);background:var(--surface2);color:var(--fg2);font-size:11.5px;height:30px;padding:0 13px;border-radius:var(--r)">취소</button>
+          <button onClick="{{ closeAll }}" style="border:0;background:var(--danger);color:#fff;font-size:11.5px;font-weight:600;height:30px;padding:0 13px;border-radius:var(--r)">삭제</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;background:rgba(15,15,14,.34);display:flex;justify-content:flex-end">
+      <div style="width:380px;height:100%;background:var(--surface);border-left:1px solid var(--bd2);display:flex;flex-direction:column;animation:slidein .16s ease">
+        <div style="flex:none;display:flex;align-items:center;gap:9px;padding:13px 14px;border-bottom:1px solid var(--bd)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--fg2)" stroke-width="1.5"><path d="M4 5h16v14H4zM8 12l2.5 2.5L16 9"/></svg>
+          <span style="font-size:13px;font-weight:700">할 일 수정</span>
+          <button onClick="{{ closeAll }}" style="margin-left:auto;border:0;background:transparent;color:var(--fg3);padding:4px;display:flex;border-radius:4px" style-hover="background:var(--hover)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:10.5px;color:var(--fg3)">제목</span>
+            <input value="홍길동이 보내준 기획안 검토하기" style="height:32px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:12px" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:10.5px;color:var(--fg3)">라벨</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span style="display:flex;align-items:center;gap:6px;font-size:11px;border:1px solid var(--ac);background:var(--acw);border-radius:20px;padding:3px 9px"><span style="width:8px;height:8px;border-radius:50%;background:#4a7fd9"></span>업무</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:11px;border:1px solid var(--bd2);border-radius:20px;padding:3px 9px;color:var(--fg2)"><span style="width:8px;height:8px;border-radius:50%;background:#3f7d5e"></span>집안일</span>
+              <span style="font-size:11px;border:1px dashed var(--bd2);border-radius:20px;padding:3px 9px;color:var(--fg3)">+ 라벨 만들기</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:10.5px;color:var(--fg3)">마감</span>
+            <div style="display:flex;align-items:center;gap:7px;height:32px;padding:0 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);font-size:12px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--fg3)" stroke-width="1.6"><path d="M4 6h16v14H4zM8 3v4M16 3v4"/></svg>2026-08-04 18:00
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:10.5px;color:var(--fg3)">메모</span>
+            <textarea rows="4" style="padding:8px 9px;border:1px solid var(--bd2);border-radius:var(--r);background:var(--surface2);color:var(--fg);font-size:12px;resize:none">2장 일정표부터 확인</textarea>
+          </div>
+        </div>
+        <div style="flex:none;display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--bd);background:var(--surface2)">
+          <button onClick="{{ closeAll }}" style="flex:1;border:1px solid var(--bd2);background:var(--surface);color:var(--fg2);font-size:12px;height:34px;border-radius:var(--r)">취소</button>
+          <button onClick="{{ closeAll }}" style="flex:1;border:0;background:var(--ac);color:var(--acfg);font-size:12px;font-weight:700;height:34px;border-radius:var(--r)">수정</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1400}}">
+const AC = [
+  {name:'인디고', hex:'#3f5bd9'}, {name:'세이지', hex:'#3f7d5e'}, {name:'클레이', hex:'#b4563a'},
+  {name:'플럼', hex:'#7a4b9c'}, {name:'그래파이트', hex:'#3d3d3a'}
+];
+const D = {
+  cal:'M4 6h16v14H4zM8 3v4M16 3v4M4 10h16',
+  check:'M4 5h16v14H4zM8 12l2.5 2.5L16 9',
+  wallet:'M3 7h18v12H3zM3 11h6a2 2 0 000 4H3',
+  repeat:'M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7M18 4v4h-4M6 20v-4h4',
+  clip:'M9 15l6-6M10 6h5a3 3 0 010 6h-1M14 18H9a3 3 0 010-6h1',
+  note:'M5 4h10l4 4v12H5zM15 4v4h4',
+  inbox:'M4 5h16v14H4zM4 13h5l1 3h4l1-3h5',
+  alert:'M12 4l9 16H3zM12 10v4.5M12 17.4v.4',
+  search:'M11 4a7 7 0 100 14 7 7 0 000-14zM16.5 16.5L20 20',
+  sync:'M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7M18 4v4h-4M6 20v-4h4',
+  ghost:'M12 3l8 4.5v9L12 21l-8-4.5v-9zM9 10l6 6M15 10l-6 6',
+  plug:'M9 3v6M15 3v6M6 9h12v3a6 6 0 01-12 0zM12 18v3'
+};
+
+class Component extends DCLogic {
+  state = {theme:'light', accent:'#3f5bd9', radius:1, dows:{1:true,3:true,5:true}, modalOpen:false, drawerOpen:false};
+
+  componentDidMount(){ this.applyTokens(); }
+  componentDidUpdate(){ this.applyTokens(); }
+  applyTokens(){
+    const r = document.documentElement.style, dark = this.state.theme === 'dark';
+    const t = dark ? {bg:'#131313',surface:'#1c1c1b',surface2:'#232322',fg:'#f1f0ed',fg2:'#a9a9a3',fg3:'#78786f',bd:'#2d2d2b',bd2:'#3d3d39',hover:'#262625'}
+                   : {bg:'#f6f6f5',surface:'#ffffff',surface2:'#fafaf9',fg:'#1b1b1a',fg2:'#5c5c58',fg3:'#8e8e88',bd:'#e4e4e1',bd2:'#d3d3ce',hover:'#f1f1ef'};
+    Object.keys(t).forEach(k => r.setProperty('--'+k, t[k]));
+    const ac = this.state.accent;
+    r.setProperty('--ac', ac);
+    r.setProperty('--acfg', this.lum(ac) > 0.55 ? '#141414' : '#ffffff');
+    r.setProperty('--acw', this.mix(ac, dark ? '#1c1c1b' : '#ffffff', dark ? 0.16 : 0.09));
+    r.setProperty('--warn', dark ? '#d99a3d' : '#b0700f');
+    r.setProperty('--danger', dark ? '#e0655a' : '#c0392b');
+    r.setProperty('--r', [0,4,8,14][this.state.radius] + 'px');
+  }
+  rgb(h){ return [1,3,5].map(i => parseInt(h.slice(i,i+2),16)); }
+  lum(h){ const [r,g,b] = this.rgb(h).map(v => v/255); return 0.2126*r + 0.7152*g + 0.0722*b; }
+  mix(a,b,t){ const A=this.rgb(a),B=this.rgb(b); return '#'+A.map((v,i)=>Math.round(v*t+B[i]*(1-t)).toString(16).padStart(2,'0')).join(''); }
+  soft(h){ return this.mix(h, this.state.theme==='dark' ? '#1c1c1b' : '#ffffff', this.state.theme==='dark' ? 0.2 : 0.13); }
+  set(o){ this.setState(o); }
+
+  renderVals(){
+    const S = this.state, dark = S.theme === 'dark';
+    const btn = (label, kind, disabled) => {
+      const map = {
+        primary:{bd:'0', bg:'var(--ac)', fg:'var(--acfg)'},
+        secondary:{bd:'1px solid var(--bd2)', bg:'var(--surface2)', fg:'var(--fg)'},
+        danger:{bd:'0', bg:'var(--danger)', fg:'#fff'},
+        text:{bd:'0', bg:'transparent', fg:'var(--ac)'}
+      }[kind];
+      return {label, ...map, op: disabled ? 0.4 : 1};
+    };
+    const sbRows = (mode) => {
+      const base = [
+        {isTitle:true, label:'모듈'}, {isItem:true, label:'할 일'}, {isItem:true, label:'루틴'},
+        {isTitle:true, label:'기록'}, {isItem:true, label:'자료'}, {isItem:true, label:'가계부'}
+      ];
+      if (mode === 'flat') return base.filter(r => r.isItem).concat([{isItem:true,label:'일정'},{isItem:true,label:'수집함'}]);
+      return base;
+    };
+    return {
+      accents: AC.map(a => ({...a, pick:() => this.set({accent:a.hex})})),
+      themeLabel: dark ? '다크' : '라이트', toggleTheme:() => this.set({theme: dark ? 'light' : 'dark'}),
+      radiusLabel: ['각짐','기본','둥금','아주 둥금'][S.radius], cycleRadius:() => this.set({radius:(S.radius+1)%4}),
+      btnRows: [
+        {name:'주요', items:[btn('저장','primary'),btn('저장','primary'),btn('저장','primary',true),btn('저장 중…','primary')]},
+        {name:'보조', items:[btn('취소','secondary'),btn('취소','secondary'),btn('취소','secondary',true)]},
+        {name:'위험', items:[btn('삭제','danger'),btn('삭제','danger',true)]},
+        {name:'텍스트', items:[btn('되돌리기','text'),btn('되돌리기','text',true)]}
+      ],
+      swatches: ['#d94f4f','#e0a52b','#3f7d5e','#4a7fd9','#7a4b9c','#b4563a','#8e8e88'].map((hex,i) => ({hex, bd: i === 3 ? '2px solid var(--fg)' : '1px solid rgba(0,0,0,.12)'})),
+      iconPicks: [D.cal,D.check,D.repeat,D.wallet,D.clip,D.note].map((d,i) => ({d, bd: i === 1 ? 'var(--ac)' : 'var(--bd2)', bg: i === 1 ? 'var(--acw)' : 'var(--surface2)'})),
+      dowPicks: ['일','월','화','수','목','금','토'].map((n,i) => {
+        const on = !!S.dows[i];
+        return {name:n, bd: on ? 'var(--ac)' : 'var(--bd2)', bg: on ? 'var(--ac)' : 'var(--surface2)', fg: on ? 'var(--acfg)' : 'var(--fg2)',
+          toggle: () => this.setState(s => ({dows:{...s.dows, [i]: !s.dows[i]}}))};
+      }),
+      inboxVariants: [
+        {name:'높은 확신', note:'92% · 바로 승인', raw:'담주 일요일 12시 홍대에서 합주함', target:'일정', d:D.cal, color:'#4a7fd9', soft:this.soft('#4a7fd9'), conf:'확신도 92%', confFg:'var(--fg3)', confBd:'var(--bd)', pct:92, barBg:'var(--ac)'},
+        {name:'낮은 확신', note:'61% · 검토 권장 표시', raw:'레퍼런스 유튜브 영상 링크', target:'자료', d:D.clip, color:'#7a4b9c', soft:this.soft('#7a4b9c'), conf:'확신도 61% · 검토 권장', confFg:'var(--warn)', confBd:'var(--warn)', pct:61, barBg:'var(--warn)'},
+        {name:'모듈 지정', note:'@할일 · 모듈 추론 생략', raw:'@할일 빨래 정리하기', target:'할 일', d:D.check, color:'#3f7d5e', soft:this.soft('#3f7d5e'), conf:'지정됨 · 필드만 추론', confFg:'var(--fg3)', confBd:'var(--bd2)', pct:100, barBg:'var(--bd2)'}
+      ],
+      taskVariants: [
+        {name:'할 일', note:'라벨 + 마감', title:'홍길동 기획안 검토', sub:'기한: 2일 후', subFg:'var(--warn)', label:'업무', bg:'var(--surface)', bd:'1px solid var(--bd)', bar:'3px solid #4a7fd9', pad:'10px 12px', leftCb:false, badge:false, badgeText:''},
+        {name:'루틴', note:'요일 + 기간 배지', title:'비타민 먹기', sub:'월·수·금 · ~8/19', subFg:'var(--fg3)', label:'건강', bg:'var(--surface)', bd:'1px solid var(--bd)', bar:'3px solid #3f7d5e', pad:'10px 12px', leftCb:true, badge:true, badgeText:'루틴'},
+        {name:'위젯 안 재사용', note:'옅은 배경 variant', title:'운동 30분 하기', sub:'매일 · 무기한', subFg:'var(--fg3)', label:'건강', bg:'var(--surface2)', bd:'1px dashed var(--bd2)', bar:'3px solid #3f7d5e', pad:'8px 10px', leftCb:false, badge:true, badgeText:'오늘'}
+      ],
+      sbVariants: [
+        {name:'그룹 제목형', note:'모듈 5~15개', gap:2, h:20, rows:sbRows('grouped').map(r => ({...r, bg:'transparent'}))},
+        {name:'평면 목록형', note:'모듈 20개 이상', gap:1, h:18, rows:sbRows('flat').map((r,i) => ({...r, bg: i === 0 ? 'var(--acw)' : 'transparent'}))},
+        {name:'여유 밀도', note:'접근성 · 터치', gap:4, h:26, rows:sbRows('grouped').map(r => ({...r, bg:'transparent'}))}
+      ],
+      stateCards: [
+        {name:'로딩', tag:'스켈레톤', skeleton:true, icon:false},
+        {name:'빈 상태', tag:'모듈별 문구', icon:true, d:D.inbox, stroke:'var(--bd2)', title:'아직 항목이 없습니다', body:'빠른 캡처로 무엇이든 던져 넣으세요.', action:'캡처하기', aBd:'0', aBg:'var(--ac)', aFg:'var(--acfg)'},
+        {name:'에러', tag:'원인 + 재시도', icon:true, d:D.alert, stroke:'var(--danger)', title:'불러오지 못했습니다', body:'데이터를 읽는 중 문제가 생겼습니다.', action:'다시 시도', aBd:'1px solid var(--bd2)', aBg:'var(--surface)', aFg:'var(--fg)'},
+        {name:'오프라인', tag:'전역', icon:true, d:D.plug, stroke:'var(--warn)', title:'서버에 연결할 수 없습니다', body:'캡처는 기기에 쌓였다가 나중에 분류됩니다.', action:'', aBd:'0', aBg:'transparent', aFg:'var(--fg)'},
+        {name:'분류 실패', tag:'AI 판단 불가', icon:true, d:D.ghost, stroke:'var(--warn)', title:'모듈을 정하지 못했습니다', body:'대상을 직접 고르면 그대로 저장됩니다.', action:'대상 고르기', aBd:'1px solid var(--bd2)', aBg:'var(--surface)', aFg:'var(--fg)'},
+        {name:'검색 결과 없음', tag:'빈 상태와 구분', icon:true, d:D.search, stroke:'var(--bd2)', title:'"합주"에 대한 결과 없음', body:'다른 단어로 검색하거나 필터를 해제하세요.', action:'필터 해제', aBd:'1px solid var(--bd2)', aBg:'var(--surface)', aFg:'var(--fg)'},
+        {name:'분류 중', tag:'AI 처리', icon:true, d:D.sync, stroke:'var(--ac)', title:'2건을 분류하고 있습니다', body:'화면을 떠나도 계속됩니다.', action:'', aBd:'0', aBg:'transparent', aFg:'var(--fg)'},
+        {name:'루틴 종료', tag:'기간 만료', icon:true, d:D.repeat, stroke:'var(--fg3)', title:'8월 19일로 끝난 루틴', body:'더 이상 할 일로 만들어지지 않습니다.', action:'기간 연장', aBd:'1px solid var(--bd2)', aBg:'var(--surface)', aFg:'var(--fg)'}
+      ],
+      modalOpen:S.modalOpen, drawerOpen:S.drawerOpen,
+      openModal:() => this.set({modalOpen:true}), openDrawer:() => this.set({drawerOpen:true}),
+      closeAll:() => this.set({modalOpen:false, drawerOpen:false})
+    };
+  }
+}
+
+</script>
+</body>
+</html>

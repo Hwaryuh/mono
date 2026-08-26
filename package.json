@@ -1,0 +1,23 @@
+{
+  "name": "mono-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "branding:sync": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-windows-branding.ps1",
+    "build": "npm run build --workspace @mono/desktop",
+    "test": "npm run test --workspace @mono/desktop",
+    "typecheck": "tsc -b",
+    "predesktop:dev": "npm run branding:sync",
+    "desktop:dev": "npm run tauri --workspace @mono/desktop -- dev",
+    "predesktop:build": "npm run branding:sync",
+    "desktop:build": "npm run tauri --workspace @mono/desktop -- build",
+    "postdesktop:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/export-desktop-release.ps1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

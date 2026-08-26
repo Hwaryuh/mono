@@ -1,0 +1,63 @@
+if (import.meta.env.DEV) {
+  import("react-grab");
+}
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router";
+import { createAppRouter } from "./app/router";
+import { createHttpRepositories } from "./infrastructure/http/http-repositories";
+import { HttpAiSettingsStore } from "./infrastructure/http/http-ai-settings-store";
+import { MediaStoreProvider } from "./infrastructure/media/media-store-context";
+import { TauriMediaStore } from "./infrastructure/media/media-store";
+import "@mono/ui/tokens.css";
+import "@mono/ui/styles.css";
+import "./styles/global.css";
+
+const mediaStore = new TauriMediaStore();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      // networkMode "always": 서버는 항상 localhost. 브라우저 navigator.onLine 오탐으로
+      // 쿼리가 "paused" 상태로 멈춰 오류 화면이 뜨지 않는 것을 막는다.
+      networkMode: "always",
+    },
+    mutations: {
+      networkMode: "always",
+    },
+  },
+});
+
+async function start() {
+  const {
+    dashboardRepository,
+    inboxRepository,
+    todoRepository,
+    routineRepository,
+    calendarRepository,
+    scrapRepository,
+    ledgerRepository,
+  } = createHttpRepositories();
+  const router = createAppRouter(dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository, new HttpAiSettingsStore());
+
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <MediaStoreProvider value={mediaStore}>
+          <RouterProvider router={router} />
+        </MediaStoreProvider>
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
+start().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  const root = document.getElementById("root");
+  if (root) root.textContent = `앱 데이터를 준비하지 못했습니다. ${message}`;
+  console.error(error);
+});
