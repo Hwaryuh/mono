@@ -1,28 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
-
 export interface AiSettingsStore {
   hasGeminiApiKey(): Promise<boolean>;
   setGeminiApiKey(apiKey: string): Promise<void>;
   deleteGeminiApiKey(): Promise<void>;
   testGeminiConnection(): Promise<void>;
-}
-
-export class TauriAiSettingsStore implements AiSettingsStore {
-  hasGeminiApiKey(): Promise<boolean> {
-    return invoke<boolean>("has_gemini_api_key");
-  }
-
-  async setGeminiApiKey(apiKey: string): Promise<void> {
-    await invoke("set_gemini_api_key", { apiKey });
-  }
-
-  async deleteGeminiApiKey(): Promise<void> {
-    await invoke("delete_gemini_api_key");
-  }
-
-  async testGeminiConnection(): Promise<void> {
-    await invoke("test_gemini_connection");
-  }
 }
 
 export class InMemoryAiSettingsStore implements AiSettingsStore {

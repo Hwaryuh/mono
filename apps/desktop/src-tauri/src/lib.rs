@@ -1,15 +1,6 @@
-mod ai_commands;
-mod gemini;
 mod platform_state_store;
-mod secret_store;
 
-use ai_commands::{
-    analyze_capture, delete_gemini_api_key, has_gemini_api_key, set_gemini_api_key,
-    test_gemini_connection,
-};
-use gemini::GeminiProvider;
 use platform_state_store::SqlitePlatformStateStore;
-use secret_store::CredentialSecretStore;
 use tauri::Manager;
 
 #[tauri::command]
@@ -72,8 +63,6 @@ pub fn run() {
                 .map_err(|error| format!("앱 데이터 디렉터리 생성 실패: {error}"))?;
             let store = SqlitePlatformStateStore::open(&data_directory.join("mono.sqlite3"))?;
             app.manage(store);
-            app.manage(CredentialSecretStore::of());
-            app.manage(GeminiProvider::of()?);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,12 +71,7 @@ pub fn run() {
             save_media,
             load_media,
             delete_media,
-            gc_media,
-            set_gemini_api_key,
-            has_gemini_api_key,
-            delete_gemini_api_key,
-            test_gemini_connection,
-            analyze_capture
+            gc_media
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 데스크톱 앱 실행 실패");
