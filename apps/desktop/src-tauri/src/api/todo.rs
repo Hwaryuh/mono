@@ -129,7 +129,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    let items = conn
+    let own_items = conn
         .prepare(
             "SELECT id, title, label_id, due_date, due_time, note, done, completed_at, \
              routine_id, occurrence_date FROM todo_items ORDER BY seq DESC",
@@ -149,6 +149,25 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    // read-model join: 오늘 스케줄된 루틴 occurrence를 todo item처럼 맨 앞에 붙인다.
+    // (apps/desktop mock-routine-occurrences.ts routineTodoItems 와 동일)
+    let mut items: Vec<TodoItem> = super::routine::today_todo_rows(conn)?
+        .into_iter()
+        .map(|r| TodoItem {
+            id: r.id,
+            title: r.title,
+            label_id: r.label_id,
+            due_date: Some(r.occurrence_date.clone()),
+            due_time: None,
+            note: String::new(),
+            done: r.done,
+            completed_at: r.completed_at,
+            routine_id: Some(r.routine_id),
+            occurrence_date: Some(r.occurrence_date),
+        })
+        .collect();
+    items.extend(own_items);
 
     Ok(TodoSnapshot { today: today_iso(), labels, items })
 }
@@ -261,6 +280,11 @@ fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult
         "UPDATE todo_items SET label_id = ?1 WHERE label_id = ?2",
         params![replacement, id],
     )?;
+    // 루틴도 같은 라벨 풀을 쓴다 — 죽은 label_id가 남지 않도록 함께 옮긴다 (mock deleteLabel).
+    tx.execute(
+        "UPDATE routine_items SET label_id = ?1 WHERE label_id = ?2",
+        params![replacement, id],
+    )?;
     tx.execute("DELETE FROM todo_labels WHERE id = ?1", [id])?;
     tx.commit()?;
     Ok(())
@@ -300,6 +324,10 @@ fn update_item(conn: &Connection, id: &str, input: TodoWriteInput) -> ApiResult<
 }
 
 fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
+    // todo 스냅샷에 섞여 나온 루틴 occurrence면 그쪽을 토글한다 (mock toggleComplete).
+    if super::routine::toggle_occurrence_by_id(conn, id)? {
+        return Ok(());
+    }
     let done_now = require_item(conn, id)?;
     let done = !done_now;
     let completed_at = if done { Some(now_iso()) } else { None };
@@ -570,5 +598,29 @@ mod tests {
         let label = seed_label(&conn, "업무");
         let err = create_item(&conn, item_input("   ", &label)).unwrap_err();
         assert!(matches!(err, ApiError::Validation(_)));
+    }
+
+    #[test]
+    fn routine_occurrence_shows_in_todo_snapshot_and_toggles_via_todo_id() {
+        use chrono::Datelike;
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let today_weekday = chrono::Local::now().date_naive().weekday().num_days_from_sunday();
+        conn.execute(
+            "INSERT INTO routine_items (id, seq, title, label_id, days_json, start_date, end_date) \
+             VALUES ('r1', 1, '물 마시기', 'health', ?1, '2000-01-01', NULL)",
+            params![format!("[{today_weekday}]")],
+        )
+        .unwrap();
+
+        let snapshot = get_snapshot(&conn).unwrap();
+        let routine_item = snapshot.items.iter().find(|i| i.routine_id.is_some()).unwrap();
+        assert_eq!(routine_item.title, "물 마시기");
+        assert!(routine_item.id.starts_with("routine-occurrence:r1:"));
+        assert!(!routine_item.done);
+
+        toggle_complete(&conn, &routine_item.id.clone()).unwrap();
+        let after = get_snapshot(&conn).unwrap();
+        assert!(after.items.iter().find(|i| i.routine_id.is_some()).unwrap().done);
     }
 }

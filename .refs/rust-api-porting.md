@@ -36,11 +36,23 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `051400e` | ledger | `src/api/ledger.rs` |
 | `462c408` | calendar | `src/api/calendar.rs` |
 | `34ca935` | scrap | `src/api/scrap.rs` |
+| (this) | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
 
-`cargo test --lib` 50개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 61개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
-네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*`
-프록시 중: `/routine/*` `/inbox/*` `/dashboard/*` `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*`
+프록시 중: `/inbox/*` `/dashboard/*` `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+
+routine 노트:
+- occurrence는 결정 키 `routine-occurrence:{routineId}:{date}`로 멱등 생성. `is_scheduled`는
+  ISO 날짜의 UTC 요일(chrono `weekday().num_days_from_sunday()`, JS `getUTCDay`와 동일)로 판정.
+- `todo.rs get_snapshot`이 `routine::today_todo_rows`로 오늘 occurrence를 todo item처럼 맨 앞에
+  join. `todo.rs toggle_complete`는 id가 occurrence면 `routine::toggle_occurrence_by_id`로 위임.
+  `todo.rs delete_label` 트랜잭션이 `routine_items.label_id`도 대체 라벨로 이동(라벨 풀 공유).
+  → Node `todo-repository.ts`는 이 join을 안 하지만 mock(`mock-routine-occurrences.ts`)은 함.
+  Rust는 mock 동작에 맞췄다. 프록시 중인 Node dashboard도 같은 sqlite `routine_occurrences`를
+  읽으므로 결정 키가 같아 정합.
+- `toggle`의 `completedAt`은 Node와 동일하게 `now_iso()` (mock의 "방금" 아님).
 
 ## 토대 모듈
 
@@ -89,12 +101,7 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 
 ### 1. routine → inbox → dashboard (크로스 경계)
 
-- **routine** — `getSnapshot`이 occurrence를 결정적 id(`routine-occurrence:{routineId}:{date}`)로
-  멱등 생성/병합. **todo 스냅샷에도 routine occurrence가 todo item처럼 섞여 나옴** (read-model
-  join — `todo-repository.ts` 주석 "루틴 occurrence 병합"). routine 포팅 시 todo.rs의
-  `get_snapshot`도 occurrence join 추가해야 함. `routine-repository.ts` +
-  `mock-routine-occurrences.ts` 로직 정독. contracts: `routineDefinitionSchema`,
-  `routineOccurrenceSchema`, `routineSnapshotSchema`, `routineWriteInputSchema` (L200~).
+- **routine** — ✅ 완료 (이번 커밋). 위 "routine 노트" 참고.
 - **inbox** — approve 시 `todo`/`calendar`/`ledger`/`scrap`에 write (`inbox-repository.ts`
   `approveToTodo`/`approveToCalendar`/`approveToScrap`/`approveToLedger`). JSON 컬럼
   (`fields_json`/`images_json`/`videos_json`) — 파싱은 `serde_json::from_str` 수동.

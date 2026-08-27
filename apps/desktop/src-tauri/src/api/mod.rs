@@ -8,6 +8,7 @@ mod db;
 mod error;
 mod ledger;
 mod proxy;
+mod routine;
 mod scrap;
 mod todo;
 
@@ -82,6 +83,7 @@ fn build_router(database: db::Db) -> Router {
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
         .merge(calendar::routes(database.clone()))
+        .merge(routine::routes(database.clone()))
         .merge(scrap::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
@@ -194,7 +196,7 @@ mod tests {
         // (아직 포팅 안 된 경계 하나를 골라 쓴다.)
         let router = build_router(db::open_memory());
         let response = router
-            .oneshot(Request::builder().uri("/routine/snapshot").body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/dashboard/snapshot").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
