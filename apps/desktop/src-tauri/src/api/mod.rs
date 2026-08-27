@@ -2,6 +2,7 @@
 // 포팅된 경계는 네이티브 처리, 나머지는 proxy.rs가 Node sidecar(127.0.0.1:4175)로 넘긴다.
 // 이관이 끝나면 proxy·sidecar를 삭제하고 이게 유일한 백엔드가 된다(계획: Option C).
 
+mod calendar;
 mod color;
 mod db;
 mod error;
@@ -78,7 +79,8 @@ fn build_router(database: db::Db) -> Router {
 
     Router::new()
         .merge(todo::routes(database.clone()))
-        .merge(ledger::routes(database))
+        .merge(ledger::routes(database.clone()))
+        .merge(calendar::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
@@ -187,9 +189,10 @@ mod tests {
     #[tokio::test]
     async fn unported_route_falls_through_to_proxy() {
         // 업스트림 sidecar(4175)가 없으니 502 — 프록시 fallback 배선 확인.
+        // (아직 포팅 안 된 경계 하나를 골라 쓴다.)
         let router = build_router(db::open_memory());
         let response = router
-            .oneshot(Request::builder().uri("/calendar/snapshot").body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/routine/snapshot").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
