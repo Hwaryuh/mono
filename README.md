@@ -4,8 +4,11 @@
 
 ## 개발 명령
 
-API 서버는 Tauri 바이너리에 임베드된 Rust axum 서버다(`apps/desktop/src-tauri/src/api`,
-127.0.0.1:4174). 별도로 띄울 것이 없다.
+API 서버는 별도 크레이트(`crates/mono-api`)의 Rust axum 서버다. 데스크톱은 이를 임베드해
+(`mono_api::spawn`, 127.0.0.1:4174) 실행하므로 별도로 띄울 것이 없다. 같은 서버를
+standalone으로 돌려(`cargo run -p mono-api`) 여러 기기가 공유할 수도 있다 — `MONO_BIND_ADDR`
+`MONO_DB_PATH` `MONO_SECRET_KEY_PATH` `MONO_CORS_ORIGINS` env로 설정하고, 데스크톱은
+`VITE_API_BASE_URL`로 그 주소를 가리킨다.
 
 ```powershell
 npm install
@@ -18,7 +21,7 @@ npm run desktop:dev
 npm run typecheck
 npm test                                     # 프론트 vitest
 npm run build
-cd apps/desktop/src-tauri; cargo test --lib  # 임베드 API 서버 유닛 테스트
+cargo test --lib -p mono-api                  # API 서버 유닛 테스트
 npm run desktop:build
 ```
 
