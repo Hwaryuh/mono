@@ -64,18 +64,21 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
-      # macOS 러너는 Apple Silicon → aarch64 .app/.dmg. Intel Mac 대상은 별도 매트릭스 필요.
-      # 코드 서명·공증은 APPLE_* 시크릿이 있을 때만. 없으면 미서명 번들.
+      # macOS 러너는 Apple Silicon → aarch64 .dmg. Intel Mac 대상은 별도 매트릭스 필요.
+      # APPLE_SIGNING_IDENTITY: '-' → ad-hoc 서명. 없으면 arm64 미서명 앱이 "손상됨"으로
+      # 안 뜬다. 정식 배포는 Developer ID + 공증(APPLE_ID/APPLE_TEAM_ID 시크릿).
       - name: Tauri build
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: npm run tauri --workspace @mono/desktop -- build
 
+      # .app은 zip으로 압축하면 심볼릭 링크·실행 권한이 깨진다 — .dmg만 올린다(mac 배포 형식).
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: mono-${{ matrix.os }}
           path: |
             apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/macos/*.app
             apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: warn
 
