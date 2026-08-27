@@ -323,8 +323,9 @@ fn update_item(conn: &Connection, id: &str, input: TodoWriteInput) -> ApiResult<
     Ok(())
 }
 
-fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
+pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
     // todo 스냅샷에 섞여 나온 루틴 occurrence면 그쪽을 토글한다 (mock toggleComplete).
+    // dashboard toggleTask도 이 함수를 그대로 쓴다 (동일 시맨틱).
     if super::routine::toggle_occurrence_by_id(conn, id)? {
         return Ok(());
     }

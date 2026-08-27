@@ -37,12 +37,22 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `462c408` | calendar | `src/api/calendar.rs` |
 | `34ca935` | scrap | `src/api/scrap.rs` |
 | `f8500d9` | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
-| (this) | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
+| `9881bd8` | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
+| (this) | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
 
-`cargo test --lib` 72개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 77개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
 네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*`
-프록시 중: `/dashboard/*` `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+  `/dashboard/snapshot` `/dashboard/tasks/{id}/toggle`
+프록시 중: `POST /dashboard/capture`(AI 얽힘), `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+
+dashboard 노트:
+- read-model 조합. sibling `get_snapshot` 안 부름 — todo.rs get_snapshot이 이제 occurrence를
+  merge하므로 dashboard가 그걸 쓰면 routineTasks가 중복됨. `todo_items` 테이블 직접 쿼리(최근 2),
+  routineTasks는 `routine::today_todo_rows` 재사용.
+- `toggle_handler`는 `todo::toggle_complete` 그대로 재사용(occurrence→todo 위임 시맨틱 동일).
+- `capture`는 analysisProvider(OpenAI/Gemini) 호출이라 AI 경계 포팅 후 네이티브로. 그때까지 프록시.
+  → cutover는 AI 경계까지 끝나야 가능(dashboard capture가 마지막 프록시 의존).
 
 inbox 노트:
 - `SqliteInboxRepository`는 이제 순수 DB — analysisProvider 안 씀(리팩터로 빠짐). 캡처 분석 경로 없음.
@@ -112,10 +122,8 @@ routine 노트:
 
 - **routine** — ✅ 완료. 위 "routine 노트" 참고.
 - **inbox** — ✅ 완료. 위 "inbox 노트" 참고.
-- **dashboard** — 모든 경계 집계(`dashboard-repository.ts`). todo/calendar/ledger/routine/scrap가
-  전부 네이티브인 뒤에 마지막으로. `dashboard-repository.ts` 정독 필요 — routine occurrence를
-  todo task로 병합(routine.rs `today_todo_rows` 재사용 가능), 월 지출 집계는 ledger 로직과 겹침.
-  AI 분석 provider(`recentCaptures`?)도 확인. 다음 세션 목표.
+- **dashboard** — ✅ snapshot + toggleTask 완료. `POST /dashboard/capture`만 프록시(AI 얽힘).
+  위 "dashboard 노트" 참고.
 
 ### 2. 인프라 청크
 

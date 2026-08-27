@@ -4,6 +4,7 @@
 
 mod calendar;
 mod color;
+mod dashboard;
 mod db;
 mod error;
 mod inbox;
@@ -86,7 +87,8 @@ fn build_router(database: db::Db) -> Router {
         .merge(calendar::routes(database.clone()))
         .merge(routine::routes(database.clone()))
         .merge(scrap::routes(database.clone()))
-        .merge(inbox::routes(database))
+        .merge(inbox::routes(database.clone()))
+        .merge(dashboard::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
@@ -198,7 +200,7 @@ mod tests {
         // (아직 포팅 안 된 경계 하나를 골라 쓴다.)
         let router = build_router(db::open_memory());
         let response = router
-            .oneshot(Request::builder().uri("/dashboard/snapshot").body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/ai/keys/gemini").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
