@@ -1,6 +1,8 @@
 node_modules/
 dist/
 target/
+.claude/settings.local.json
+.impeccable/hook.cache.json
 release/
 *.log
 *.tsbuildinfo
