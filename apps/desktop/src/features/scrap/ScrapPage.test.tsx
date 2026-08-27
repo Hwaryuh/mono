@@ -19,6 +19,7 @@ function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepositor
     create: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
     addTag: vi.fn(async () => {}),
+    renameTag: vi.fn(async () => {}),
     addComment: vi.fn(async () => {}),
     updateComment: vi.fn(async () => {}),
     deleteComment: vi.fn(async () => {}),
@@ -252,6 +253,29 @@ describe("ScrapPage", () => {
     expect(managerTrigger).toHaveFocus();
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
     expect(await screen.findByRole("button", { name: /새 링크 자료/ })).toBeInTheDocument();
+  });
+
+  it("라벨 관리 Modal에서 기존 라벨 이름을 바꾸면 목록과 필터에 반영된다", async () => {
+    const repository = createMockScrapRepository();
+    renderPage(repository, "/scrap?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    fireEvent.click(within(modal).getByRole("button", { name: "관리" }));
+    const manager = await screen.findByRole("dialog", { name: "라벨 관리" });
+
+    fireEvent.click(within(manager).getByRole("button", { name: "요리 편집" }));
+    expect(within(manager).getByRole("textbox", { name: "라벨 이름" })).toHaveValue("요리");
+    expect(within(manager).getByText("라벨 수정")).toBeInTheDocument();
+
+    fireEvent.change(within(manager).getByRole("textbox", { name: "라벨 이름" }), { target: { value: "레시피" } });
+    fireEvent.click(within(manager).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(within(manager).queryByText("요리")).not.toBeInTheDocument());
+    expect(within(manager).getByText("레시피")).toBeInTheDocument();
+
+    const snapshot = await repository.getSnapshot();
+    expect(snapshot.tags).not.toContain("요리");
+    expect(snapshot.tags).toContain("레시피");
+    expect(snapshot.items.filter((item) => item.tag === "요리")).toHaveLength(0);
   });
 
   it("생성 mutation 실패 시 Modal과 입력값을 보존한다", async () => {

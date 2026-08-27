@@ -39,6 +39,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const [tagSaving, setTagSaving] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tagError, setTagError] = useState<string | null>(null);
+  const [editingTag, setEditingTag] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const handledModalRef = useRef(false);
   const tagRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -145,6 +146,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   function openTagManager() {
     setTagInput("");
     setTagError(null);
+    setEditingTag(null);
     setTagManagerOpen(true);
   }
 
@@ -152,6 +154,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     if (tagSaving) return;
     setTagManagerOpen(false);
     setTagInput("");
+    setTagError(null);
+    setEditingTag(null);
+  }
+
+  function editTag(tag: string) {
+    setEditingTag(tag);
+    setTagInput(tag);
     setTagError(null);
   }
 
@@ -164,9 +173,17 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     setTagError(null);
     setTagSaving(true);
     try {
-      await repository.addTag(tag);
-      await queryClient.invalidateQueries({ queryKey: scrapQueryKey });
-      setDraft((current) => ({ ...current, tag }));
+      if (editingTag) {
+        await repository.renameTag(editingTag, tag);
+        await invalidateSnapshots();
+        setActiveTag((current) => current === editingTag ? tag : current);
+        setDraft((current) => current.tag === editingTag ? { ...current, tag } : current);
+        setEditingTag(null);
+      } else {
+        await repository.addTag(tag);
+        await queryClient.invalidateQueries({ queryKey: scrapQueryKey });
+        setDraft((current) => ({ ...current, tag }));
+      }
       setTagInput("");
     } catch (error) {
       setTagError(errorMessage(error));
@@ -258,14 +275,18 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
               <div className="scrap-label-manager__row" key={tag}>
                 <strong>{tag}</strong>
                 <span>{snapshot.items.filter((item) => item.tag === tag).length}개</span>
+                <IconButton aria-label={`${tag} 편집`} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title="편집" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
               </div>
             ))}
           </div>
           <form aria-busy={tagSaving} className="scrap-label-create" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
-            <strong>새 라벨</strong>
+            <div className="scrap-label-create__header">
+              <strong>{editingTag ? "라벨 수정" : "새 라벨"}</strong>
+              {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">취소</button>}
+            </div>
             <div className="scrap-label-create__controls">
               <Input aria-label="라벨 이름" autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder="라벨 이름" value={tagInput} />
-              <Button loading={tagSaving} type="submit" variant="primary">추가</Button>
+              <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? "저장" : "추가"}</Button>
             </div>
             {tagError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
           </form>

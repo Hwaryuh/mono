@@ -60,6 +60,33 @@ describe("SqliteScrapRepository", () => {
     await repo.addTag("새태그");
     expect((await repo.getSnapshot()).tags).toEqual(["새태그"]);
   });
+
+  it("renameTag는 태그 목록과 이를 참조하는 스크랩 항목을 함께 옮긴다", async () => {
+    await repo.create({ title: "스크랩1", memo: "", url: "", tag: "요리" });
+    await repo.create({ title: "스크랩2", memo: "", url: "", tag: "요리" });
+
+    await repo.renameTag("요리", "레시피");
+
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.tags).toEqual(["레시피"]);
+    expect(snapshot.items.every((item) => item.tag === "레시피")).toBe(true);
+  });
+
+  it("renameTag는 없는 태그면 명확한 오류를 던진다", async () => {
+    await expect(repo.renameTag("없음", "새이름")).rejects.toThrow("찾을 수 없습니다");
+  });
+
+  it("renameTag는 다른 태그와 이름이 겹치면 거부한다", async () => {
+    await repo.addTag("요리");
+    await repo.addTag("레퍼런스");
+    await expect(repo.renameTag("요리", "레퍼런스")).rejects.toThrow("같은 이름의 라벨이 이미 있습니다.");
+  });
+
+  it("renameTag는 자기 자신으로의 변경(공백 트림만)은 허용한다", async () => {
+    await repo.addTag("요리");
+    await repo.renameTag("요리", " 요리 ");
+    expect((await repo.getSnapshot()).tags).toEqual(["요리"]);
+  });
 });
 
 describe("scrap routes", () => {
@@ -76,6 +103,21 @@ describe("scrap routes", () => {
 
     const missing = await app.inject({ method: "DELETE", url: "/scrap/items/nope" });
     expect(missing.statusCode).toBe(404);
+
+    await app.close();
+  });
+
+  it("HTTP로 태그 이름을 바꾸면 스냅샷에 반영된다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+
+    await app.inject({ method: "POST", url: "/scrap/items", payload: { title: "스크랩", memo: "", url: "", tag: "요리" } });
+    const renamed = await app.inject({ method: "PUT", url: `/scrap/tags/${encodeURIComponent("요리")}`, payload: { nextTag: "레시피" } });
+    expect(renamed.statusCode).toBe(200);
+
+    const snapshot = JSON.parse((await app.inject({ method: "GET", url: "/scrap/snapshot" })).body);
+    expect(snapshot.tags).toEqual(["레시피"]);
+    expect(snapshot.items[0].tag).toBe("레시피");
 
     await app.close();
   });

@@ -11,4 +11,5 @@ export interface ScrapRepository extends ScrapCommentRepository {
   create(input: ScrapWriteInput): Promise<void>;
   delete(scrapId: string): Promise<void>;
   addTag(tag: string): Promise<void>;
+  renameTag(tag: string, nextTag: string): Promise<void>;
 }

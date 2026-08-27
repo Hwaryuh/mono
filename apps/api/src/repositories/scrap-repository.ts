@@ -66,6 +66,19 @@ export class SqliteScrapRepository {
     this.db.insert(scrapTags).values({ tag: parsed }).onConflictDoNothing().run();
   }
 
+  // 스크랩 태그는 todo 라벨과 달리 별도 id가 없다 — 문자열 자체가 기본키다.
+  // 그래서 이름을 바꾸는 건 곧 기본키를 바꾸는 것이고, 이를 참조하는 scrapItems.tag도
+  // 함께 옮겨줘야 한다(FK 제약이 없어 DB가 대신 해주지 않는다).
+  async renameTag(tag: string, nextTag: string): Promise<void> {
+    const parsed = scrapWriteInputSchema.shape.tag.parse(nextTag);
+    this.requireTag(tag);
+    if (parsed !== tag) this.assertUniqueTagName(parsed);
+    this.db.transaction((tx) => {
+      tx.update(scrapTags).set({ tag: parsed }).where(eq(scrapTags.tag, tag)).run();
+      tx.update(scrapItems).set({ tag: parsed }).where(eq(scrapItems.tag, tag)).run();
+    });
+  }
+
   async addComment(scrapId: string, input: ScrapCommentInput): Promise<void> {
     this.requireScrap(scrapId);
     const parsed = scrapCommentInputSchema.parse(input);
@@ -96,5 +109,15 @@ export class SqliteScrapRepository {
     const comment = this.db.select().from(scrapComments).where(eq(scrapComments.id, commentId)).get();
     if (!comment || comment.scrapId !== scrapId) throw new Error(`댓글을 찾을 수 없습니다: ${commentId}`);
     return comment;
+  }
+
+  private requireTag(tag: string) {
+    const row = this.db.select().from(scrapTags).where(eq(scrapTags.tag, tag)).get();
+    if (!row) throw new Error(`라벨을 찾을 수 없습니다: ${tag}`);
+  }
+
+  private assertUniqueTagName(tag: string) {
+    const clash = this.db.select().from(scrapTags).where(eq(scrapTags.tag, tag)).get();
+    if (clash) throw new Error("같은 이름의 라벨이 이미 있습니다.");
   }
 }

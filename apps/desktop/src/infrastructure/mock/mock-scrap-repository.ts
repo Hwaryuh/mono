@@ -41,6 +41,15 @@ class MockScrapRepository implements ScrapRepository {
     if (!this.state.scrap.tags.includes(parsed)) this.state.scrap.tags.push(parsed);
   }
 
+  async renameTag(tag: string, nextTag: string) {
+    const parsed = scrapWriteInputSchema.shape.tag.parse(nextTag);
+    const index = this.state.scrap.tags.indexOf(tag);
+    if (index === -1) throw new Error(`라벨을 찾을 수 없습니다: ${tag}`);
+    if (parsed !== tag && this.state.scrap.tags.includes(parsed)) throw new Error("같은 이름의 라벨이 이미 있습니다.");
+    this.state.scrap.tags[index] = parsed;
+    this.state.scrap.items.forEach((item) => { if (item.tag === tag) item.tag = parsed; });
+  }
+
   async addComment(scrapId: string, input: Parameters<ScrapRepository["addComment"]>[1]) {
     const scrap = requireScrap(this.state, scrapId);
     const parsed = scrapCommentInputSchema.parse(input);
