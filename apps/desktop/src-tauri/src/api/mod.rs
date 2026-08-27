@@ -2,6 +2,7 @@
 // 포팅된 경계는 네이티브 처리, 나머지는 proxy.rs가 Node sidecar(127.0.0.1:4175)로 넘긴다.
 // 이관이 끝나면 proxy·sidecar를 삭제하고 이게 유일한 백엔드가 된다(계획: Option C).
 
+mod ai;
 mod calendar;
 mod color;
 mod dashboard;
@@ -102,10 +103,11 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>) -> Router {
         .merge(calendar::routes(database.clone()))
         .merge(routine::routes(database.clone()))
         .merge(scrap::routes(database.clone()))
-        .merge(inbox::routes(database.clone()))
-        .merge(dashboard::routes(database.clone()))
+        .merge(inbox::routes(database))
+        .merge(dashboard::routes(secret_state.clone()))
         .merge(secret::routes(secret_state.clone()))
-        .merge(media::routes(secret_state))
+        .merge(media::routes(secret_state.clone()))
+        .merge(ai::routes(secret_state))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.

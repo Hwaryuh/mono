@@ -1,19 +1,21 @@
 use std::collections::{HashMap, HashSet};
 
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::Datelike;
-use rusqlite::Connection;
-use serde::Serialize;
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::db::Db;
-use super::error::ApiResult;
+use super::ai::{self, AnalysisContext, CaptureImage, CaptureVideo};
+use super::error::{ApiError, ApiResult};
+use super::secret::{self, SecretState};
 use super::{routine, todo};
 
-// capture(캡처 분석)는 AI 경계와 얽혀 있어 아직 프록시로 Node에 넘긴다.
-// 여기서는 read-model 조회(getSnapshot)와 toggleTask만 네이티브 처리한다.
+// getSnapshot·toggleTask·capture 모두 네이티브. capture의 AI 분석은 ai.rs가 처리하고
+// 실패 시 Node와 동일하게 status:"failed" 수집함 항목을 만든다(201은 그대로 반환).
 
 const OTHER_COLOR: &str = "oklch(0.645 0.009 106.643)";
 
@@ -93,6 +95,10 @@ struct DashboardSnapshot {
 
 fn today_iso() -> String {
     chrono::Local::now().date_naive().to_string()
+}
+
+fn now_iso() -> String {
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
 // domain koreanDateLabel(iso, "long")
@@ -329,21 +335,197 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
     })
 }
 
-// ---------- 라우트 (apps/api/src/routes/dashboard.ts — capture는 프록시로) ----------
+// ---------- capture (dashboard-repository.ts capture 1:1) ----------
 
-pub fn routes(db: Db) -> Router {
+#[derive(Deserialize)]
+struct CaptureInput {
+    #[serde(default)]
+    raw: String,
+    #[serde(default)]
+    images: Vec<CaptureImage>,
+    #[serde(default)]
+    videos: Vec<CaptureVideo>,
+}
+
+fn names(conn: &Connection, sql: &str) -> ApiResult<Vec<String>> {
+    Ok(conn
+        .prepare(sql)?
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+fn build_context(conn: &Connection) -> ApiResult<AnalysisContext> {
+    Ok(AnalysisContext {
+        today: today_iso(),
+        todo_labels: names(conn, "SELECT name FROM todo_labels")?,
+        calendar_categories: names(conn, "SELECT name FROM calendar_categories")?,
+        ledger_categories: names(conn, "SELECT name FROM ledger_categories")?,
+        scrap_tags: names(conn, "SELECT tag FROM scrap_tags")?,
+    })
+}
+
+fn field(label: &str, value: &str) -> ai::AnalysisField {
+    ai::AnalysisField { label: label.to_string(), value: value.to_string(), confidence: None }
+}
+
+async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
+    let raw_trimmed = input.raw.trim().to_string();
+    if raw_trimmed.chars().count() > 2_000 {
+        return Err(ApiError::validation("캡처 텍스트는 2000자 이하여야 합니다."));
+    }
+    if input.images.len() > 4 {
+        return Err(ApiError::validation("사진은 최대 4장입니다."));
+    }
+    if input.videos.len() > 1 {
+        return Err(ApiError::validation("영상은 1개만 첨부할 수 있습니다."));
+    }
+    if raw_trimmed.is_empty() && input.images.is_empty() && input.videos.is_empty() {
+        return Err(ApiError::validation("텍스트, 사진 또는 영상이 필요합니다."));
+    }
+
+    let has_video = !input.videos.is_empty();
+    let raw = if !raw_trimmed.is_empty() {
+        raw_trimmed.clone()
+    } else if has_video {
+        input.videos[0].name.clone()
+    } else {
+        format!("사진 {}장", input.images.len())
+    };
+
+    // 영상은 고정 분석(mock·Node 동일), 그 외는 활성 provider로.
+    let analysis: Result<ai::CaptureAnalysisResult, String> = if has_video {
+        Ok(ai::CaptureAnalysisResult {
+            target: "scrap".into(),
+            confidence: 1.0,
+            fields: vec![
+                field("제목", &raw),
+                field("메모", &raw_trimmed),
+                field("라벨", "수집"),
+            ],
+        })
+    } else {
+        let (provider, key, context) = {
+            let conn = state.db.lock().unwrap();
+            let provider = secret::get_active_provider(&conn)?;
+            let key = secret::get_api_key(&conn, &state.crypto, &provider)?;
+            let context = build_context(&conn)?;
+            (provider, key, context)
+        };
+        match key {
+            None => Err(format!("{} API 키가 설정되지 않았습니다.", ai::label(&provider))),
+            Some(key) => ai::analyze(&provider, &key, &raw, &input.images, Some(&context)).await,
+        }
+    };
+
+    let source = if has_video {
+        "video"
+    } else if !input.images.is_empty() {
+        "image"
+    } else if raw.starts_with("http://") || raw.starts_with("https://") {
+        "url"
+    } else {
+        "text"
+    };
+
+    let strip = |items: &[(String, String, i64, String)]| {
+        serde_json::to_string(
+            &items
+                .iter()
+                .map(|(name, mime, size, media)| {
+                    json!({ "name": name, "mimeType": mime, "size": size, "mediaId": media })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let images_meta: Vec<_> = input
+        .images
+        .iter()
+        .map(|i| (i.name.clone(), i.mime_type.clone(), i.size, i.media_id.clone()))
+        .collect();
+    let videos_meta: Vec<_> = input
+        .videos
+        .iter()
+        .map(|v| (v.name.clone(), v.mime_type.clone(), v.size, v.media_id.clone()))
+        .collect();
+    let images_json = (!images_meta.is_empty()).then(|| strip(&images_meta));
+    let videos_json = has_video.then(|| strip(&videos_meta));
+
+    let (target, confidence, status, fields_json) = match &analysis {
+        Ok(a) => (
+            Some(a.target.clone()),
+            a.confidence,
+            "pending",
+            serde_json::to_string(&a.fields).unwrap(),
+        ),
+        Err(message) => (
+            None,
+            0.0_f64,
+            "failed",
+            json!([{ "label": "원인", "value": message }]).to_string(),
+        ),
+    };
+
+    let conn = state.db.lock().unwrap();
+    if let Ok(a) = &analysis {
+        let next: i64 = conn
+            .query_row("SELECT COALESCE(MAX(seq), 0) FROM dashboard_captures", [], |r| r.get(0))?;
+        conn.execute(
+            "INSERT INTO dashboard_captures (id, seq, raw, module, confidence) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![uuid::Uuid::new_v4().to_string(), next + 1, raw, a.target, a.confidence],
+        )?;
+    }
+    let next_inbox: i64 =
+        conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM inbox_items", [], |r| r.get(0))?;
+    conn.execute(
+        "INSERT INTO inbox_items \
+         (id, seq, source, raw, target, confidence, status, pinned, received_at, fields_json, images_json, videos_json) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        params![
+            uuid::Uuid::new_v4().to_string(),
+            next_inbox + 1,
+            source,
+            raw,
+            target,
+            confidence,
+            status,
+            has_video as i64,
+            now_iso(),
+            fields_json,
+            images_json,
+            videos_json,
+        ],
+    )?;
+    Ok(())
+}
+
+// ---------- 라우트 (apps/api/src/routes/dashboard.ts) ----------
+
+pub fn routes(state: SecretState) -> Router {
     Router::new()
         .route("/dashboard/snapshot", get(snapshot_handler))
+        .route("/dashboard/capture", post(capture_handler))
         .route("/dashboard/tasks/{id}/toggle", post(toggle_handler))
-        .with_state(db)
+        .with_state(state)
 }
 
-async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<DashboardSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap())?))
+async fn snapshot_handler(State(state): State<SecretState>) -> ApiResult<Json<DashboardSnapshot>> {
+    Ok(Json(get_snapshot(&state.db.lock().unwrap())?))
 }
 
-async fn toggle_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    todo::toggle_complete(&db.lock().unwrap(), &id)?;
+async fn capture_handler(
+    State(state): State<SecretState>,
+    Json(input): Json<CaptureInput>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    capture(&state, input).await?;
+    Ok((StatusCode::CREATED, Json(json!({ "ok": true }))))
+}
+
+async fn toggle_handler(
+    State(state): State<SecretState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    todo::toggle_complete(&state.db.lock().unwrap(), &id)?;
     Ok(Json(json!({ "ok": true })))
 }
 
@@ -489,5 +671,78 @@ mod tests {
         assert_eq!(snap.routines[0].week.len(), 7);
         assert!(snap.routines[0].week[6]); // today = 마지막 칸
         assert_eq!(snap.routines[0].period, "∞");
+    }
+
+    fn state(db: crate::api::db::Db) -> SecretState {
+        SecretState { db, crypto: crate::api::secret::SecretCrypto::test_arc() }
+    }
+
+    #[tokio::test]
+    async fn capture_without_api_key_creates_failed_inbox_item() {
+        let db = db::open_memory();
+        capture(
+            &state(db.clone()),
+            CaptureInput { raw: "테스트 캡처".into(), images: vec![], videos: vec![] },
+        )
+        .await
+        .unwrap();
+        let conn = db.lock().unwrap();
+        let (status, fields, source): (String, String, String) = conn
+            .query_row("SELECT status, fields_json, source FROM inbox_items LIMIT 1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(status, "failed");
+        assert_eq!(source, "text");
+        assert!(fields.contains("원인"));
+        assert!(fields.contains("API 키가 설정되지 않았습니다"));
+        assert_eq!(get_snapshot(&conn).unwrap().pending_capture_count, 0);
+    }
+
+    #[tokio::test]
+    async fn capture_video_uses_fixed_scrap_analysis() {
+        let db = db::open_memory();
+        capture(
+            &state(db.clone()),
+            CaptureInput {
+                raw: String::new(),
+                images: vec![],
+                videos: vec![CaptureVideo {
+                    name: "clip.mp4".into(),
+                    mime_type: "video/mp4".into(),
+                    size: 10,
+                    media_id: "m1".into(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+        let conn = db.lock().unwrap();
+        let (source, target, status, pinned, raw): (String, Option<String>, String, i64, String) =
+            conn.query_row(
+                "SELECT source, target, status, pinned, raw FROM inbox_items LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .unwrap();
+        assert_eq!(source, "video");
+        assert_eq!(target.as_deref(), Some("scrap"));
+        assert_eq!(status, "pending");
+        assert_eq!(pinned, 1);
+        assert_eq!(raw, "clip.mp4");
+        let captures: i64 =
+            conn.query_row("SELECT COUNT(*) FROM dashboard_captures", [], |r| r.get(0)).unwrap();
+        assert_eq!(captures, 1);
+    }
+
+    #[tokio::test]
+    async fn capture_rejects_empty_input() {
+        let err = capture(
+            &state(db::open_memory()),
+            CaptureInput { raw: "  ".into(), images: vec![], videos: vec![] },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, ApiError::Validation(_)));
     }
 }

@@ -40,13 +40,27 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `9881bd8` | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
 | `bbdb8f6` | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
 | `b0b8908` | secret-store + crypto (AI 키 · R2 자격증명 CRUD) | `src/api/secret.rs`, `mod.rs`, `lib.rs`, `Cargo.toml` |
-| (this) | R2 media store (`/media/*` 전부) | `src/api/media.rs`, `src/api/secret.rs` (get_r2_config 노출), `Cargo.toml` |
+| `c8a9bde` | R2 media store (`/media/*` 전부) | `src/api/media.rs`, `src/api/secret.rs` (get_r2_config 노출), `Cargo.toml` |
+| (this) | AI capture-analysis (`/dashboard/capture` + `/ai/keys/{p}/test`) | `src/api/ai.rs`, `src/api/dashboard.rs`, `src/api/secret.rs` (get_api_key·get_active_provider 노출) |
 
-`cargo test --lib` 94개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 108개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
 네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*` `/media/*`
-  `/dashboard/snapshot` `/dashboard/tasks/{id}/toggle` `/ai/keys/{provider}` `/ai/provider`
-프록시 중: `POST /dashboard/capture`(AI 얽힘), `POST /ai/keys/{p}/test`(provider 연결 확인), `/link-previews/*`
+  `/dashboard/*` `/ai/*`
+프록시 중: `/link-previews/*` (마지막 경계)
+
+ai 노트:
+- capture-analysis-prompt/validation + openai/gemini provider + selectable dispatch를 `ai.rs`로.
+  프롬프트 문자열·모델(gpt-5-nano / gemini-2.5-flash-lite)·엔드포인트·gemini responseJsonSchema
+  전부 Node 그대로. reqwest는 `json` feature 없어 `.body(payload.to_string())` + content-type 헤더 수동.
+- `analyze`/`test_connection`은 `Result<_, String>` — capture는 실패를 삼켜 inbox `status:"failed"`
+  (`fields:[{원인, msg}]`)로 저장하고 201 반환. `/ai/keys/{p}/test`는 실패를 400으로.
+- dashboard `routes`가 이제 `SecretState`를 받음(capture가 활성 provider·API 키·context 필요).
+  snapshot/toggle 핸들러도 `state.db` 사용.
+- **AI 실제 HTTP 왕복은 in-repo 검증 없음** — JS도 fetch 목킹. 프롬프트 빌드·응답 파싱·검증·
+  capture 실패/영상 경로만 유닛 테스트(11 + 3).
+- `SelectableCaptureAnalysisProvider`(호출 시점 active provider 재조회)는 capture 안에서
+  `secret::get_active_provider` + `secret::get_api_key`로 인라인.
 
 media 노트:
 - aws-sdk 대신 SigV4 손수 서명(`hmac`+`sha2`) + `reqwest`. 6개 op만: put/get/delete/head-bucket/list.
@@ -151,12 +165,11 @@ routine 노트:
 
 - **secret-store + secret-crypto** — ✅ 완료. 위 "secret 노트" 참고.
 - **R2 media store** — ✅ 완료. 위 "media 노트" 참고.
-- **AI capture-analysis** — `reqwest`. OpenAI + Gemini provider
-  (`openai-capture-analysis-provider.ts`, `gemini-capture-analysis-provider.ts`),
-  프롬프트 빌드(`capture-analysis-prompt.ts`), 응답 검증(`capture-analysis-validation.ts`),
-  provider 선택(`selectable-capture-analysis-provider.ts`). `/ai` 라우트.
-- **link-preview** — `reqwest` + HTML 파싱(`scraper` 크레이트). OG 태그 추출 후 이미지 프록시
+- **AI capture-analysis** — ✅ 완료. 위 "ai 노트" 참고.
+- **link-preview** — `reqwest` + HTML 파싱. OG 태그 추출 후 이미지 프록시
   (`link-preview-image-provider.ts`). `/link-previews/image` 라우트. CSP에 이미 4174 허용됨.
+  `scraper` 크레이트는 무거움 — OG 메타 추출은 `<meta property="og:..." content="...">` 정규식/
+  손수 파싱으로 충분(inbox 날짜 스캐너처럼). 마지막 경계 → 끝나면 cutover.
 
 ### 3. cutover
 

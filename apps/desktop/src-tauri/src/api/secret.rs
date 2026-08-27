@@ -147,6 +147,22 @@ fn has_api_key(conn: &Connection, provider: &str) -> ApiResult<bool> {
     has_key(conn, provider_storage_key(provider)?)
 }
 
+// ai 경계 + dashboard capture가 쓴다 — 복호화한 API 키. 알 수 없는 provider면 BadRequest.
+pub(super) fn get_api_key(
+    conn: &Connection,
+    crypto: &SecretCrypto,
+    provider: &str,
+) -> ApiResult<Option<String>> {
+    let storage_key = provider_storage_key(provider)?;
+    match conn
+        .query_row("SELECT value FROM secrets WHERE key = ?1", [storage_key], |r| r.get::<_, String>(0))
+        .optional()?
+    {
+        Some(enc) => Ok(Some(crypto.decrypt(&enc)?)),
+        None => Ok(None),
+    }
+}
+
 fn set_api_key(conn: &Connection, crypto: &SecretCrypto, provider: &str, api_key: &str) -> ApiResult<()> {
     let storage_key = provider_storage_key(provider)?;
     if api_key.trim().is_empty() {
@@ -162,7 +178,7 @@ fn delete_api_key(conn: &Connection, provider: &str) -> ApiResult<()> {
     delete_key(conn, provider_storage_key(provider)?)
 }
 
-fn get_active_provider(conn: &Connection) -> ApiResult<String> {
+pub(super) fn get_active_provider(conn: &Connection) -> ApiResult<String> {
     let value: Option<String> = conn
         .query_row("SELECT value FROM secrets WHERE key = ?1", [ACTIVE_PROVIDER_KEY], |row| row.get(0))
         .optional()?;
