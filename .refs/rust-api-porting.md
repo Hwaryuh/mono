@@ -36,12 +36,21 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `051400e` | ledger | `src/api/ledger.rs` |
 | `462c408` | calendar | `src/api/calendar.rs` |
 | `34ca935` | scrap | `src/api/scrap.rs` |
-| (this) | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
+| `f8500d9` | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
+| (this) | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
 
-`cargo test --lib` 61개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 72개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
-네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*`
-프록시 중: `/inbox/*` `/dashboard/*` `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*`
+프록시 중: `/dashboard/*` `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+
+inbox 노트:
+- `SqliteInboxRepository`는 이제 순수 DB — analysisProvider 안 씀(리팩터로 빠짐). 캡처 분석 경로 없음.
+- approve 시 대상 테이블(todo/calendar/ledger/scrap)에 sibling repo 우회하고 직접 INSERT.
+  ledger만 `ledger::create_expense`(원화 정규화 재사용) 경유.
+- 라벨/분류 매칭: `normalize_name`(공백 제거+소문자) 후 이름 비교 → fallback(work/hobby/other/첫 항목).
+- 일시/마감 파싱: `/\d{4}-\d{2}-\d{2}/` `/\d{1,2}:\d{2}/`를 바이트 스캐너로 손수(정규식 크레이트 없음).
+- JSON 컬럼(`fields_json`/`images_json`/`videos_json`)은 `serde_json::from_str` 수동 파싱.
 
 routine 노트:
 - occurrence는 결정 키 `routine-occurrence:{routineId}:{date}`로 멱등 생성. `is_scheduled`는
@@ -101,14 +110,12 @@ routine 노트:
 
 ### 1. routine → inbox → dashboard (크로스 경계)
 
-- **routine** — ✅ 완료 (이번 커밋). 위 "routine 노트" 참고.
-- **inbox** — approve 시 `todo`/`calendar`/`ledger`/`scrap`에 write (`inbox-repository.ts`
-  `approveToTodo`/`approveToCalendar`/`approveToScrap`/`approveToLedger`). JSON 컬럼
-  (`fields_json`/`images_json`/`videos_json`) — 파싱은 `serde_json::from_str` 수동.
-  AI 분석 호출(`SqliteInboxRepository` 생성자에 analysisProvider) — 분석은 `/ai` 경계와
-  얽힘. inbox의 캡처 분석 경로는 AI 경계 포팅 후에.
+- **routine** — ✅ 완료. 위 "routine 노트" 참고.
+- **inbox** — ✅ 완료. 위 "inbox 노트" 참고.
 - **dashboard** — 모든 경계 집계(`dashboard-repository.ts`). todo/calendar/ledger/routine/scrap가
-  전부 네이티브인 뒤에 마지막으로. AI 분석 provider도 씀.
+  전부 네이티브인 뒤에 마지막으로. `dashboard-repository.ts` 정독 필요 — routine occurrence를
+  todo task로 병합(routine.rs `today_todo_rows` 재사용 가능), 월 지출 집계는 ledger 로직과 겹침.
+  AI 분석 provider(`recentCaptures`?)도 확인. 다음 세션 목표.
 
 ### 2. 인프라 청크
 

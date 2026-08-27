@@ -48,13 +48,13 @@ struct LedgerSnapshot {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct LedgerWriteInput {
-    title: String,
-    amount_won: Value,
-    date: String,
-    category_id: String,
+pub(super) struct LedgerWriteInput {
+    pub(super) title: String,
+    pub(super) amount_won: Value,
+    pub(super) date: String,
+    pub(super) category_id: String,
     #[serde(default)]
-    note: String,
+    pub(super) note: String,
 }
 
 #[derive(Deserialize)]
@@ -261,7 +261,7 @@ fn assert_unique_name(conn: &Connection, name: &str, except_id: Option<&str>) ->
     Ok(())
 }
 
-fn create_expense(conn: &Connection, input: LedgerWriteInput) -> ApiResult<()> {
+pub(super) fn create_expense(conn: &Connection, input: LedgerWriteInput) -> ApiResult<()> {
     let title = validated_title(&input.title)?;
     let amount = validated_amount(&input.amount_won)?;
     let date = validated_date(&input.date)?;

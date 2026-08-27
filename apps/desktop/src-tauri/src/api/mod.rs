@@ -6,6 +6,7 @@ mod calendar;
 mod color;
 mod db;
 mod error;
+mod inbox;
 mod ledger;
 mod proxy;
 mod routine;
@@ -84,7 +85,8 @@ fn build_router(database: db::Db) -> Router {
         .merge(ledger::routes(database.clone()))
         .merge(calendar::routes(database.clone()))
         .merge(routine::routes(database.clone()))
-        .merge(scrap::routes(database))
+        .merge(scrap::routes(database.clone()))
+        .merge(inbox::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
