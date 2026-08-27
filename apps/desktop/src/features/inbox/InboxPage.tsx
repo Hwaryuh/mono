@@ -1,5 +1,5 @@
 import type { CalendarCategory, InboxField, InboxItem, InboxUpdateInput, LedgerCategory, TodoLabel } from "@mono/contracts";
-import { inboxTargetModuleIds, type InboxTargetModuleId } from "@mono/domain";
+import { formatTimestamp, inboxTargetModuleIds, type InboxTargetModuleId } from "@mono/domain";
 import {
   Badge,
   Button,
@@ -570,7 +570,7 @@ function InboxRow({
   return (
     <Card aria-busy={busy} className="inbox-item">
       <div className="inbox-item__source">
-        <div><Icon name={source.icon} size={13} /><span>{source.name}</span><time>{item.receivedAt}</time></div>
+        <div><Icon name={source.icon} size={13} /><span>{source.name}</span><time>{formatTimestamp(item.receivedAt)}</time></div>
         <p>{item.raw}</p>
         {item.source === "image" && (item.images?.length
           ? <div className="inbox-item__thumbnails">{item.images.map((image, index) => <InboxMediaThumbnail key={`${image.mediaId}-${index}`} mediaId={image.mediaId} name={image.name} />)}</div>

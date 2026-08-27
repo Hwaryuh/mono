@@ -20,6 +20,7 @@ pub fn run() {
             let sidecar = ApiSidecar::spawn(
                 &data_directory.join("mono.sqlite"),
                 &data_directory.join("mono.secret.key"),
+                &data_directory.join("sidecar"),
             );
             app.manage(sidecar);
 

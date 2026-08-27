@@ -8,6 +8,7 @@ export type InboxTargetModuleId = (typeof inboxTargetModuleIds)[number];
 
 export {
   currentIsoDate,
+  formatTimestamp,
   koreanDateLabel,
   koreanMonthLabel,
   type WeekdayStyle,

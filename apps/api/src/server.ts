@@ -8,6 +8,7 @@ import { SqliteDashboardRepository } from "./repositories/dashboard-repository.t
 import { GeminiCaptureAnalysisProvider } from "./repositories/gemini-capture-analysis-provider.ts";
 import { SqliteInboxRepository } from "./repositories/inbox-repository.ts";
 import { SqliteLedgerRepository } from "./repositories/ledger-repository.ts";
+import { HttpLinkPreviewImageProvider } from "./repositories/link-preview-image-provider.ts";
 import { MediaReferenceRepository } from "./repositories/media-reference-repository.ts";
 import { OpenAiCaptureAnalysisProvider } from "./repositories/openai-capture-analysis-provider.ts";
 import { R2MediaStore } from "./repositories/r2-media-store.ts";
@@ -21,6 +22,7 @@ import { registerCalendarRoutes } from "./routes/calendar.ts";
 import { registerDashboardRoutes } from "./routes/dashboard.ts";
 import { registerInboxRoutes } from "./routes/inbox.ts";
 import { registerLedgerRoutes } from "./routes/ledger.ts";
+import { registerLinkPreviewRoutes } from "./routes/link-preview.ts";
 import { registerMediaCredentialRoutes } from "./routes/media-credentials.ts";
 import { registerMediaRoutes } from "./routes/media.ts";
 import { registerRoutineRoutes } from "./routes/routine.ts";
@@ -77,6 +79,7 @@ export function buildServer(db: Db = createDb()) {
   registerRoutineRoutes(app, new SqliteRoutineRepository(db));
   registerCalendarRoutes(app, new SqliteCalendarRepository(db));
   registerScrapRoutes(app, new SqliteScrapRepository(db));
+  registerLinkPreviewRoutes(app, HttpLinkPreviewImageProvider.of());
   registerMediaRoutes(app, mediaStore, mediaReferences);
   registerMediaCredentialRoutes(app, secretStore, mediaStore);
   registerInboxRoutes(app, new SqliteInboxRepository(db));

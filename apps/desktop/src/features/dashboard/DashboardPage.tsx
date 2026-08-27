@@ -23,6 +23,15 @@ function Widget({ title, icon, to, wide = false, className = "", children }: { t
   );
 }
 
+function WidgetEmpty({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return (
+    <div className="dashboard-widget-empty">
+      <Icon name={icon} size={22} strokeWidth={1.4} />
+      <span>{children}</span>
+    </div>
+  );
+}
+
 function LoadingState() {
   return (
     <div className="dashboard dashboard--loading" aria-label="대시보드 불러오는 중">
@@ -79,16 +88,18 @@ export function DashboardPage({ repository }: { repository: DashboardRepository 
 function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onToggle: (taskId: string) => void }) {
   return (
     <Widget icon="todo" title="오늘 할 일" to="/todo" wide>
-      <div className="task-list">
-        {snapshot.tasks.map((task) => (
-          <div className={`task-row ${task.done ? "task-row--done" : ""}`} key={task.id}>
-            <Checkbox checked={task.done} label={`${task.title} ${task.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => onToggle(task.id)} />
-            <span className="task-row__title">{task.title}</span>
-            {task.isRoutine && <Badge>루틴</Badge>}
-            <Chip dotColor={task.labelColor}>{task.label}</Chip>
-          </div>
-        ))}
-      </div>
+      {snapshot.tasks.length === 0 ? <WidgetEmpty icon="todo">오늘 할 일이 없습니다</WidgetEmpty> : (
+        <div className="task-list">
+          {snapshot.tasks.map((task) => (
+            <div className={`task-row ${task.done ? "task-row--done" : ""}`} key={task.id}>
+              <Checkbox checked={task.done} label={`${task.title} ${task.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => onToggle(task.id)} />
+              <span className="task-row__title">{task.title}</span>
+              {task.isRoutine && <Badge>루틴</Badge>}
+              <Chip dotColor={task.labelColor}>{task.label}</Chip>
+            </div>
+          ))}
+        </div>
+      )}
     </Widget>
   );
 }
@@ -96,23 +107,29 @@ function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onTog
 function TodayEvents({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
     <Widget icon="calendar" title="오늘 일정" to="/calendar">
-      <div className="event-list">
-        {snapshot.events.map((event) => <div className="event-row" key={event.id}><i style={{ backgroundColor: event.color }} /><time>{event.time}</time><span>{event.title}</span></div>)}
-        {snapshot.events.length === 0 && <div className="widget-empty">오늘은 일정이 없습니다</div>}
-      </div>
+      {snapshot.events.length === 0 ? <WidgetEmpty icon="calendar">오늘 일정이 없습니다</WidgetEmpty> : (
+        <div className="event-list">
+          {snapshot.events.map((event) => <div className="event-row" key={event.id}><i style={{ backgroundColor: event.color }} /><time>{event.time}</time><span>{event.title}</span></div>)}
+        </div>
+      )}
     </Widget>
   );
 }
 
 function MonthlyExpense({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const hasExpense = snapshot.monthlyExpense.total > 0 || snapshot.monthlyExpense.categories.length > 0;
   return (
     <Widget className="expense-widget" icon="wallet" title="이번 달 지출" to="/ledger">
-      <strong className="expense-widget__total">{formatWon(snapshot.monthlyExpense.total)}</strong>
-      <div className="expense-categories">
-        {snapshot.monthlyExpense.categories.map((category) => (
-          <div key={category.name}><span className="color-square" style={{ background: category.color }} /><span>{category.name}</span><span>{formatWon(category.amount)}</span></div>
-        ))}
-      </div>
+      {hasExpense ? (
+        <>
+          <strong className="expense-widget__total">{formatWon(snapshot.monthlyExpense.total)}</strong>
+          <div className="expense-categories">
+            {snapshot.monthlyExpense.categories.map((category) => (
+              <div key={category.name}><span className="color-square" style={{ background: category.color }} /><span>{category.name}</span><span>{formatWon(category.amount)}</span></div>
+            ))}
+          </div>
+        </>
+      ) : <WidgetEmpty icon="wallet">이번 달 지출이 없습니다</WidgetEmpty>}
     </Widget>
   );
 }
@@ -120,17 +137,19 @@ function MonthlyExpense({ snapshot }: { snapshot: DashboardSnapshot }) {
 function RoutineWidget({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
     <Widget icon="routine" title="루틴 스트릭" to="/routine" wide>
-      <div className="routine-list">
-        {snapshot.routines.map((routine) => (
-          <div className="routine-row" key={routine.id}>
-            <span className="routine-row__title">{routine.title}</span>
-            <div className="routine-week" aria-label={`${routine.title} 최근 7일`}>
-              {routine.week.map((done, index) => <span className={done ? "routine-day routine-day--done" : "routine-day"} key={index} />)}
+      {snapshot.routines.length === 0 ? <WidgetEmpty icon="routine">아직 루틴이 없습니다</WidgetEmpty> : (
+        <div className="routine-list">
+          {snapshot.routines.map((routine) => (
+            <div className="routine-row" key={routine.id}>
+              <span className="routine-row__title">{routine.title}</span>
+              <div className="routine-week" aria-label={`${routine.title} 최근 7일`}>
+                {routine.week.map((done, index) => <span className={done ? "routine-day routine-day--done" : "routine-day"} key={index} />)}
+              </div>
+              <span>{routine.period}</span>
             </div>
-            <span>{routine.period}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </Widget>
   );
 }
@@ -139,14 +158,16 @@ function RecentScraps({ snapshot }: { snapshot: DashboardSnapshot }) {
   const kindIcon = { 사진: "image", 링크: "scrap", 메모: "note", 동영상: "video" } as const;
   return (
     <Widget icon="scrap" title="최근 스크랩" to="/scrap" wide>
-      <div className="scrap-grid">
-        {snapshot.scraps.map((scrap) => (
-          <Link className="scrap-card" key={scrap.id} to={`/scrap?detail=${encodeURIComponent(scrap.id)}`}>
-            <div className="scrap-card__meta"><Icon name={kindIcon[scrap.kind]} size={12} /><span>{scrap.kind}</span><span>댓글 {scrap.commentCount}</span></div>
-            <strong>{scrap.title}</strong>
-          </Link>
-        ))}
-      </div>
+      {snapshot.scraps.length === 0 ? <WidgetEmpty icon="scrap">아직 스크랩이 없습니다</WidgetEmpty> : (
+        <div className="scrap-grid">
+          {snapshot.scraps.map((scrap) => (
+            <Link className="scrap-card" key={scrap.id} to={`/scrap?detail=${encodeURIComponent(scrap.id)}`}>
+              <div className="scrap-card__meta"><Icon name={kindIcon[scrap.kind]} size={12} /><span>{scrap.kind}</span><span>댓글 {scrap.commentCount}</span></div>
+              <strong>{scrap.title}</strong>
+            </Link>
+          ))}
+        </div>
+      )}
     </Widget>
   );
 }

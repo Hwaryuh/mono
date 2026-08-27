@@ -3,11 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { createMockDashboardRepository } from "../../infrastructure/mock/mock-dashboard-repository";
+import type { DashboardRepository } from "./dashboard-repository";
 import { DashboardPage } from "./DashboardPage";
 
-function renderDashboard() {
+function renderDashboard(repository: DashboardRepository = createMockDashboardRepository()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const repository = createMockDashboardRepository();
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter><DashboardPage repository={repository} /></MemoryRouter>
@@ -16,7 +16,35 @@ function renderDashboard() {
   return { repository };
 }
 
+const emptyDashboardRepository: DashboardRepository = {
+  async getSnapshot() {
+    return {
+      dateLabel: "2026년 8월 27일 목요일",
+      pendingCaptureCount: 0,
+      recentCaptures: [],
+      tasks: [],
+      events: [],
+      monthlyExpense: { total: 0, categories: [] },
+      routines: [],
+      scraps: [],
+    };
+  },
+  async capture() {},
+  async toggleTask() {},
+};
+
 describe("DashboardPage", () => {
+  it("초기 데이터가 없으면 각 위젯에 빈 상태를 표시한다", async () => {
+    renderDashboard(emptyDashboardRepository);
+
+    expect(await screen.findByText("아직 분류한 항목이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("오늘 할 일이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("오늘 일정이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("이번 달 지출이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("아직 루틴이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("아직 스크랩이 없습니다")).toBeInTheDocument();
+  });
+
   it("빠른 캡처를 저장소 경계로 제출하고 최근 분류를 갱신한다", async () => {
     renderDashboard();
     const input = await screen.findByRole("textbox", { name: "빠른 캡처" });

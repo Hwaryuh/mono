@@ -8,6 +8,7 @@ release/
 .idea/
 .vscode/
 apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/sidecar.zip
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

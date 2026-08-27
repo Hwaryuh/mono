@@ -6,7 +6,6 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   delete document.documentElement.dataset.theme;
-  delete document.documentElement.dataset.reducedMotion;
   document.documentElement.style.removeProperty("--color-accent");
   document.documentElement.style.removeProperty("--color-accent-foreground");
 });

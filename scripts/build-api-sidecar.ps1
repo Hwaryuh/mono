@@ -1,14 +1,17 @@
 $ErrorActionPreference = "Stop"
 
 # 패키징된 exe는 API 서버 없이는 뜨지 않는다(모든 화면이 HTTP로 데이터를 가져온다).
-# release 빌드 exe 옆에 Node 런타임 + 번들된 API + better-sqlite3 네이티브 바이너리를
-# "sidecar" 폴더로 통째로 넣어, 다른 PC에 Node가 없어도 exe 하나(+ 이 폴더)로 뜨게 한다.
+# Node 런타임 + 번들된 API + better-sqlite3 네이티브 바이너리를 하나의 zip으로 묶어
+# src-tauri/sidecar.zip 에 둔다. release exe가 이 zip을 통째로 임베드하고(src/api_sidecar.rs)
+# 첫 실행 때 앱 데이터 폴더로 풀기 때문에, 배포물은 exe 파일 하나면 된다.
+# 이 스크립트는 cargo/tauri build 전에 실행해야 한다(그래야 최신 zip이 임베드된다).
 # 개발 모드(desktop:dev)는 건드리지 않는다 - 그때는 지금처럼 npm run dev --workspace @mono/api를
 # 따로 띄운다.
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $apiRoot = Join-Path $repositoryRoot "apps/api"
 $sidecarDirectory = Join-Path $repositoryRoot "apps/desktop/src-tauri/target/release/sidecar"
+$sidecarZip = Join-Path $repositoryRoot "apps/desktop/src-tauri/sidecar.zip"
 
 Write-Output "API 번들 생성 중..."
 npm run build --workspace @mono/api
@@ -58,5 +61,13 @@ Copy-PackageFiles "better-sqlite3" @("package.json", "lib", "build/Release/bette
 Copy-PackageFiles "bindings" @("package.json", "bindings.js")
 Copy-PackageFiles "file-uri-to-path" @("package.json", "index.js")
 
-$sizeMb = [math]::Round((Get-ChildItem -LiteralPath $sidecarDirectory -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
-Write-Output "API sidecar 준비 완료: $sidecarDirectory ($sizeMb MB)"
+# exe에 임베드할 zip으로 압축한다. Compress-Archive는 deflate zip을 만들고, Rust zip 크레이트가
+# 그대로 읽는다. staging 폴더는 zip이 유일한 산출물이므로 지운다.
+if (Test-Path -LiteralPath $sidecarZip) {
+  Remove-Item -LiteralPath $sidecarZip -Force
+}
+Compress-Archive -Path (Join-Path $sidecarDirectory "*") -DestinationPath $sidecarZip -CompressionLevel Optimal -Force
+Remove-Item -LiteralPath $sidecarDirectory -Recurse -Force
+
+$sizeMb = [math]::Round((Get-Item -LiteralPath $sidecarZip).Length / 1MB, 1)
+Write-Output "API sidecar zip 준비 완료: $sidecarZip ($sizeMb MB)"

@@ -313,6 +313,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
       {snapshot && (
         <div className="capture-meta">
           <span className="capture-meta__label">최근 분류:</span>
+          {snapshot.recentCaptures.length === 0 && <span className="capture-meta__empty">아직 분류한 항목이 없습니다</span>}
           {snapshot.recentCaptures.slice(0, 2).map((capture) => {
             const meta = moduleMeta[capture.module];
             return (

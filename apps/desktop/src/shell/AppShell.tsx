@@ -1,4 +1,4 @@
-import { Button, Checkbox, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, type IconName } from "@mono/ui";
+import { Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, type IconName } from "@mono/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -24,7 +24,7 @@ type NavigationItem = {
 };
 
 type Theme = "light" | "dark";
-type SettingsSectionId = "appearance" | "ai" | "accessibility" | "storage" | "about";
+type SettingsSectionId = "appearance" | "ai" | "storage" | "about";
 
 interface SettingsSectionDefinition {
   id: SettingsSectionId;
@@ -35,7 +35,6 @@ interface SettingsSectionDefinition {
 const settingsSections: SettingsSectionDefinition[] = [
   { id: "appearance", label: "화면", icon: "sun" },
   { id: "ai", label: "AI", icon: "sparkles" },
-  { id: "accessibility", label: "접근성", icon: "todo" },
   { id: "storage", label: "저장공간", icon: "layers" },
   { id: "about", label: "정보", icon: "note" },
 ];
@@ -67,7 +66,6 @@ export function AppShell({
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const today = currentIsoDate();
@@ -126,10 +124,6 @@ export function AppShell({
     root.style.setProperty("--color-accent-foreground", accentForegroundOf(accentColor));
     accentColorPreferenceStore.write(accentColor);
   }, [accentColor]);
-
-  useEffect(() => {
-    document.documentElement.dataset.reducedMotion = reducedMotion ? "true" : "false";
-  }, [reducedMotion]);
 
   useEffect(() => {
     setQuickCaptureOpen(false);
@@ -251,11 +245,9 @@ export function AppShell({
         mediaMaintenance={mediaMaintenance}
         onClose={() => setSettingsOpen(false)}
         onAccentColorChange={setAccentColor}
-        onReducedMotionChange={setReducedMotion}
         onThemeChange={setTheme}
         open={settingsOpen}
         r2SettingsStore={r2SettingsStore}
-        reducedMotion={reducedMotion}
         theme={theme}
       />
       <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
@@ -266,15 +258,13 @@ export function AppShell({
   );
 }
 
-function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, reducedMotion, onReducedMotionChange, aiSettingsStore, mediaMaintenance, r2SettingsStore }: {
+function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, aiSettingsStore, mediaMaintenance, r2SettingsStore }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   accentColor: string;
   onAccentColorChange: (accentColor: string) => void;
-  reducedMotion: boolean;
-  onReducedMotionChange: (reducedMotion: boolean) => void;
   aiSettingsStore: AiSettingsStore;
   mediaMaintenance: MediaMaintenance;
   r2SettingsStore: R2SettingsStore;
@@ -324,16 +314,6 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
                   <ColorPicker icon="edit" label="강조색" onChange={onAccentColorChange} selected value={accentColor} />
                   <span>{accentColor.toUpperCase()}</span>
                 </div>
-              </section>
-            </>
-          )}
-
-          {activeSection === "accessibility" && (
-            <>
-              <SettingsHeading description="움직임과 상호작용 효과를 편안하게 조정합니다." title="접근성" />
-              <section className="settings-group settings-toggle-row">
-                <div><strong>애니메이션 줄이기</strong><span>모핑 아이콘과 창 전환 애니메이션을 끕니다.</span></div>
-                <Checkbox checked={reducedMotion} label="애니메이션 줄이기" onCheckedChange={onReducedMotionChange} />
               </section>
             </>
           )}
@@ -522,13 +502,13 @@ const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string
 function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
   const [activeProvider, setActiveProviderState] = useState<AiProviderId | null>(null);
   const [providerPending, setProviderPending] = useState(false);
-  const [providerError, setProviderError] = useState<string | null>(null);
+  const [providerError, setProviderError] = useState<{ provider: AiProviderId | null; message: string } | null>(null);
 
   useEffect(() => {
     let active = true;
     store.getActiveProvider()
       .then((provider) => { if (active) setActiveProviderState(provider); })
-      .catch((cause: unknown) => { if (active) setProviderError(messageOf(cause)); });
+      .catch((cause: unknown) => { if (active) setProviderError({ provider: null, message: messageOf(cause) }); });
     return () => { active = false; };
   }, [store]);
 
@@ -539,7 +519,7 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
       await store.setActiveProvider(provider);
       setActiveProviderState(provider);
     } catch (cause) {
-      setProviderError(messageOf(cause));
+      setProviderError({ provider, message: messageOf(cause) });
     } finally {
       setProviderPending(false);
     }
@@ -547,35 +527,33 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description="빠른 캡처의 텍스트와 사진을 분류할 AI 모델을 고릅니다." title="AI" />
-      <section className="settings-group">
-        <header><strong>사용할 모델</strong><span>API 키를 설정한 쪽을 선택하세요.</span></header>
-        <div aria-label="AI provider" className="settings-theme-options" role="radiogroup">
-          {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
-            <button
-              aria-checked={activeProvider === provider}
-              disabled={providerPending}
-              key={provider}
-              onClick={() => void selectProvider(provider)}
-              role="radio"
-              type="button"
-            >
-              <span>{providerMeta[provider].label}</span>
-              <span>{providerMeta[provider].model}</span>
-            </button>
-          ))}
-        </div>
-        {providerError && <p className="settings-ai__error" role="alert">{providerError}</p>}
-      </section>
-
-      {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
-        <ApiKeySection key={provider} provider={provider} store={store} />
-      ))}
+      <SettingsHeading description="각 API 키에서 빠른 캡처에 사용할 모델을 선택합니다." title="AI" />
+      {providerError?.provider === null && <p className="settings-ai__error settings-ai__provider-error" role="alert">{providerError.message}</p>}
+      <div aria-label="사용할 AI 모델" className="settings-ai-providers" role="radiogroup">
+        {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
+          <ApiKeySection
+            active={activeProvider === provider}
+            key={provider}
+            onSelect={() => void selectProvider(provider)}
+            provider={provider}
+            providerPending={providerPending}
+            selectionError={providerError?.provider === provider ? providerError.message : null}
+            store={store}
+          />
+        ))}
+      </div>
     </>
   );
 }
 
-function ApiKeySection({ provider, store }: { provider: AiProviderId; store: AiSettingsStore }) {
+function ApiKeySection({ active, onSelect, provider, providerPending, selectionError, store }: {
+  active: boolean;
+  onSelect: () => void;
+  provider: AiProviderId;
+  providerPending: boolean;
+  selectionError: string | null;
+  store: AiSettingsStore;
+}) {
   const meta = providerMeta[provider];
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -605,46 +583,52 @@ function ApiKeySection({ provider, store }: { provider: AiProviderId; store: AiS
   }
 
   return (
-    <section aria-label={`${meta.label} API 키 설정`} className="settings-group settings-ai">
-      <header>
-        <strong>{meta.label} API 키</strong>
+    <section aria-label={`${meta.label} API 키 설정`} className={`settings-group settings-ai settings-ai--provider ${active ? "settings-ai--active" : "settings-ai--inactive"}`}>
+      <header className="settings-ai__provider-header">
+        <label>
+          <input checked={active} disabled={providerPending} name="active-ai-provider" onChange={onSelect} type="radio" />
+          <span className="settings-ai__provider-title"><strong>{meta.label} API 키</strong><small>{meta.model}</small></span>
+        </label>
         <span>서버에 암호화되어 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
       </header>
-      <form onSubmit={(event) => {
-        event.preventDefault();
-        void run("save", async () => {
-          await store.setApiKey(provider, apiKey);
-          setApiKey("");
-          setHasKey(true);
-          setMessage("API 키를 저장했습니다.");
-        });
-      }}>
-        <Input
-          aria-label={`${meta.label} API 키`}
-          autoComplete="off"
-          onChange={(event) => setApiKey(event.target.value)}
-          placeholder={hasKey ? "새 키로 교체" : meta.keyPlaceholder}
-          type="password"
-          value={apiKey}
-        />
-        <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">저장</Button>
-      </form>
-      <div className="settings-ai__status">
-        <span>상태</span>
-        <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
-        <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
-          await store.testConnection(provider);
-          setMessage(`${meta.label} 연결에 성공했습니다.`);
-        })} type="button">연결 테스트</Button>
-        <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
-          await store.deleteApiKey(provider);
-          setHasKey(false);
-          setMessage("API 키를 삭제했습니다.");
-        })} type="button">삭제</Button>
+      <div className="settings-ai__body">
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          void run("save", async () => {
+            await store.setApiKey(provider, apiKey);
+            setApiKey("");
+            setHasKey(true);
+            setMessage("API 키를 저장했습니다.");
+          });
+        }}>
+          <Input
+            aria-label={`${meta.label} API 키`}
+            autoComplete="off"
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={hasKey ? "새 키로 교체" : meta.keyPlaceholder}
+            type="password"
+            value={apiKey}
+          />
+          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">저장</Button>
+        </form>
+        <div className="settings-ai__status">
+          <span>상태</span>
+          <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
+          <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
+            await store.testConnection(provider);
+            setMessage(`${meta.label} 연결에 성공했습니다.`);
+          })} type="button">연결 테스트</Button>
+          <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
+            await store.deleteApiKey(provider);
+            setHasKey(false);
+            setMessage("API 키를 삭제했습니다.");
+          })} type="button">삭제</Button>
+        </div>
+        {selectionError && <p className="settings-ai__error" role="alert">{selectionError}</p>}
+        {message && <p className="settings-ai__message" role="status">{message}</p>}
+        {error && <p className="settings-ai__error" role="alert">{error}</p>}
+        <p className="settings-ai__notice-text">{meta.dataNotice}</p>
       </div>
-      {message && <p className="settings-ai__message" role="status">{message}</p>}
-      {error && <p className="settings-ai__error" role="alert">{error}</p>}
-      <p className="settings-ai__notice-text">{meta.dataNotice} 모델: {meta.model}</p>
     </section>
   );
 }

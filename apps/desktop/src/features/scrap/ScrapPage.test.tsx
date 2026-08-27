@@ -72,6 +72,16 @@ describe("ScrapPage", () => {
     expect(within(await screen.findByRole("dialog", { name: /스크랩/ })).getByText(title)).toBeInTheDocument();
   });
 
+  it("상세 헤더에서 ISO 저장 시각을 사람이 읽는 형식으로 표시한다", async () => {
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "iso", kind: "text", title: "시각 검증", memo: "", tag: "수집", savedAt: "2026-08-27T00:38:50.792Z", url: null, mediaId: null, comments: [] }] }),
+      "/scrap?detail=iso",
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    expect(within(drawer).getByText(/\d{4}\. \d{1,2}\. \d{1,2} \d{2}:\d{2} 저장/)).toBeInTheDocument();
+    expect(within(drawer).queryByText(/2026-08-27T/)).not.toBeInTheDocument();
+  });
+
   it("상세의 웹 URL을 안전한 외부 링크로 연다", async () => {
     const url = "https://www.youtube.com/watch?v=rop5hVsowDQ&list=WL&index=3";
     const open = vi.fn(async () => {});
@@ -87,6 +97,26 @@ describe("ScrapPage", () => {
     expect(link).toHaveAttribute("target", "_blank");
     fireEvent.click(link);
     expect(open).toHaveBeenCalledWith(url);
+  });
+
+  it("URL 스크랩 카드와 상세에 서버 링크 미리보기 이미지를 표시한다", async () => {
+    const url = "https://example.com/article?id=1&lang=ko";
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "link-preview", kind: "url", title: "관련 사진", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, comments: [] }] }));
+
+    const card = await screen.findByRole("button", { name: /관련 사진/ });
+    const cardImage = within(card).getByRole("presentation");
+    expect(cardImage).toHaveAttribute("src", expect.stringContaining(`/link-previews/image?url=${encodeURIComponent(url)}`));
+
+    fireEvent.click(card);
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    expect(within(drawer).getByRole("presentation")).toHaveAttribute("src", expect.stringContaining("/link-previews/image?url="));
+  });
+
+  it("프로토콜 없는 URL도 HTTPS로 정규화해 미리보기한다", async () => {
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "bare-link", kind: "url", title: "프로토콜 없는 링크", memo: "", tag: "수집", savedAt: "오늘", url: "example.com/article", mediaId: null, comments: [] }] }));
+
+    const image = within(await screen.findByRole("button", { name: /프로토콜 없는 링크/ })).getByRole("presentation");
+    expect(image).toHaveAttribute("src", expect.stringContaining(encodeURIComponent("https://example.com/article")));
   });
 
   it("웹 URL이 아닌 값은 외부 링크로 만들지 않는다", async () => {

@@ -142,9 +142,6 @@ describe("AppShell", () => {
     expect(closeLines[2]).toHaveAttribute("opacity", "0");
     fireEvent.click(screen.getByRole("radio", { name: "다크" }));
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
-    fireEvent.click(within(settingsModal).getByRole("button", { name: "접근성" }));
-    fireEvent.click(within(settingsModal).getByRole("checkbox", { name: "애니메이션 줄이기" }));
-    expect(document.documentElement.dataset.reducedMotion).toBe("true");
 
     fireEvent.keyDown(window, { key: "Escape" });
     const reopenedButton = await screen.findByRole("button", { name: "설정 열기" });
@@ -193,6 +190,34 @@ describe("AppShell", () => {
     expect(await within(geminiSection).findByText("Gemini 연결에 성공했습니다.")).toBeInTheDocument();
     fireEvent.click(within(geminiSection).getByRole("button", { name: "삭제" }));
     await waitFor(() => expect(within(geminiSection).getByText("키 없음")).toBeInTheDocument());
+  });
+
+  it("각 API 키 카드에서 사용할 AI 모델을 선택한다", async () => {
+    const store = new InMemoryAiSettingsStore();
+    renderShell(undefined, undefined, undefined, undefined, undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "AI" }));
+    const providerGroup = within(settingsModal).getByRole("radiogroup", { name: "사용할 AI 모델" });
+    const geminiRadio = within(providerGroup).getByRole("radio", { name: /Gemini API 키/ });
+    const openaiRadio = within(providerGroup).getByRole("radio", { name: /OpenAI API 키/ });
+    const geminiSection = within(settingsModal).getByRole("region", { name: "Gemini API 키 설정" });
+    const openaiSection = within(settingsModal).getByRole("region", { name: "OpenAI API 키 설정" });
+
+    expect(within(settingsModal).queryByText("사용할 모델")).not.toBeInTheDocument();
+    await waitFor(() => expect(geminiRadio).toBeChecked());
+    expect(openaiRadio).not.toBeChecked();
+    expect(geminiSection).toHaveClass("settings-ai--active");
+    expect(openaiSection).toHaveClass("settings-ai--inactive");
+    expect(within(openaiSection).getByLabelText("OpenAI API 키")).toBeEnabled();
+
+    fireEvent.click(openaiRadio);
+
+    await waitFor(() => expect(openaiRadio).toBeChecked());
+    expect(geminiRadio).not.toBeChecked();
+    expect(geminiSection).toHaveClass("settings-ai--inactive");
+    expect(openaiSection).toHaveClass("settings-ai--active");
+    await expect(store.getActiveProvider()).resolves.toBe("openai");
   });
 
   async function openStoragePanel(mediaMaintenance: MediaMaintenance) {

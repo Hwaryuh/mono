@@ -1,9 +1,11 @@
 import type { ScrapComment, ScrapItem, ScrapKind, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
+import { formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
+import { API_BASE_URL } from "../../infrastructure/http/http-client";
 import { useMedia } from "../../infrastructure/media/media-store-context";
 import type { ScrapRepository } from "./scrap-repository";
 
@@ -262,7 +264,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
         icon="scrap"
         onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
-        title={<span className="scrap-detail-title">스크랩{detail && <small>{detail.savedAt} 저장</small>}</span>}
+        title={<span className="scrap-detail-title">스크랩{detail && <small>{formatTimestamp(detail.savedAt)} 저장</small>}</span>}
       >
         {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} urlOpener={urlOpener} />}
       </Drawer>
@@ -355,7 +357,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
 function ScrapMediaPreview({ item, meta, iconSize }: { item: ScrapItem; meta: { icon: IconName; label: string }; iconSize: number }) {
   const { data } = useMedia(item.kind === "image" ? item.mediaId : null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const externalUrl = item.kind === "url" && item.url ? externalUrlOf(item.url) : null;
+  const previewUrl = externalUrl
+    ? `${API_BASE_URL}/link-previews/image?url=${encodeURIComponent(externalUrl)}`
+    : null;
   if (data) return <img alt={item.title} src={data} />;
+  if (previewUrl && !previewFailed) return <img alt="" decoding="async" loading="lazy" onError={() => setPreviewFailed(true)} src={previewUrl} />;
   return <><Icon name={meta.icon} size={iconSize} strokeWidth={1.4} /><span>{meta.label}</span></>;
 }
 
@@ -374,7 +382,7 @@ function ScrapDetail({ item, repository, urlOpener, onRequestDelete }: { item: S
     void urlOpener.open(externalUrl);
   }
 
-  return <div className="scrap-detail">{item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy"><div className="scrap-detail__copy-head"><strong>{item.title}</strong><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p><div><span>{item.tag}</span>{item.url && (externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>)}</div></div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} />)}</div></div>;
+  return <div className="scrap-detail">{item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy"><div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} />)}</div></div>;
 }
 
 function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string }) {
@@ -435,7 +443,7 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
   return (
     <article aria-busy={updateMutation.isPending || deleteMutation.isPending} className={editing ? "scrap-comment scrap-comment--editing" : "scrap-comment"}>
       <div className="scrap-comment__meta">
-        <time>{comment.createdAt}</time>
+        <time>{formatTimestamp(comment.createdAt)}</time>
         {!editing && !confirmingDelete && (
           <div className="scrap-comment__actions">
             <IconButton aria-label={`${comment.text} 댓글 수정`} id={editButtonDomId} onClick={startEditing} size="small" title="댓글 수정" type="button" variant="ghost"><Icon name="edit" size={12} /></IconButton>

@@ -2,6 +2,16 @@
   "detector": {
     "ignoreRules": [],
     "ignoreFiles": [],
-    "ignoreValues": []
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "apps/desktop/src/features/scrap/ScrapPage.tsx"
+        ],
+        "createdAt": "2026-08-27T08:08:54.869Z",
+        "reason": "claude: L365-366 imgs use dynamic runtime src (useMedia data URL + link-preview API endpoint), truthiness-guarded with onError->icon fallback; pre-existing, not empty/placeholder"
+      }
+    ]
   }
 }
