@@ -1,0 +1,574 @@
+use axum::extract::{Path, State};
+use axum::routing::{get, post, put};
+use axum::{Json, Router};
+use chrono::SecondsFormat;
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use super::color::normalize_color_to_oklch;
+use super::db::Db;
+use super::error::{ApiError, ApiResult};
+
+// apps/api/src/db/schema.ts TODO_OTHER_LABEL_ID
+const OTHER_LABEL_ID: &str = "other";
+
+// ---------- DTO (packages/contracts/src/index.ts todo* 스키마) ----------
+
+#[derive(Serialize)]
+struct TodoLabel {
+    id: String,
+    name: String,
+    color: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TodoItem {
+    id: String,
+    title: String,
+    label_id: String,
+    due_date: Option<String>,
+    due_time: Option<String>,
+    note: String,
+    done: bool,
+    completed_at: Option<String>,
+    // Routine 경계가 넘어오기 전까지 항상 null.
+    routine_id: Option<String>,
+    occurrence_date: Option<String>,
+}
+
+#[derive(Serialize)]
+struct TodoSnapshot {
+    today: String,
+    labels: Vec<TodoLabel>,
+    items: Vec<TodoItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TodoWriteInput {
+    title: String,
+    label_id: String,
+    due_date: Option<String>,
+    due_time: Option<String>,
+    #[serde(default)]
+    note: String,
+}
+
+#[derive(Deserialize)]
+struct TodoLabelWriteInput {
+    name: String,
+    color: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LabelOrderInput {
+    label_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteLabelInput {
+    replacement_label_id: String,
+}
+
+// ---------- 검증 ----------
+
+fn validated_title(raw: &str) -> ApiResult<String> {
+    let title = raw.trim();
+    if title.is_empty() {
+        return Err(ApiError::validation("제목을 입력해야 합니다."));
+    }
+    if title.chars().count() > 500 {
+        return Err(ApiError::validation("제목은 500자 이하여야 합니다."));
+    }
+    Ok(title.to_string())
+}
+
+fn validated_note(raw: &str) -> ApiResult<String> {
+    if raw.chars().count() > 4_000 {
+        return Err(ApiError::validation("메모는 4000자 이하여야 합니다."));
+    }
+    Ok(raw.to_string())
+}
+
+fn validated_label_name(raw: &str) -> ApiResult<String> {
+    let name = raw.trim();
+    if name.is_empty() {
+        return Err(ApiError::validation("라벨 이름을 입력해야 합니다."));
+    }
+    if name.chars().count() > 100 {
+        return Err(ApiError::validation("라벨 이름은 100자 이하여야 합니다."));
+    }
+    Ok(name.to_string())
+}
+
+fn validated_color(raw: &str) -> ApiResult<String> {
+    normalize_color_to_oklch(raw)
+        .ok_or_else(|| ApiError::validation("색상은 OKLCH 또는 6자리 HEX 값이어야 합니다."))
+}
+
+// ---------- 저장소 로직 (apps/api/src/repositories/todo-repository.ts 1:1) ----------
+
+fn now_iso() -> String {
+    // JS new Date().toISOString() 과 동일 형식: 2026-08-27T00:38:50.792Z
+    chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+fn today_iso() -> String {
+    chrono::Local::now().date_naive().to_string()
+}
+
+fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
+    let labels = conn
+        .prepare("SELECT id, name, color FROM todo_labels ORDER BY order_index ASC")?
+        .query_map([], |row| {
+            Ok(TodoLabel { id: row.get(0)?, name: row.get(1)?, color: row.get(2)? })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let items = conn
+        .prepare(
+            "SELECT id, title, label_id, due_date, due_time, note, done, completed_at, \
+             routine_id, occurrence_date FROM todo_items ORDER BY seq DESC",
+        )?
+        .query_map([], |row| {
+            Ok(TodoItem {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                label_id: row.get(2)?,
+                due_date: row.get(3)?,
+                due_time: row.get(4)?,
+                note: row.get(5)?,
+                done: row.get::<_, i64>(6)? != 0,
+                completed_at: row.get(7)?,
+                routine_id: row.get(8)?,
+                occurrence_date: row.get(9)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(TodoSnapshot { today: today_iso(), labels, items })
+}
+
+fn label_exists(conn: &Connection, id: &str) -> ApiResult<bool> {
+    Ok(conn.query_row("SELECT 1 FROM todo_labels WHERE id = ?1", [id], |_| Ok(())).is_ok())
+}
+
+fn require_label(conn: &Connection, id: &str) -> ApiResult<()> {
+    if label_exists(conn, id)? {
+        Ok(())
+    } else {
+        Err(ApiError::NotFound(format!("라벨을 찾을 수 없습니다: {id}")))
+    }
+}
+
+fn require_item(conn: &Connection, id: &str) -> ApiResult<bool> {
+    conn.query_row("SELECT done FROM todo_items WHERE id = ?1", [id], |row| {
+        Ok(row.get::<_, i64>(0)? != 0)
+    })
+    .map_err(|_| ApiError::NotFound(format!("할 일을 찾을 수 없습니다: {id}")))
+}
+
+fn assert_unique_label_name(conn: &Connection, name: &str, except_id: Option<&str>) -> ApiResult<()> {
+    let target = name.to_lowercase();
+    let clash = conn
+        .prepare("SELECT id, name FROM todo_labels")?
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .any(|(id, existing)| Some(id.as_str()) != except_id && existing.to_lowercase() == target);
+    if clash {
+        return Err(ApiError::BadRequest("같은 이름의 라벨이 이미 있습니다.".into()));
+    }
+    Ok(())
+}
+
+fn create_label(conn: &Connection, input: TodoLabelWriteInput) -> ApiResult<()> {
+    let name = validated_label_name(&input.name)?;
+    let color = validated_color(&input.color)?;
+    assert_unique_label_name(conn, &name, None)?;
+    // "기타"는 항상 마지막에 남도록 order_index를 그보다 작게.
+    let next_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(order_index), -1) FROM todo_labels WHERE id != ?1",
+        [OTHER_LABEL_ID],
+        |row| row.get(0),
+    )?;
+    conn.execute(
+        "INSERT INTO todo_labels (id, name, color, order_index) VALUES (?1, ?2, ?3, ?4)",
+        params![uuid::Uuid::new_v4().to_string(), name, color, next_order + 1],
+    )?;
+    Ok(())
+}
+
+fn update_label(conn: &Connection, id: &str, input: TodoLabelWriteInput) -> ApiResult<()> {
+    require_label(conn, id)?;
+    let name = validated_label_name(&input.name)?;
+    let color = validated_color(&input.color)?;
+    assert_unique_label_name(conn, &name, Some(id))?;
+    conn.execute(
+        "UPDATE todo_labels SET name = ?1, color = ?2 WHERE id = ?3",
+        params![name, color, id],
+    )?;
+    Ok(())
+}
+
+fn reorder_labels(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
+    if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
+        return Err(ApiError::validation("라벨 순서 목록이 올바르지 않습니다."));
+    }
+    let current: Vec<String> = conn
+        .prepare("SELECT id FROM todo_labels")?
+        .query_map([], |row| row.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let unique: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
+    if ids.len() != current.len()
+        || unique.len() != current.len()
+        || current.iter().any(|id| !unique.contains(id.as_str()))
+    {
+        return Err(ApiError::BadRequest(
+            "라벨 순서에 현재 라벨이 정확히 한 번씩 포함되어야 합니다.".into(),
+        ));
+    }
+    let tx = conn.transaction()?;
+    for (index, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE todo_labels SET order_index = ?1 WHERE id = ?2",
+            params![index as i64, id],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult<()> {
+    require_label(conn, id)?;
+    if id == OTHER_LABEL_ID {
+        return Err(ApiError::BadRequest("기타 라벨은 삭제할 수 없습니다.".into()));
+    }
+    require_label(conn, replacement)?;
+    if id == replacement {
+        return Err(ApiError::BadRequest("삭제할 라벨과 이동할 라벨은 달라야 합니다.".into()));
+    }
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM todo_labels", [], |row| row.get(0))?;
+    if count == 1 {
+        return Err(ApiError::BadRequest("마지막 라벨은 삭제할 수 없습니다.".into()));
+    }
+    let tx = conn.transaction()?;
+    tx.execute(
+        "UPDATE todo_items SET label_id = ?1 WHERE label_id = ?2",
+        params![replacement, id],
+    )?;
+    tx.execute("DELETE FROM todo_labels WHERE id = ?1", [id])?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn create_item(conn: &Connection, input: TodoWriteInput) -> ApiResult<()> {
+    let title = validated_title(&input.title)?;
+    let note = validated_note(&input.note)?;
+    let next_seq: i64 =
+        conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM todo_items", [], |row| row.get(0))?;
+    conn.execute(
+        "INSERT INTO todo_items \
+         (id, seq, title, label_id, due_date, due_time, note, done, completed_at, routine_id, occurrence_date) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, NULL, NULL, NULL)",
+        params![
+            uuid::Uuid::new_v4().to_string(),
+            next_seq + 1,
+            title,
+            input.label_id,
+            input.due_date,
+            input.due_time,
+            note,
+        ],
+    )?;
+    Ok(())
+}
+
+fn update_item(conn: &Connection, id: &str, input: TodoWriteInput) -> ApiResult<()> {
+    require_item(conn, id)?;
+    let title = validated_title(&input.title)?;
+    let note = validated_note(&input.note)?;
+    conn.execute(
+        "UPDATE todo_items SET title = ?1, label_id = ?2, due_date = ?3, due_time = ?4, note = ?5 WHERE id = ?6",
+        params![title, input.label_id, input.due_date, input.due_time, note, id],
+    )?;
+    Ok(())
+}
+
+fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
+    let done_now = require_item(conn, id)?;
+    let done = !done_now;
+    let completed_at = if done { Some(now_iso()) } else { None };
+    conn.execute(
+        "UPDATE todo_items SET done = ?1, completed_at = ?2 WHERE id = ?3",
+        params![done as i64, completed_at, id],
+    )?;
+    Ok(())
+}
+
+fn delete_item(conn: &Connection, id: &str) -> ApiResult<()> {
+    require_item(conn, id)?;
+    conn.execute("DELETE FROM todo_items WHERE id = ?1", [id])?;
+    Ok(())
+}
+
+// ---------- 라우트 (apps/api/src/routes/todo.ts 경로 그대로) ----------
+
+pub fn routes(db: Db) -> Router {
+    Router::new()
+        .route("/todo/snapshot", get(snapshot_handler))
+        .route("/todo/items", post(create_item_handler))
+        .route(
+            "/todo/items/{id}",
+            put(update_item_handler).delete(delete_item_handler),
+        )
+        .route("/todo/items/{id}/toggle", post(toggle_handler))
+        .route("/todo/labels", post(create_label_handler))
+        .route("/todo/labels/order", put(reorder_handler))
+        .route(
+            "/todo/labels/{id}",
+            put(update_label_handler).delete(delete_label_handler),
+        )
+        .with_state(db)
+}
+
+fn ok() -> Json<Value> {
+    Json(json!({ "ok": true }))
+}
+
+fn created() -> (axum::http::StatusCode, Json<Value>) {
+    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
+}
+
+async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<TodoSnapshot>> {
+    let conn = db.lock().unwrap();
+    Ok(Json(get_snapshot(&conn)?))
+}
+
+async fn create_item_handler(
+    State(db): State<Db>,
+    Json(input): Json<TodoWriteInput>,
+) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
+    create_item(&db.lock().unwrap(), input)?;
+    Ok(created())
+}
+
+async fn update_item_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<TodoWriteInput>,
+) -> ApiResult<Json<Value>> {
+    update_item(&db.lock().unwrap(), &id, input)?;
+    Ok(ok())
+}
+
+async fn toggle_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    toggle_complete(&db.lock().unwrap(), &id)?;
+    Ok(ok())
+}
+
+async fn delete_item_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    delete_item(&db.lock().unwrap(), &id)?;
+    Ok(ok())
+}
+
+async fn create_label_handler(
+    State(db): State<Db>,
+    Json(input): Json<TodoLabelWriteInput>,
+) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
+    create_label(&db.lock().unwrap(), input)?;
+    Ok(created())
+}
+
+async fn update_label_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<TodoLabelWriteInput>,
+) -> ApiResult<Json<Value>> {
+    update_label(&db.lock().unwrap(), &id, input)?;
+    Ok(ok())
+}
+
+async fn reorder_handler(
+    State(db): State<Db>,
+    Json(input): Json<LabelOrderInput>,
+) -> ApiResult<Json<Value>> {
+    reorder_labels(&mut db.lock().unwrap(), input.label_ids)?;
+    Ok(ok())
+}
+
+async fn delete_label_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<DeleteLabelInput>,
+) -> ApiResult<Json<Value>> {
+    delete_label(&mut db.lock().unwrap(), &id, &input.replacement_label_id)?;
+    Ok(ok())
+}
+
+// ---------- 테스트 (apps/api/src/repositories/todo-repository.test.ts 이식) ----------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::db;
+
+    fn label_input(name: &str, color: &str) -> TodoLabelWriteInput {
+        TodoLabelWriteInput { name: name.into(), color: color.into() }
+    }
+
+    fn item_input(title: &str, label_id: &str) -> TodoWriteInput {
+        TodoWriteInput {
+            title: title.into(),
+            label_id: label_id.into(),
+            due_date: None,
+            due_time: None,
+            note: String::new(),
+        }
+    }
+
+    fn seed_label(conn: &Connection, name: &str) -> String {
+        create_label(conn, label_input(name, "#b03a55")).unwrap();
+        get_snapshot(conn)
+            .unwrap()
+            .labels
+            .into_iter()
+            .find(|l| l.name == name)
+            .unwrap()
+            .id
+    }
+
+    #[test]
+    fn other_label_always_present_and_last() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let snapshot = get_snapshot(&conn).unwrap();
+        assert_eq!(snapshot.labels.iter().map(|l| l.id.as_str()).collect::<Vec<_>>(), ["other"]);
+        assert_eq!(snapshot.labels[0].name, "기타");
+    }
+
+    #[test]
+    fn new_label_goes_before_other() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_label(&conn, "업무");
+        let names: Vec<String> =
+            get_snapshot(&conn).unwrap().labels.into_iter().map(|l| l.name).collect();
+        assert_eq!(names, ["업무", "기타"]);
+    }
+
+    #[test]
+    fn other_label_cannot_be_deleted() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let err = delete_label(&mut conn, "other", "other").unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(m) if m.contains("기타 라벨은 삭제할 수 없습니다")));
+    }
+
+    #[test]
+    fn stores_items_newest_first() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("첫째", &label)).unwrap();
+        create_item(
+            &conn,
+            TodoWriteInput {
+                title: "둘째".into(),
+                label_id: label.clone(),
+                due_date: Some("2026-08-26".into()),
+                due_time: None,
+                note: "메모".into(),
+            },
+        )
+        .unwrap();
+        let snapshot = get_snapshot(&conn).unwrap();
+        assert_eq!(
+            snapshot.items.iter().map(|i| i.title.as_str()).collect::<Vec<_>>(),
+            ["둘째", "첫째"]
+        );
+        assert_eq!(snapshot.labels.len(), 2);
+        assert!(!snapshot.items[0].done);
+    }
+
+    #[test]
+    fn rejects_duplicate_label_name() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_label(&conn, "업무");
+        let err = create_label(&conn, label_input("업무", "#000000")).unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(m) if m.contains("이미 있습니다")));
+    }
+
+    #[test]
+    fn toggle_sets_and_clears_completed_at() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("할 일", &label)).unwrap();
+        let id = get_snapshot(&conn).unwrap().items[0].id.clone();
+
+        toggle_complete(&conn, &id).unwrap();
+        let item = get_snapshot(&conn).unwrap().items.remove(0);
+        assert!(item.done);
+        assert!(item.completed_at.is_some());
+
+        toggle_complete(&conn, &id).unwrap();
+        let item = get_snapshot(&conn).unwrap().items.remove(0);
+        assert!(!item.done);
+        assert!(item.completed_at.is_none());
+    }
+
+    #[test]
+    fn delete_label_moves_items_to_replacement() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let a = seed_label(&conn, "A");
+        let b = seed_label(&conn, "B");
+        create_item(&conn, item_input("이동 대상", &a)).unwrap();
+
+        delete_label(&mut conn, &a, &b).unwrap();
+        let snapshot = get_snapshot(&conn).unwrap();
+        assert_eq!(
+            snapshot.labels.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(),
+            ["B", "기타"]
+        );
+        assert_eq!(snapshot.items[0].label_id, b);
+
+        let err = delete_label(&mut conn, &b, &b).unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(m) if m.contains("달라야")));
+    }
+
+    #[test]
+    fn reorder_keeps_other() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let a = seed_label(&conn, "A");
+        let b = seed_label(&conn, "B");
+        reorder_labels(&mut conn, vec!["other".into(), b.clone(), a.clone()]).unwrap();
+        let names: Vec<String> =
+            get_snapshot(&conn).unwrap().labels.into_iter().map(|l| l.name).collect();
+        assert_eq!(names, ["기타", "B", "A"]);
+    }
+
+    #[test]
+    fn missing_item_toggle_is_not_found() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let err = toggle_complete(&conn, "nope").unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(m) if m.contains("찾을 수 없습니다")));
+    }
+
+    #[test]
+    fn empty_title_is_validation_error() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        let err = create_item(&conn, item_input("   ", &label)).unwrap_err();
+        assert!(matches!(err, ApiError::Validation(_)));
+    }
+}

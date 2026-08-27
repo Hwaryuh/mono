@@ -1,10 +1,12 @@
+mod api;
 mod api_sidecar;
 
 use api_sidecar::ApiSidecar;
 use tauri::Manager;
 
-// 앱 상태 원본은 API 서버 SQLite다(architecture-decisions.md §9). 사진·영상 바이트도 이제 API
-// 서버를 거쳐 R2에 저장된다 — Rust는 사이드카를 띄우는 것 외에 로컬 저장소를 다루지 않는다.
+// 앱 상태 원본은 API 서버 SQLite다(architecture-decisions.md §9). Node/Fastify API를 Rust로
+// 이관하는 중(계획: Option C) — 임베드 axum 서버(mod api)가 127.0.0.1:4174를 점유하고,
+// 아직 포팅 안 된 라우트는 Node sidecar(PORT 4175)로 프록시한다.
 
 pub fn run() {
     let app = tauri::Builder::default()
@@ -23,6 +25,9 @@ pub fn run() {
                 &data_directory.join("sidecar"),
             );
             app.manage(sidecar);
+
+            // 임베드 API 서버. 포팅된 경계는 네이티브, 나머지는 sidecar로 프록시.
+            api::spawn(data_directory.join("mono.sqlite"));
 
             Ok(())
         })

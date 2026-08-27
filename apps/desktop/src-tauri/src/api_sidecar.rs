@@ -57,7 +57,9 @@ fn try_spawn(
     command
         .arg(&server)
         .current_dir(sidecar_directory)
-        .env("PORT", "4174")
+        // 임베드 Rust 서버(mod api)가 4174를 점유한다 — 이 sidecar는 아직 포팅 안 된
+        // 라우트만 처리하는 내부 업스트림이라 4175로 띄우고 proxy.rs가 넘긴다.
+        .env("PORT", "4175")
         .env("MONO_DB_PATH", db_path)
         .env("MONO_SECRET_KEY_PATH", secret_key_path);
 
