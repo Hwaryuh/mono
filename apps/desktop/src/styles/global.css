@@ -264,12 +264,12 @@ li {
 .settings-accent-control { min-height: 34px; display: flex; align-items: center; gap: 12px; }
 .settings-accent-control > span { position: relative; top: -1px; color: var(--color-text-muted); font: 11px var(--font-code); font-variant-numeric: tabular-nums; }
 .settings-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.settings-theme-options > button { min-width: 0; padding: 7px; display: flex; flex-direction: column; gap: 8px; border: 0; border-radius: calc(var(--radius-control) + 4px); background: transparent; color: var(--color-text-muted); cursor: pointer; box-shadow: 0 0 0 1px var(--color-border); transition-property: scale, box-shadow, color; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+.settings-theme-options > button { -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; padding: 7px; display: flex; align-items: stretch; flex-direction: column; gap: 8px; border: 0; border-radius: calc(var(--radius-control) + 4px); background: transparent; color: var(--color-text-muted); cursor: pointer; box-shadow: 0 0 0 1px var(--color-border); transition-property: scale, box-shadow, color; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
 .settings-theme-options > button:hover { box-shadow: 0 0 0 1px var(--color-border-strong), 0 4px 14px oklch(0.222 0.002 106.554 / 7%); color: var(--color-text); }
 .settings-theme-options > button:active { scale: 0.96; }
 .settings-theme-options > button[aria-checked="true"] { color: var(--color-text); box-shadow: 0 0 0 2px var(--color-accent); }
 .settings-theme-options > button > span:last-child { min-height: 28px; padding: 0 3px; display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; }
-.settings-theme-preview { position: relative; height: 100px; overflow: hidden; display: block; border-radius: var(--radius-control); outline: 1px solid oklch(0 0 0 / 10%); outline-offset: -1px; }
+.settings-theme-preview { position: relative; width: 100%; height: 100px; flex: 0 0 100px; overflow: hidden; display: block; border-radius: var(--radius-control); outline: 1px solid oklch(0 0 0 / 10%); outline-offset: -1px; }
 .settings-theme-preview::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 25%; background: var(--preview-sidebar); }
 .settings-theme-preview::after { content: ""; position: absolute; top: 14px; right: 12px; width: 57%; height: 12px; border-radius: 3px; background: var(--preview-line); box-shadow: 0 24px 0 var(--preview-line), 0 48px 0 var(--preview-line); }
 .settings-theme-preview--light { --preview-sidebar: oklch(0.946 0.003 106.45); --preview-line: oklch(0.899 0.007 106.534); background: oklch(1 0 0); }
