@@ -8,6 +8,7 @@ mod db;
 mod error;
 mod ledger;
 mod proxy;
+mod scrap;
 mod todo;
 
 use std::path::PathBuf;
@@ -80,7 +81,8 @@ fn build_router(database: db::Db) -> Router {
     Router::new()
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
-        .merge(calendar::routes(database))
+        .merge(calendar::routes(database.clone()))
+        .merge(scrap::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
