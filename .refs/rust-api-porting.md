@@ -41,13 +41,22 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `bbdb8f6` | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
 | `b0b8908` | secret-store + crypto (AI 키 · R2 자격증명 CRUD) | `src/api/secret.rs`, `mod.rs`, `lib.rs`, `Cargo.toml` |
 | `c8a9bde` | R2 media store (`/media/*` 전부) | `src/api/media.rs`, `src/api/secret.rs` (get_r2_config 노출), `Cargo.toml` |
-| (this) | AI capture-analysis (`/dashboard/capture` + `/ai/keys/{p}/test`) | `src/api/ai.rs`, `src/api/dashboard.rs`, `src/api/secret.rs` (get_api_key·get_active_provider 노출) |
+| `7c8a493` | AI capture-analysis (`/dashboard/capture` + `/ai/keys/{p}/test`) | `src/api/ai.rs`, `src/api/dashboard.rs`, `src/api/secret.rs` (get_api_key·get_active_provider 노출) |
+| (this) | link-preview (`/link-previews/image`) — **모든 경계 포팅 완료** | `src/api/link_preview.rs`, `mod.rs` |
 
-`cargo test --lib` 108개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 117개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
-네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*` `/media/*`
-  `/dashboard/*` `/ai/*`
-프록시 중: `/link-previews/*` (마지막 경계)
+**모든 라우트 네이티브.** proxy는 fallback으로 아직 배선돼 있지만 도달 불가 — 다음은 cutover.
+
+link-preview 노트:
+- `scraper` 크레이트 안 씀 — `<meta>` 태그 스캔 + 속성 토크나이저 + HTML 엔티티 디코더 손수.
+- SSRF 방어 `isPrivateAddress` 로직 그대로 이식(IPv4 0/10/127/100.64/169.254/172.16-31/192.168/
+  198.18-19/224+, IPv6 loopback·unspecified·ULA fc/fd·link-local fe80-febf·v4-mapped 재귀).
+- DNS는 `tokio::net::lookup_host`, 검증된 첫 주소로 `reqwest::Client::resolve` pin. 리디렉션은
+  `Policy::none()` + 수동 루프(≤4), 매 홉 호스트 재검증. 응답은 `Response::chunk()`로 스트리밍
+  누적하며 상한(HTML 2MB / 이미지 10MB) 검사(`bytes()` 버퍼링 회피).
+- 30분 TTL · 32개 FIFO 캐시는 `Arc<Mutex<Vec<..>>>`(라우터 state). 음수 캐시(None)도 저장.
+- **실제 HTTP 왕복 in-repo 검증 없음** — SSRF 판정·URL 검증·메타 파싱·엔티티 디코드만 유닛 테스트.
 
 ai 노트:
 - capture-analysis-prompt/validation + openai/gemini provider + selectable dispatch를 `ai.rs`로.
@@ -166,10 +175,7 @@ routine 노트:
 - **secret-store + secret-crypto** — ✅ 완료. 위 "secret 노트" 참고.
 - **R2 media store** — ✅ 완료. 위 "media 노트" 참고.
 - **AI capture-analysis** — ✅ 완료. 위 "ai 노트" 참고.
-- **link-preview** — `reqwest` + HTML 파싱. OG 태그 추출 후 이미지 프록시
-  (`link-preview-image-provider.ts`). `/link-previews/image` 라우트. CSP에 이미 4174 허용됨.
-  `scraper` 크레이트는 무거움 — OG 메타 추출은 `<meta property="og:..." content="...">` 정규식/
-  손수 파싱으로 충분(inbox 날짜 스캐너처럼). 마지막 경계 → 끝나면 cutover.
+- **link-preview** — ✅ 완료. 위 "link-preview 노트" 참고.
 
 ### 3. cutover
 

@@ -10,6 +10,7 @@ mod db;
 mod error;
 mod inbox;
 mod ledger;
+mod link_preview;
 mod media;
 mod proxy;
 mod routine;
@@ -108,6 +109,7 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>) -> Router {
         .merge(secret::routes(secret_state.clone()))
         .merge(media::routes(secret_state.clone()))
         .merge(ai::routes(secret_state))
+        .merge(link_preview::routes(link_preview::state()))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
@@ -214,12 +216,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unported_route_falls_through_to_proxy() {
-        // 업스트림 sidecar(4175)가 없으니 502 — 프록시 fallback 배선 확인.
-        // (아직 포팅 안 된 경계 하나를 골라 쓴다.)
+    async fn unrouted_path_falls_through_to_proxy() {
+        // 모든 경계가 포팅됐다 — 라우트 없는 임의 경로로 fallback 배선만 확인.
+        // 업스트림 sidecar(4175)가 없으니 502. cutover에서 proxy·이 테스트 삭제.
         let router = build_router(db::open_memory(), SecretCrypto::test_arc());
         let response = router
-            .oneshot(Request::builder().uri("/link-previews/image").body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/__unrouted__").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
