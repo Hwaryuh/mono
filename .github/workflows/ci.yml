@@ -3,10 +3,13 @@ name: CI
 on:
   push:
     branches: [main, master]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  # 빠른 검증 — 모든 push/PR. 프론트 + 임베드 API 서버 유닛 테스트.
+  check:
     strategy:
       fail-fast: false
       matrix:
@@ -20,27 +23,55 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install JS deps
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Frontend tests
-        run: npm test
-
-      - name: Frontend build
-        run: npm run build
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
 
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
 
-      # 임베드 API 서버(axum + rusqlite). tauri build 전체는 아이콘/서명 설정이 정리되면 추가.
       - name: API server tests
         run: cargo test --lib --manifest-path apps/desktop/src-tauri/Cargo.toml
 
       - name: API server release build
         run: cargo build --release --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+  # 전체 번들 — push(main/master)·태그·수동 실행만. PR에서는 스킵(느림).
+  bundle:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      # macOS 러너는 Apple Silicon → aarch64 .app/.dmg. Intel Mac 대상은 별도 매트릭스 필요.
+      # 코드 서명·공증은 APPLE_* 시크릿이 있을 때만. 없으면 미서명 번들이 나온다.
+      - name: Tauri build
+        run: npm run tauri --workspace @mono/desktop -- build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mono-${{ matrix.os }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/macos/*.app
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: warn
