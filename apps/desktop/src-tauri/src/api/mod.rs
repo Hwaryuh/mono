@@ -12,9 +12,11 @@ mod ledger;
 mod proxy;
 mod routine;
 mod scrap;
+mod secret;
 mod todo;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
 use axum::extract::DefaultBodyLimit;
@@ -22,22 +24,32 @@ use axum::http::{HeaderValue, Method};
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 
+use secret::{SecretCrypto, SecretState};
+
 const BIND_ADDR: &str = "127.0.0.1:4174";
 
-// 마이그레이션 중 Rust와 Node가 같은 SQLite 파일을 연다. WAL 모드라 다중 커넥션 안전
-// (동시 쓰기는 SQLite 락으로 직렬화). 로컬 단일 사용자라 경합 무시 가능.
-pub fn spawn(db_path: PathBuf) -> JoinHandle<()> {
+// 마이그레이션 중 Rust와 Node가 같은 SQLite 파일 + 같은 마스터 키 파일을 쓴다. release에서
+// lib.rs가 두 프로세스에 동일 경로를 넘긴다(dev는 DB·키 경로 정합이 원래 안 맞음 — E2E 주의).
+pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
     thread::Builder::new()
         .name("mono-api".into())
-        .spawn(move || run(db_path))
+        .spawn(move || run(db_path, secret_key_path))
         .expect("API 서버 스레드 생성 실패")
 }
 
-fn run(db_path: PathBuf) {
+fn run(db_path: PathBuf, secret_key_path: PathBuf) {
     let database = match db::open(&db_path) {
         Ok(database) => database,
         Err(error) => {
             eprintln!("API DB 초기화 실패: {error} - 화면에 연결 오류가 뜰 수 있습니다.");
+            return;
+        }
+    };
+
+    let crypto = match SecretCrypto::load_or_create(&secret_key_path) {
+        Ok(crypto) => Arc::new(crypto),
+        Err(error) => {
+            eprintln!("마스터 키 로드 실패: {error} - AI/미디어 자격증명 라우트가 실패합니다.");
             return;
         }
     };
@@ -58,13 +70,13 @@ fn run(db_path: PathBuf) {
                 return;
             }
         };
-        if let Err(error) = axum::serve(listener, build_router(database)).await {
+        if let Err(error) = axum::serve(listener, build_router(database, crypto)).await {
             eprintln!("API 서버 종료: {error}");
         }
     });
 }
 
-fn build_router(database: db::Db) -> Router {
+fn build_router(database: db::Db, crypto: Arc<SecretCrypto>) -> Router {
     // apps/api/src/server.ts 의 origin 허용 목록과 동일.
     let origins: Vec<HeaderValue> = [
         "http://127.0.0.1:4173",
@@ -88,7 +100,8 @@ fn build_router(database: db::Db) -> Router {
         .merge(routine::routes(database.clone()))
         .merge(scrap::routes(database.clone()))
         .merge(inbox::routes(database.clone()))
-        .merge(dashboard::routes(database))
+        .merge(dashboard::routes(database.clone()))
+        .merge(secret::routes(SecretState { db: database, crypto }))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
@@ -111,7 +124,7 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_serializes_camel_case_and_seeds_other() {
-        let router = build_router(db::open_memory());
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc());
         let response = router
             .oneshot(Request::builder().uri("/todo/snapshot").body(Body::empty()).unwrap())
             .await
@@ -124,7 +137,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_label_and_item_over_http() {
-        let router = build_router(db::open_memory());
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc());
 
         let created = router
             .clone()
@@ -178,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_item_toggle_is_404_json() {
-        let router = build_router(db::open_memory());
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc());
         let response = router
             .oneshot(
                 Request::builder()
@@ -198,9 +211,9 @@ mod tests {
     async fn unported_route_falls_through_to_proxy() {
         // 업스트림 sidecar(4175)가 없으니 502 — 프록시 fallback 배선 확인.
         // (아직 포팅 안 된 경계 하나를 골라 쓴다.)
-        let router = build_router(db::open_memory());
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc());
         let response = router
-            .oneshot(Request::builder().uri("/ai/keys/gemini").body(Body::empty()).unwrap())
+            .oneshot(Request::builder().uri("/link-previews/image").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);

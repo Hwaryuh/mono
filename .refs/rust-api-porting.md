@@ -38,13 +38,27 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `34ca935` | scrap | `src/api/scrap.rs` |
 | `f8500d9` | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
 | `9881bd8` | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
-| (this) | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
+| `bbdb8f6` | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
+| (this) | secret-store + crypto (AI 키 · R2 자격증명 CRUD) | `src/api/secret.rs`, `mod.rs`, `lib.rs`, `Cargo.toml` |
 
-`cargo test --lib` 77개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 87개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
 네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*`
   `/dashboard/snapshot` `/dashboard/tasks/{id}/toggle`
-프록시 중: `POST /dashboard/capture`(AI 얽힘), `/media/*` `/ai/*` `/media-credentials/*` `/link-previews/*`
+  `GET|POST|DELETE /ai/keys/{provider}` `GET|POST /ai/provider` `GET|POST|DELETE /media/credentials`
+프록시 중: `POST /dashboard/capture`(AI 얽힘), `/media/*` 업로드/다운로드,
+  `POST /ai/keys/{p}/test` · `POST /media/credentials/test`(외부 연결 확인), `/link-previews/*`
+
+secret 노트:
+- `secret-crypto.ts` 이식: AES-256-GCM, `iv:tag:ciphertext` 전부 hex(`aes-gcm` + `getrandom`
+  크레이트, hex는 손수). Node `cipher.encrypt`는 `ct||tag` 반환 → `split_off(len-16)`으로 tag 분리.
+- 마스터 키: `SecretCrypto::load_or_create(path)`. `api::spawn`에 `secret_key_path` 인자 추가,
+  lib.rs가 sidecar와 **동일 경로**(`data_dir/mono.secret.key`) 전달 — 두 프로세스가 같은 암호문을
+  읽어야 하므로. dev는 원래 DB·키 경로 정합이 안 맞음(Node `npm run dev`는 cwd 상대 경로) — E2E 시 주의.
+- `build_router(db, crypto)` 시그니처 변경. `SecretState { db, crypto: Arc<SecretCrypto> }` axum State.
+- active provider("active_ai_provider")는 평문 저장(Node와 동일), API 키·R2는 암호문.
+- `getApiKey`(복호화)는 AI provider가 쓰는데 그건 아직 프록시 → `decrypt`에 `#[allow(dead_code)]`.
+- `/ai/keys/{p}/test`, `/media/credentials/test`는 reqwest/S3 연결 확인이라 AI·media 경계로 미룸.
 
 dashboard 노트:
 - read-model 조합. sibling `get_snapshot` 안 부름 — todo.rs get_snapshot이 이제 occurrence를
@@ -127,10 +141,7 @@ routine 노트:
 
 ### 2. 인프라 청크
 
-- **secret-store + secret-crypto** — `aes-gcm` 크레이트. AES-256-GCM,
-  `iv:tag:ciphertext` hex 포맷 (`apps/api/src/security/secret-crypto.ts`). 마스터 키 파일
-  `mono.secret.key` (`MONO_SECRET_KEY_PATH`, `api::spawn`에 경로 인자 추가 필요).
-  `/media-credentials` 라우트 + R2 자격증명 저장.
+- **secret-store + secret-crypto** — ✅ 완료. 위 "secret 노트" 참고.
 - **R2 media store** — `aws-sdk-s3` 또는 `rust-s3`/`object_store`. S3 호환.
   `/media` 라우트 (multipart 업로드, 스트림 다운로드). `r2-media-store.ts` +
   `media-reference-repository.ts`. 이거 넘어가면 proxy 바디 버퍼링 이슈 무의미해짐.

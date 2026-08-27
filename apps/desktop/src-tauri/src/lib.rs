@@ -27,7 +27,11 @@ pub fn run() {
             app.manage(sidecar);
 
             // 임베드 API 서버. 포팅된 경계는 네이티브, 나머지는 sidecar로 프록시.
-            api::spawn(data_directory.join("mono.sqlite"));
+            // 마스터 키 파일은 sidecar와 동일 경로 — 양쪽이 같은 암호문을 읽고 써야 한다.
+            api::spawn(
+                data_directory.join("mono.sqlite"),
+                data_directory.join("mono.secret.key"),
+            );
 
             Ok(())
         })
