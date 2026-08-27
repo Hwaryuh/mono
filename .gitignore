@@ -8,6 +8,9 @@ release/
 .idea/
 .vscode/
 apps/desktop/src-tauri/gen/
+# 모바일 아이콘은 iOS/Android 착수 시 `tauri icon`으로 재생성. 지금은 데스크톱만.
+apps/desktop/src-tauri/icons/android/
+apps/desktop/src-tauri/icons/ios/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
