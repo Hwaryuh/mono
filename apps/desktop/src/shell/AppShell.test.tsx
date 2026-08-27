@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMockInboxRepository } from "../infrastructure/mock/mock-inbox-repository";
 import type { InboxRepository } from "../features/inbox/inbox-repository";
 import { InMemoryMediaStore, type MediaStore } from "../infrastructure/media/media-store";
@@ -49,16 +49,22 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
   );
 }
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("AppShell", () => {
   it("사이드바 검색을 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
     const { container } = renderShell();
     expect(container.querySelector(".sidebar__search")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "설정 열기" })).toHaveAttribute("title", "설정 (Ctrl+,)");
     const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
     collapseButton.focus();
 
     fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
 
     const modal = await screen.findByRole("dialog", { name: "빠른 캡처" });
+    expect(modal.querySelector("kbd")).toHaveTextContent("Ctrl+K");
     const input = within(modal).getByRole("textbox", { name: "빠른 캡처" });
     await waitFor(() => expect(input).toHaveFocus());
     fireEvent.change(input, { target: { value: "어디서든 기록하기" } });
@@ -99,6 +105,36 @@ describe("AppShell", () => {
 
     fireEvent.click(within(modal).getByRole("button", { name: "분류 요청" }));
     await waitFor(() => expect(within(modal).getByText("https://example.com/reference")).toBeInTheDocument());
+  });
+
+  it("macOS에서는 Cmd 조합만 처리하고 플랫폼별 단축키 힌트를 표시한다", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+    renderShell();
+    const settingsButton = screen.getByRole("button", { name: "설정 열기" });
+    expect(settingsButton).toHaveAttribute("title", "설정 (⌘,)");
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
+    expect(screen.queryByRole("dialog", { name: "빠른 캡처" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { metaKey: true, key: "k" });
+    const captureModal = await screen.findByRole("dialog", { name: "빠른 캡처" });
+    expect(captureModal.querySelector("kbd")).toHaveTextContent("⌘K");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(captureModal).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { ctrlKey: true, key: "," });
+    expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { metaKey: true, key: "," });
+    expect(await screen.findByRole("dialog", { name: "설정" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
+    const createButton = await screen.findByRole("button", { name: "새 할 일" });
+    expect(createButton).toHaveAttribute("title", "새 할 일 (⌘N)");
+    fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+    expect(screen.queryByRole("dialog", { name: "새 할 일" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { metaKey: true, key: "n" });
+    expect(await screen.findByRole("dialog", { name: "새 할 일" })).toBeInTheDocument();
   });
 
   it("상단바에 별도 테마 전환 버튼을 표시하지 않는다", () => {
@@ -270,6 +306,7 @@ describe("AppShell", () => {
     renderShell();
     fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
     const createButton = await screen.findByRole("button", { name: "새 할 일" });
+    expect(createButton).toHaveAttribute("title", "새 할 일 (Ctrl+N)");
     createButton.focus();
     fireEvent.click(createButton);
 

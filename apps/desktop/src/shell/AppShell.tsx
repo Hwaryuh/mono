@@ -66,6 +66,8 @@ export function AppShell({
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const isMacintosh = navigator.userAgent.includes("Macintosh");
+  const shortcutModifier = isMacintosh ? "⌘" : "Ctrl+";
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const today = currentIsoDate();
@@ -93,6 +95,13 @@ export function AppShell({
   function openNewItemModal() {
     if (!meta.action) return;
     navigate(`${pathname}?modal=new`);
+  }
+
+  function matchesModifier(event: KeyboardEvent) {
+    if (event.altKey || event.shiftKey) return false;
+    return isMacintosh
+      ? event.metaKey && !event.ctrlKey
+      : event.ctrlKey && !event.metaKey;
   }
   const moduleNavigationGroup: { label: string; items: NavigationItem[] } = {
     label: "모듈",
@@ -131,7 +140,7 @@ export function AppShell({
 
   useEffect(() => {
     const openQuickCapture = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "k") return;
+      if (!matchesModifier(event) || event.key.toLowerCase() !== "k") return;
       event.preventDefault();
       if (!event.repeat) setQuickCaptureOpen(true);
     };
@@ -141,7 +150,7 @@ export function AppShell({
 
   useEffect(() => {
     const toggleSettings = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey || event.shiftKey || event.key !== ",") return;
+      if (!matchesModifier(event) || event.key !== ",") return;
       event.preventDefault();
       if (!event.repeat) setSettingsOpen((current) => !current);
     };
@@ -151,7 +160,7 @@ export function AppShell({
 
   useEffect(() => {
     const openNewItem = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "n" || !meta.action) return;
+      if (!matchesModifier(event) || event.key.toLowerCase() !== "n" || !meta.action) return;
       event.preventDefault();
       if (!event.repeat) openNewItemModal();
     };
@@ -202,7 +211,7 @@ export function AppShell({
               className="sidebar__settings-trigger"
               id="sidebar-settings-trigger"
               onClick={() => setSettingsOpen((value) => !value)}
-              title={settingsOpen ? "설정 닫기" : "설정"}
+              title={`${settingsOpen ? "설정 닫기" : "설정"} (${shortcutModifier},)`}
               type="button"
             >
               <MorphingIcon name={settingsOpen ? "close" : "settings"} size={15} />
@@ -233,7 +242,7 @@ export function AppShell({
           </div>
           <div className="topbar__actions">
             <IconButton aria-label="검색" title="검색"><Icon name="search" size={14} strokeWidth={1.7} /></IconButton>
-            {meta.action && <Button onClick={openNewItemModal} title={`${meta.action} (Ctrl+N)`} variant="primary"><Icon name="plus" size={13} strokeWidth={2} />{meta.action}</Button>}
+            {meta.action && <Button onClick={openNewItemModal} title={`${meta.action} (${shortcutModifier}N)`} variant="primary"><Icon name="plus" size={13} strokeWidth={2} />{meta.action}</Button>}
           </div>
         </header>
         <section className="workspace__content"><Outlet /></section>
@@ -252,7 +261,9 @@ export function AppShell({
       />
       <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
         <QuickCapture autoFocus repository={dashboardRepository} snapshot={dashboardQuery.data} />
-        <div className="quick-capture-shortcut" aria-hidden="true"><kbd>ESC</kbd><span>닫기</span></div>
+        <div className="quick-capture-shortcut" aria-hidden="true">
+          <kbd>{shortcutModifier}K</kbd><span>빠른 캡처</span><kbd>ESC</kbd><span>닫기</span>
+        </div>
       </Modal>
     </div>
   );
