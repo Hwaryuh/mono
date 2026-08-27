@@ -10,9 +10,8 @@ if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
   throw "Desktop release executable not found: $source"
 }
 
-# exe는 API sidecar(node.exe + 번들된 API)를 통째로 임베드하고 첫 실행 때 앱 데이터 폴더로
-# 푼다(apps/desktop/src-tauri/src/api_sidecar.rs). 배포물은 이 exe 파일 하나면 된다.
-# sidecar.zip이 최신인지 확신하려면 이 스크립트 전에 scripts/build-api-sidecar.ps1을 돌려야 한다.
+# API 서버는 Tauri 바이너리에 임베드된 axum 서버다(apps/desktop/src-tauri/src/api).
+# 별도 런타임·sidecar 없이 이 exe 파일 하나가 배포물이다.
 New-Item -ItemType Directory -Force -Path $releaseDirectory | Out-Null
 Copy-Item -LiteralPath $source -Destination $destination -Force
 

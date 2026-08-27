@@ -15,10 +15,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
-# 임베드 API 서버(src/api). Node/Fastify(apps/api)를 대체하는 중 — 포팅 안 된 라우트는
-# proxy.rs가 Node sidecar로 넘긴다.
+# 임베드 API 서버(src/api) — Tauri 바이너리에 담긴 axum HTTP 서버. 앱의 유일한 백엔드.
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros"] }
 tower-http = { version = "0.6", features = ["cors"] }

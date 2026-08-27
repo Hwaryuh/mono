@@ -292,11 +292,11 @@ PC 데스크톱의 수집함, 할 일, 루틴, 일정, 스크랩, 가계부와 D
 
 ## 이후 진행 (2026-08-26~27)
 
-이 문서는 2026-08-21 시점 스냅샷이다. 그 이후 다음이 완료돼 위 세 섹션의 "서버·SQLite·AI 미구현", "일곱 경계는 메모리 mock" 서술은 더 이상 맞지 않는다. 자세한 경계별 현황은 [apps/api/README.md](../apps/api/README.md)를 원본으로 본다.
+이 문서는 2026-08-21 시점 스냅샷이다. 그 이후 다음이 완료돼 위 세 섹션의 "서버·SQLite·AI 미구현", "일곱 경계는 메모리 mock" 서술은 더 이상 맞지 않는다.
 
-- **서버·SQLite 영속화**: `apps/api`에 Fastify + Drizzle + better-sqlite3로 일곱 경계 전부 구현. 데스크톱은 mock 대신 이 API를 HTTP로 호출한다(`createHttpRepositories`). mock 저장소는 테스트 전용으로만 남았다.
-- **AI 캡처 분류**: Gemini·OpenAI 중 설정에서 고른 provider로 실제 분류. API 키는 서버에 AES-256-GCM 암호화 저장.
-- **패키징**: `release/mono-desktop.exe`가 API 서버를 Node 사이드카로 자체 번들해, 이 PC에 Node가 없어도 단독 실행된다(루트 README "패키징" 절).
+- **서버·SQLite 영속화**: 처음엔 `apps/api`(Fastify + Drizzle + better-sqlite3)로 전 경계 구현. **2026-08-27 Tauri 바이너리에 임베드된 Rust axum 서버로 전면 이관 완료** — `apps/api`는 삭제됨. 계약 경계(HTTP)는 불변이라 프론트(`http-*-repository.ts`)·mock은 무변경. 상세: [rust-api-porting.md](./rust-api-porting.md), [architecture-decisions.md](./architecture-decisions.md) §9.
+- **AI 캡처 분류**: Gemini·OpenAI 중 설정에서 고른 provider로 실제 분류. API 키는 AES-256-GCM 암호화 저장.
+- **패키징**: `release/mono-desktop.exe` 단독 실행. API 서버가 바이너리에 임베드돼 별도 런타임·사이드카 없음(Node 이관 전에는 Node 사이드카를 zip으로 임베드했음).
 - **설정 화면**: AI provider 선택·API 키 관리, 저장공간(미사용 미디어 정리) 패널 추가.
 - 안 된 것: 파일 저장소(`FileStore`), 백업 정책, iOS. `.refs/architecture-decisions.md` §9 "아직 결정하지 않은 사항" 그대로 유효.
 

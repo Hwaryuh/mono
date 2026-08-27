@@ -31,12 +31,15 @@ React 기반 UI를 웹 브라우저 전용으로 취급하지 않는다. Tauri�
 
 ### 서버
 
-- 언어: TypeScript
-- HTTP API: Fastify
-- 데이터베이스: SQLite
-- ORM 및 마이그레이션: Drizzle ORM
+- 언어: Rust (2026-08-27 이관 완료 — §9 참고. 이전: TypeScript/Fastify)
+- HTTP API: axum, Tauri 데스크톱 바이너리에 임베드 (127.0.0.1:4174)
+- 데이터베이스: SQLite (`rusqlite`, bundled)
+- 마이그레이션: idempotent DDL (스키마 안정 시 승격 재검토)
 - API 명세: OpenAPI
-- 파일: 데이터베이스 BLOB가 아닌 별도 파일 저장소
+- 파일: 데이터베이스 BLOB가 아닌 별도 파일 저장소 (R2 / S3 호환)
+
+iOS 착수 시 임베드 서버를 standalone 프로세스로 분리하는 방안은 그때 결정한다
+(계약 경계는 이미 HTTP라 프론트 무변경 분리 가능).
 
 단일 사용자와 낮은 쓰기 동시성을 전제로 SQLite를 사용한다. PostgreSQL, Redis, BullMQ는 현재 범위에서 운영 복잡도만 높이므로 도입하지 않는다.
 
@@ -57,8 +60,7 @@ iOS와 PC는 UI 구현 코드를 공유하지 않는다. 공유하는 것은 API
 
 ```text
 apps/
-  desktop/      React/Vite UI + Tauri 셸
-  api/          Fastify API
+  desktop/      React/Vite UI + Tauri 셸 + 임베드 axum API 서버(src-tauri/src/api)
 packages/
   domain/       프레임워크 비의존 도메인 규칙
   contracts/    Zod 스키마와 OpenAPI 계약
@@ -159,10 +161,25 @@ PC와 iOS가 각각 독립 원본 데이터베이스를 가진 뒤 파일 단위
 - 파일 저장소: **로컬 디스크**를 `FileStore` 포트 뒤에 둔다. S3 호환 저장소는 배포 때 재검토한다.
 - 네 결정 모두 "나중에 교체 가능한 경계 뒤"에 둔다. 지금 배포·인증·클라우드 저장소를 선구현하지 않는다.
 
+### API 서버 Rust 이관 (2026-08-27 완료 — Option C)
+
+- **결정**: Node/Fastify API(`apps/api`)를 Tauri 바이너리에 임베드된 axum 서버로 전면 재작성.
+  전송은 HTTP 유지 — 프론트(`http-*-repository.ts`)·계약(`@mono/contracts`) 무변경.
+- **이유**: release exe가 Node 런타임 + `better-sqlite3` 네이티브 바이너리 + PowerShell 빌드
+  스크립트를 zip으로 임베드해 첫 실행 때 풀어 자식 프로세스로 띄우던 구조라 macOS 빌드가 불가능.
+  순수 Rust(`rusqlite` bundled)로 바꿔 `tauri build`가 Windows·macOS 양쪽에서 단일 바이너리 생성.
+- **범위**: todo·ledger·calendar·scrap·routine·inbox·dashboard·secret·media·ai·link-preview
+  전 경계. R2는 aws-sdk 대신 SigV4 손수 서명, AI는 `reqwest`, 비밀은 `aes-gcm`.
+- **삭제**: `apps/api/` 전체, `src/api_sidecar.rs`, `src/api/proxy.rs`, `sidecar.zip`,
+  `scripts/build-api-sidecar.ps1`, `zip` 크레이트 의존.
+- **남은 패키징 작업**: `tauri.conf.json` `bundle.active` + macOS 아이콘(icns/png) 생성 +
+  타깃 지정, CI 매트릭스(windows/macos `tauri build`). 코어 블로커(Node/네이티브 바이너리)는 해소됨.
+- 상세: `.refs/rust-api-porting.md`.
+
 ### 아직 결정하지 않은 사항
 
 - 백업 보존 정책과 암호화 방식
-- Windows 외 데스크톱 운영체제 지원 범위
+- Windows 외 데스크톱 운영체제 지원 범위 (빌드는 이제 가능 — 지원 약속은 미정)
 - iOS 최소 지원 버전
 
 ## 참고

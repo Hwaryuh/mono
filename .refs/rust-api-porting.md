@@ -1,4 +1,9 @@
-# Rust API 포팅 (Option C) — 진행 상황 · 핸드오프
+# Rust API 포팅 (Option C) — 완료 기록
+
+> **2026-08-27 이관 완료.** 전 경계 네이티브 + cutover 끝(커밋 …0b96f1b → cutover 커밋).
+> 이 문서는 이관 과정 기록이다. 현재 구조는 `architecture-decisions.md` §9 참고.
+> 남은 것: `tauri.conf.json` `bundle.active` + macOS 아이콘 생성 + `tauri build` 매트릭스
+> (`.github/workflows/ci.yml`은 cargo test/build까지만).
 
 ## 목표
 
@@ -177,30 +182,29 @@ routine 노트:
 - **AI capture-analysis** — ✅ 완료. 위 "ai 노트" 참고.
 - **link-preview** — ✅ 완료. 위 "link-preview 노트" 참고.
 
-### 3. cutover
+### 3. cutover — ✅ 완료
 
-- 삭제: `src/api/proxy.rs`, `src/api_sidecar.rs`, `sidecar.zip`, `build.rs`의 zip 로직,
-  `src/api/mod.rs`의 `include_bytes!`... (없음, sidecar.rs에 있음),
-  `scripts/build-api-sidecar.ps1`, `scripts/export-desktop-release.ps1`의 sidecar 부분,
-  `apps/api/` 통째로, `apps/desktop/package.json`의 sidecar 스크립트 참조.
-- `lib.rs`에서 `ApiSidecar::spawn` 호출 제거.
-- `tauri.conf.json` — macOS `bundle` 설정 추가 (`bundle.active: true`, targets, 아이콘).
-- `.refs/architecture-decisions.md` §9 갱신 (API 서버가 이제 Rust 임베드).
-- CI: GitHub Actions `windows-latest` + `macos-latest` 매트릭스로 `tauri build`.
+- 삭제 완료: `src/api/proxy.rs`, `src/api_sidecar.rs`, `sidecar.zip`, `build.rs` zip 로직,
+  `scripts/build-api-sidecar.ps1`, `apps/api/` 통째로, root `package.json`의 sidecar 참조,
+  `tsconfig.json`의 apps/api 레퍼런스, `zip` 크레이트, `.gitignore` sidecar.zip.
+- `lib.rs` — `ApiSidecar` 제거, `api::spawn`만 남음. `mod.rs` — `.fallback` 제거(기본 404).
+- `npm install`로 lockfile 재생성(119 패키지 제거: fastify·better-sqlite3·drizzle·aws-sdk·esbuild…).
+- `.github/workflows/ci.yml` 추가 — windows/macos 매트릭스로 typecheck + 프론트 test/build +
+  `cargo test --lib` + `cargo build --release`. **`tauri build` 전체(installer)는 미포함** —
+  `bundle.active: true` + macOS 아이콘(icns/png, `src-tauri/app-icon.svg`에서 `tauri icon`으로 생성)
+  + 서명 설정이 남음. 코어 블로커(Node 런타임·네이티브 바이너리)는 해소.
+- `architecture-decisions.md` §9, README, desktop-implementation-handoff.md 갱신.
 
-## 검증 명령
+## 검증 명령 (현재)
 
 ```
-cd apps/desktop/src-tauri && cargo test --lib          # Rust 유닛 테스트
+cd apps/desktop/src-tauri && cargo test --lib          # 임베드 API 서버 유닛 테스트 (117)
 cd apps/desktop/src-tauri && cargo build --release     # 릴리스 빌드
-cd apps/api && npx vitest run                          # 참조 API 무변경 확인 (142)
-cd apps/desktop && npx vitest run                      # 프론트 무변경 확인 (147)
+npm run typecheck                                       # 전체 tsc
+npm test                                                # 프론트 vitest (147)
 ```
-
-E2E (네이티브 창): `npm run dev -w @mono/api` (4175) + `npm run desktop:dev`.
-포팅한 화면이 Rust에서, 나머지가 프록시로 정상 동작하는지 + `netstat`으로 4174·4175 LISTEN.
 
 ## 참고
 
 - 상세 계획: `C:\Users\imabo\.claude\plans\mossy-crafting-piglet.md`
-- 프론트는 절대 안 건드림 — 계약 경계가 하네스의 핵심.
+- 프론트는 한 줄도 안 건드림 — 계약 경계(HTTP)가 하네스의 핵심이었다.
