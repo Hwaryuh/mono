@@ -296,24 +296,41 @@ PC 데스크톱의 수집함, 할 일, 루틴, 일정, 스크랩, 가계부와 D
 
 - **서버·SQLite 영속화**: 처음엔 `apps/api`(Fastify + Drizzle + better-sqlite3)로 전 경계 구현. **2026-08-27 Tauri 바이너리에 임베드된 Rust axum 서버로 전면 이관 완료** — `apps/api`는 삭제됨. 계약 경계(HTTP)는 불변이라 프론트(`http-*-repository.ts`)·mock은 무변경. 상세: [rust-api-porting.md](./rust-api-porting.md), [architecture-decisions.md](./architecture-decisions.md) §9.
 - **AI 캡처 분류**: Gemini·OpenAI 중 설정에서 고른 provider로 실제 분류. API 키는 AES-256-GCM 암호화 저장.
-- **패키징**: `release/mono-desktop.exe` 단독 실행. API 서버가 바이너리에 임베드돼 별도 런타임·사이드카 없음(Node 이관 전에는 Node 사이드카를 zip으로 임베드했음).
+- **패키징**: API 서버가 바이너리에 임베드돼 별도 런타임·사이드카 없음(Node 이관 전에는 Node 사이드카를 zip으로 임베드했음). `tauri.conf.json` `bundle.active: true`, targets `[app, dmg, nsis]`, 아이콘은 `src-tauri/app-icon.svg`에서 `tauri icon`으로 생성(`icons/`, 모바일 android/ios는 gitignore).
 - **설정 화면**: AI provider 선택·API 키 관리, 저장공간(미사용 미디어 정리) 패널 추가.
-- 안 된 것: 파일 저장소(`FileStore`), 백업 정책, iOS. `.refs/architecture-decisions.md` §9 "아직 결정하지 않은 사항" 그대로 유효.
+- **GitHub**: private repo `Hwaryuh/mono` (branch `main`). `.github/workflows/ci.yml` — `check` 잡(모든 push/PR: 프론트 test/build + `cargo test --lib`/`build --release`, windows+macos), `bundle` 잡(`v*` 태그·수동만: `tauri build` → dmg/setup.exe artifact + draft Release 첨부).
+- **첫 릴리스**: `v0.1.0` — https://github.com/Hwaryuh/mono/releases/tag/v0.1.0 (`mono_0.1.0_aarch64.dmg`, `mono_0.1.0_x64-setup.exe`).
+- **macOS 서명**: CI에서 `APPLE_SIGNING_IDENTITY: '-'` ad-hoc 서명만. 설치 후 `xattr -dr com.apple.quarantine "/Applications/mono.app"` 또는 우클릭→열기 필요. 더블클릭만으로 실행하려면 Developer ID($99/년) + 공증 — `APPLE_CERTIFICATE`/`APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` 시크릿을 넣으면 `tauri build`가 자동 처리.
+- 안 된 것: 파일 저장소(`FileStore`) 로컬 디스크 폴백, 백업 정책, iOS. `.refs/architecture-decisions.md` §9 "아직 결정하지 않은 사항" 그대로 유효.
+
+### 다음 세션 후보 (2건)
+
+1. **macOS 단축키** — `cmd+K` 등. 현재 단축키는 웹 기준(`ctrl`)일 가능성이 큼. Tauri에서 OS별
+   modifier 처리(mac은 `cmd`, win은 `ctrl`), 전역 단축키가 필요하면 `tauri-plugin-global-shortcut`.
+   대상: 화면 전환·빠른 캡처(`?modal=new`)·커맨드 팔레트. `AppShell.tsx`의 기존 키 핸들러 확인부터.
+2. **데이터 공유(멀티 기기)** — 지금은 각 설치본이 `app_data_dir`의 독립 SQLite. Win↔Mac이 같은
+   데이터를 보려면 임베드 axum(`src-tauri/src/api`)을 standalone crate/binary로 분리해 항상 켜진
+   기기(홈서버/NAS)에서 실행, 클라이언트는 `VITE_API_BASE_URL`만 그쪽으로. 계약이 HTTP라 프론트
+   무변경. 인증(§5 스텁 → 실제)·`mono.secret.key` 공유 방식도 이때. 상세: architecture-decisions §4·§9.
 
 ## 검증 명령
 
 ```text
-npm run branding:sync
 npm run typecheck
-npm test
+npm test                                                 # 프론트 vitest (147)
 npm run build
-npm run desktop:build
+cd apps/desktop/src-tauri && cargo test --lib             # 임베드 API 서버 (117)
+cd apps/desktop/src-tauri && cargo build --release
 ```
 
-Tauri 실행 파일:
+전체 번들(`.dmg`/`.exe`)은 로컬에선 `npm run tauri --workspace @mono/desktop -- build`,
+평소엔 `v*` 태그 push로 CI가 만든다.
+
+번들 산출물:
 
 ```text
-apps/desktop/src-tauri/target/release/mono-desktop.exe
+apps/desktop/src-tauri/target/release/bundle/dmg/mono_<ver>_aarch64.dmg   # macOS
+apps/desktop/src-tauri/target/release/bundle/nsis/mono_<ver>_x64-setup.exe # Windows
 ```
 
 ## 주요 파일
@@ -370,7 +387,7 @@ apps/desktop/src-tauri/tauri.conf.json
 
 ## 다음 세션 시작 기준
 
-- 먼저 이 문서(특히 위 "이후 진행")와 `.refs/architecture-decisions.md`, `apps/api/README.md`를 UTF-8로 읽는다.
+- 먼저 이 문서(특히 위 "이후 진행"·"다음 세션 후보")와 `.refs/architecture-decisions.md`(§9), `.refs/rust-api-porting.md`를 UTF-8로 읽는다.
 - 테스트 파일·통과 개수는 이 문서가 아니라 `npm test` 실행 결과를 source of truth로 삼는다(여기 적힌 "18개 파일 87개"는 2026-08-21 desktop 전용 수치로 이미 낡았다 — 이후 서버 테스트가 추가됐고 desktop 쪽도 늘었다).
 - 수집함, 할 일, 루틴, 일정, 스크랩, 가계부, occurrence 연결을 재구현하거나 대규모 리팩터링하지 않는다. 공유 상태는 이제 mock이 아니라 API SQLite가 원본이다.
 - Dashboard의 `monthlyExpense`는 ledger 원본 상태에서 파생한다. 대시보드 전용 복제 상태를 다시 만들지 않는다.
