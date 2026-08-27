@@ -480,7 +480,7 @@ async fn gc_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
     use rusqlite::params;
 
     // AWS 문서 "Example: GET Object" 서명 벡터 — canonical request + signing key 전체 검증.
@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn client_missing_credentials_errors_before_network() {
         let db = db::open_memory();
-        let state = SecretState { db, crypto: crate::api::secret::SecretCrypto::test_arc() };
+        let state = SecretState { db, crypto: crate::secret::SecretCrypto::test_arc() };
         assert!(matches!(
             client_from(&state),
             Err(ApiError::BadRequest(m)) if m.contains("R2 자격증명이 설정되지 않았습니다")

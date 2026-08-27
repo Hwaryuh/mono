@@ -1,9 +1,9 @@
-mod api;
-
 use tauri::Manager;
 
-// 앱 상태 원본은 임베드 API 서버의 SQLite다(architecture-decisions.md §9).
-// axum 서버(mod api)가 127.0.0.1:4174를 점유한다 — 전 경계 Rust 네이티브(Option C 완료).
+// 앱 상태 원본은 API 서버의 SQLite다(architecture-decisions.md §9).
+// 임베드 모드: mono_api::spawn이 127.0.0.1:4174를 점유한다 — 서버 없이도 단독 실행.
+// 멀티 기기 공유: crates/mono-api의 standalone 바이너리를 홈서버/VPS에서 돌리고
+// VITE_API_BASE_URL로 그쪽을 가리킨다.
 
 pub fn run() {
     let app = tauri::Builder::default()
@@ -17,7 +17,7 @@ pub fn run() {
                 .map_err(|error| format!("앱 데이터 디렉터리 생성 실패: {error}"))?;
 
             // 임베드 API 서버. mono.secret.key는 비밀 복호화 마스터 키(§5).
-            api::spawn(
+            mono_api::spawn(
                 data_directory.join("mono.sqlite"),
                 data_directory.join("mono.secret.key"),
             );

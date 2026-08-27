@@ -502,7 +502,7 @@ async fn discard_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiRes
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn add_todo_label(conn: &Connection, id: &str, name: &str) {
         conn.execute(

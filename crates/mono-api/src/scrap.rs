@@ -406,7 +406,7 @@ async fn delete_comment_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn write_input(title: &str, url: &str, tag: &str) -> ScrapWriteInput {
         ScrapWriteInput {

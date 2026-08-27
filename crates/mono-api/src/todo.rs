@@ -444,7 +444,7 @@ async fn delete_label_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn label_input(name: &str, color: &str) -> TodoLabelWriteInput {
         TodoLabelWriteInput { name: name.into(), color: color.into() }
