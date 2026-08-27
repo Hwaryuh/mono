@@ -11,7 +11,7 @@ import {
 import { currentIsoDate } from "@mono/domain";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.ts";
-import { calendarCategories, calendarEvents } from "../db/schema.ts";
+import { CALENDAR_OTHER_CATEGORY_ID, calendarCategories, calendarEvents } from "../db/schema.ts";
 
 // 서버 Calendar 저장소. 데스크톱 CalendarRepository 인터페이스와 같은 op·에러 시맨틱을 만족한다.
 export class SqliteCalendarRepository {
@@ -34,7 +34,9 @@ export class SqliteCalendarRepository {
   async createCategory(input: CalendarCategoryWriteInput): Promise<void> {
     const parsed = calendarCategoryWriteInputSchema.parse(input);
     this.assertUniqueName(parsed.name);
-    const nextOrder = (this.db.select({ max: sql<number>`COALESCE(MAX(${calendarCategories.orderIndex}), -1)` }).from(calendarCategories).get()?.max ?? -1) + 1;
+    // "기타"는 항상 마지막에 남도록 order_index를 그보다 작게 매긴다.
+    const nextOrder = (this.db.select({ max: sql<number>`COALESCE(MAX(${calendarCategories.orderIndex}), -1)` })
+      .from(calendarCategories).where(sql`${calendarCategories.id} != ${CALENDAR_OTHER_CATEGORY_ID}`).get()?.max ?? -1) + 1;
     this.db.insert(calendarCategories).values({ id: randomUUID(), name: parsed.name, color: parsed.color, orderIndex: nextOrder }).run();
   }
 
@@ -58,6 +60,7 @@ export class SqliteCalendarRepository {
 
   async deleteCategory(categoryId: string, replacementCategoryId: string): Promise<void> {
     this.requireCategory(categoryId);
+    if (categoryId === CALENDAR_OTHER_CATEGORY_ID) throw new Error("기타 분류는 삭제할 수 없습니다.");
     this.requireCategory(replacementCategoryId);
     if (categoryId === replacementCategoryId) throw new Error("삭제할 분류와 이동할 분류는 달라야 합니다.");
     const count = this.db.select({ n: sql<number>`COUNT(*)` }).from(calendarCategories).get()?.n ?? 0;

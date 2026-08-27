@@ -50,6 +50,15 @@ class MockScrapRepository implements ScrapRepository {
     this.state.scrap.items.forEach((item) => { if (item.tag === tag) item.tag = parsed; });
   }
 
+  async deleteTag(tag: string, replacementTag: string) {
+    if (!this.state.scrap.tags.includes(tag)) throw new Error(`라벨을 찾을 수 없습니다: ${tag}`);
+    if (tag === "기타") throw new Error("기타 라벨은 삭제할 수 없습니다.");
+    if (!this.state.scrap.tags.includes(replacementTag)) throw new Error(`라벨을 찾을 수 없습니다: ${replacementTag}`);
+    if (tag === replacementTag) throw new Error("삭제할 라벨과 이동할 라벨은 달라야 합니다.");
+    this.state.scrap.items.forEach((item) => { if (item.tag === tag) item.tag = replacementTag; });
+    this.state.scrap.tags = this.state.scrap.tags.filter((candidate) => candidate !== tag);
+  }
+
   async addComment(scrapId: string, input: Parameters<ScrapRepository["addComment"]>[1]) {
     const scrap = requireScrap(this.state, scrapId);
     const parsed = scrapCommentInputSchema.parse(input);

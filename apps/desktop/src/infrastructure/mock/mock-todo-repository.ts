@@ -28,10 +28,11 @@ class MockTodoRepository implements TodoRepository {
   async createLabel(input: Parameters<TodoRepository["createLabel"]>[0]) {
     const parsed = todoLabelWriteInputSchema.parse(input);
     this.assertUniqueLabelName(parsed.name);
-    this.state.todo.labels = [...this.state.todo.labels, {
-      id: `label-${this.state.nextTodoLabelId++}`,
-      ...parsed,
-    }];
+    const label = { id: `label-${this.state.nextTodoLabelId++}`, ...parsed };
+    // "기타"는 항상 마지막에 남긴다.
+    const fallbackIndex = this.state.todo.labels.findIndex((candidate) => candidate.id === "other");
+    if (fallbackIndex < 0) this.state.todo.labels = [...this.state.todo.labels, label];
+    else this.state.todo.labels = [...this.state.todo.labels.slice(0, fallbackIndex), label, ...this.state.todo.labels.slice(fallbackIndex)];
   }
 
   async updateLabel(labelId: string, input: Parameters<TodoRepository["updateLabel"]>[1]) {
@@ -53,6 +54,7 @@ class MockTodoRepository implements TodoRepository {
 
   async deleteLabel(labelId: string, replacementLabelId: string) {
     requireLabel(this.state.todo.labels, labelId);
+    if (labelId === "other") throw new Error("기타 라벨은 삭제할 수 없습니다.");
     requireLabel(this.state.todo.labels, replacementLabelId);
     if (labelId === replacementLabelId) throw new Error("삭제할 라벨과 이동할 라벨은 달라야 합니다.");
     if (this.state.todo.labels.length === 1) throw new Error("마지막 라벨은 삭제할 수 없습니다.");

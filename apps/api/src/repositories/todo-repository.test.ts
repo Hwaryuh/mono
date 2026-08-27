@@ -19,6 +19,22 @@ describe("SqliteTodoRepository", () => {
     repo = new SqliteTodoRepository(freshDb());
   });
 
+  it("기타 라벨이 항상 존재하고 마지막 순서다", async () => {
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.labels.map((label) => label.id)).toEqual(["other"]);
+    expect(snapshot.labels[0].name).toBe("기타");
+  });
+
+  it("새 라벨은 기타보다 앞에 들어간다", async () => {
+    await seedLabel(repo, "업무");
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.labels.map((label) => label.name)).toEqual(["업무", "기타"]);
+  });
+
+  it("기타 라벨은 삭제할 수 없다", async () => {
+    await expect(repo.deleteLabel("other", "other")).rejects.toThrow("기타 라벨은 삭제할 수 없습니다.");
+  });
+
   it("라벨과 항목을 저장하고 스냅샷을 최신순으로 반환한다", async () => {
     const label = await seedLabel(repo);
     await repo.create({ title: "첫째", labelId: label.id, dueDate: null, dueTime: null, note: "" });
@@ -26,7 +42,7 @@ describe("SqliteTodoRepository", () => {
 
     const snapshot = await repo.getSnapshot();
     expect(snapshot.items.map((item) => item.title)).toEqual(["둘째", "첫째"]);
-    expect(snapshot.labels).toHaveLength(1);
+    expect(snapshot.labels).toHaveLength(2);
     expect(snapshot.items[0].done).toBe(false);
   });
 
@@ -58,18 +74,18 @@ describe("SqliteTodoRepository", () => {
 
     await repo.deleteLabel(a.id, b.id);
     const snapshot = await repo.getSnapshot();
-    expect(snapshot.labels.map((label) => label.name)).toEqual(["B"]);
+    expect(snapshot.labels.map((label) => label.name)).toEqual(["B", "기타"]);
     expect(snapshot.items[0].labelId).toBe(b.id);
 
     // 삭제 대상과 대체 라벨이 같으면 거부한다.
     await expect(repo.deleteLabel(b.id, b.id)).rejects.toThrow("달라야");
   });
 
-  it("라벨 순서를 재배열한다", async () => {
+  it("라벨 순서를 재배열해도 기타는 남는다", async () => {
     const a = await seedLabel(repo, "A");
     const b = await seedLabel(repo, "B");
-    await repo.reorderLabels([b.id, a.id]);
-    expect((await repo.getSnapshot()).labels.map((label) => label.name)).toEqual(["B", "A"]);
+    await repo.reorderLabels(["other", b.id, a.id]);
+    expect((await repo.getSnapshot()).labels.map((label) => label.name)).toEqual(["기타", "B", "A"]);
   });
 
   it("없는 항목 수정은 404 의미 오류를 던진다", async () => {

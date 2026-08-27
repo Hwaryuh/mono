@@ -11,7 +11,7 @@ import {
 import { currentIsoDate } from "@mono/domain";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.ts";
-import { todoItems, todoLabels } from "../db/schema.ts";
+import { TODO_OTHER_LABEL_ID, todoItems, todoLabels } from "../db/schema.ts";
 
 // 서버 Todo 저장소. 데스크톱 TodoRepository 인터페이스와 같은 op·에러 시맨틱을 만족한다.
 // 루틴 occurrence 병합(mock getSnapshot의 routineTodoItems)은 Routine 경계가 영속화될 때
@@ -36,7 +36,9 @@ export class SqliteTodoRepository {
   async createLabel(input: TodoLabelWriteInput): Promise<void> {
     const parsed = todoLabelWriteInputSchema.parse(input);
     this.assertUniqueLabelName(parsed.name);
-    const nextOrder = (this.db.select({ max: sql<number>`COALESCE(MAX(${todoLabels.orderIndex}), -1)` }).from(todoLabels).get()?.max ?? -1) + 1;
+    // "기타"는 항상 마지막에 남도록 order_index를 그보다 작게 매긴다.
+    const nextOrder = (this.db.select({ max: sql<number>`COALESCE(MAX(${todoLabels.orderIndex}), -1)` })
+      .from(todoLabels).where(sql`${todoLabels.id} != ${TODO_OTHER_LABEL_ID}`).get()?.max ?? -1) + 1;
     this.db.insert(todoLabels).values({ id: randomUUID(), name: parsed.name, color: parsed.color, orderIndex: nextOrder }).run();
   }
 
@@ -60,6 +62,7 @@ export class SqliteTodoRepository {
 
   async deleteLabel(labelId: string, replacementLabelId: string): Promise<void> {
     this.requireLabel(labelId);
+    if (labelId === TODO_OTHER_LABEL_ID) throw new Error("기타 라벨은 삭제할 수 없습니다.");
     this.requireLabel(replacementLabelId);
     if (labelId === replacementLabelId) throw new Error("삭제할 라벨과 이동할 라벨은 달라야 합니다.");
     const count = this.db.select({ n: sql<number>`COUNT(*)` }).from(todoLabels).get()?.n ?? 0;

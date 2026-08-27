@@ -14,12 +14,20 @@ describe("SqliteScrapRepository", () => {
     repo = new SqliteScrapRepository(freshDb());
   });
 
+  it("기타 태그가 항상 존재한다", async () => {
+    expect((await repo.getSnapshot()).tags).toEqual(["기타"]);
+  });
+
+  it("기타 태그는 삭제할 수 없다", async () => {
+    await expect(repo.deleteTag("기타", "기타")).rejects.toThrow("기타 라벨은 삭제할 수 없습니다.");
+  });
+
   it("스크랩을 생성하면 태그가 자동 추가되고 kind가 url/text로 갈린다", async () => {
     await repo.create({ title: "링크 스크랩", memo: "", url: "https://example.com", tag: "읽을거리" });
     await repo.create({ title: "메모 스크랩", memo: "내용", url: "", tag: "읽을거리" });
 
     const snapshot = await repo.getSnapshot();
-    expect(snapshot.tags).toEqual(["읽을거리"]);
+    expect(snapshot.tags).toEqual(["기타", "읽을거리"]);
     expect(snapshot.items.map((item) => item.kind)).toEqual(["text", "url"]);
   });
 
@@ -58,7 +66,7 @@ describe("SqliteScrapRepository", () => {
   it("addTag는 중복을 무시한다", async () => {
     await repo.addTag("새태그");
     await repo.addTag("새태그");
-    expect((await repo.getSnapshot()).tags).toEqual(["새태그"]);
+    expect((await repo.getSnapshot()).tags).toEqual(["기타", "새태그"]);
   });
 
   it("renameTag는 태그 목록과 이를 참조하는 스크랩 항목을 함께 옮긴다", async () => {
@@ -68,7 +76,7 @@ describe("SqliteScrapRepository", () => {
     await repo.renameTag("요리", "레시피");
 
     const snapshot = await repo.getSnapshot();
-    expect(snapshot.tags).toEqual(["레시피"]);
+    expect(snapshot.tags).toEqual(["기타", "레시피"]);
     expect(snapshot.items.every((item) => item.tag === "레시피")).toBe(true);
   });
 
@@ -85,7 +93,29 @@ describe("SqliteScrapRepository", () => {
   it("renameTag는 자기 자신으로의 변경(공백 트림만)은 허용한다", async () => {
     await repo.addTag("요리");
     await repo.renameTag("요리", " 요리 ");
-    expect((await repo.getSnapshot()).tags).toEqual(["요리"]);
+    expect((await repo.getSnapshot()).tags).toEqual(["기타", "요리"]);
+  });
+
+  it("deleteTag는 태그를 지우고 참조하던 스크랩을 대체 태그로 옮긴다", async () => {
+    await repo.create({ title: "스크랩1", memo: "", url: "", tag: "요리" });
+    await repo.create({ title: "스크랩2", memo: "", url: "", tag: "요리" });
+
+    await repo.deleteTag("요리", "기타");
+
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.tags).toEqual(["기타"]);
+    expect(snapshot.items.every((item) => item.tag === "기타")).toBe(true);
+  });
+
+  it("deleteTag는 없는 태그·대체 태그면 명확한 오류를 던진다", async () => {
+    await expect(repo.deleteTag("없음", "기타")).rejects.toThrow("찾을 수 없습니다");
+    await repo.addTag("요리");
+    await expect(repo.deleteTag("요리", "없음")).rejects.toThrow("찾을 수 없습니다");
+  });
+
+  it("deleteTag는 삭제 대상과 대체 태그가 같으면 거부한다", async () => {
+    await repo.addTag("요리");
+    await expect(repo.deleteTag("요리", "요리")).rejects.toThrow("달라야 합니다");
   });
 });
 
@@ -116,8 +146,26 @@ describe("scrap routes", () => {
     expect(renamed.statusCode).toBe(200);
 
     const snapshot = JSON.parse((await app.inject({ method: "GET", url: "/scrap/snapshot" })).body);
-    expect(snapshot.tags).toEqual(["레시피"]);
+    expect(snapshot.tags).toEqual(["기타", "레시피"]);
     expect(snapshot.items[0].tag).toBe("레시피");
+
+    await app.close();
+  });
+
+  it("HTTP로 태그를 삭제하면 참조하던 스크랩이 대체 태그로 이동한다", async () => {
+    const app = buildServer(freshDb());
+    await app.ready();
+
+    await app.inject({ method: "POST", url: "/scrap/items", payload: { title: "스크랩", memo: "", url: "", tag: "요리" } });
+    const deleted = await app.inject({ method: "DELETE", url: `/scrap/tags/${encodeURIComponent("요리")}`, payload: { replacementTag: "기타" } });
+    expect(deleted.statusCode).toBe(200);
+
+    const snapshot = JSON.parse((await app.inject({ method: "GET", url: "/scrap/snapshot" })).body);
+    expect(snapshot.tags).toEqual(["기타"]);
+    expect(snapshot.items[0].tag).toBe("기타");
+
+    const forbidden = await app.inject({ method: "DELETE", url: "/scrap/tags/기타", payload: { replacementTag: "기타" } });
+    expect(forbidden.statusCode).toBe(400);
 
     await app.close();
   });

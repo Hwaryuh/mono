@@ -73,9 +73,13 @@ describe("SqliteInboxRepository", () => {
     expect(todoSnapshot.items[0].labelId).toBe((await todoRepo.getSnapshot()).labels[0].id);
   });
 
-  it("라벨이 하나도 없으면 명확한 오류를 던진다", async () => {
+  it("매칭 라벨이 기타뿐이면 기타로 대체해 승인한다", async () => {
+    const todoRepo = new SqliteTodoRepository(db);
     seedInboxRow(db);
-    await expect(repo.approve("inbox-1")).rejects.toThrow("라벨이 없어");
+
+    await repo.approve("inbox-1");
+    const snapshot = await todoRepo.getSnapshot();
+    expect(snapshot.items[0].labelId).toBe(snapshot.labels.find((label) => label.id === "other")!.id);
   });
 
   it("ledger 대상 승인은 원화 정규화를 거쳐 지출을 만든다", async () => {

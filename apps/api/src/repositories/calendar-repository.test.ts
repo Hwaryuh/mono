@@ -33,6 +33,22 @@ describe("SqliteCalendarRepository", () => {
     await expect(repo.createCategory({ name: "취미", color: "#000000" })).rejects.toThrow("이미 있습니다");
   });
 
+  it("기타 분류가 항상 존재하고 마지막 순서다", async () => {
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.categories.map((category) => category.id)).toEqual(["other"]);
+    expect(snapshot.categories[0].name).toBe("기타");
+  });
+
+  it("새 분류는 기타보다 앞에 들어간다", async () => {
+    await seedCategory(repo, "취미");
+    const snapshot = await repo.getSnapshot();
+    expect(snapshot.categories.map((category) => category.name)).toEqual(["취미", "기타"]);
+  });
+
+  it("기타 분류는 삭제할 수 없다", async () => {
+    await expect(repo.deleteCategory("other", "other")).rejects.toThrow("기타 분류는 삭제할 수 없습니다.");
+  });
+
   it("분류 삭제 시 일정을 대체 분류로 옮기고 마지막 분류는 지킨다", async () => {
     const a = await seedCategory(repo, "A");
     const b = await seedCategory(repo, "B");
@@ -40,7 +56,7 @@ describe("SqliteCalendarRepository", () => {
 
     await repo.deleteCategory(a.id, b.id);
     const snapshot = await repo.getSnapshot();
-    expect(snapshot.categories.map((c) => c.name)).toEqual(["B"]);
+    expect(snapshot.categories.map((c) => c.name)).toEqual(["B", "기타"]);
     expect(snapshot.events[0].categoryId).toBe(b.id);
 
     await expect(repo.deleteCategory(b.id, b.id)).rejects.toThrow("달라야");

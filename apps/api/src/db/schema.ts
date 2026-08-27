@@ -3,6 +3,9 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 // 2단계 수직 슬라이스: Todo 경계만. 나머지 6경계는 이 패턴을 복제한다.
 // completedAt은 ISO 타임스탬프를 저장한다. mock의 "방금" 표시 문자열은 UI 관심사다.
 
+// "other"(기타)는 UI·mock 전반이 공유하는 예약 id다. 삭제 불가, 대체 fallback 대상.
+export const TODO_OTHER_LABEL_ID = "other";
+
 export const todoLabels = sqliteTable("todo_labels", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -64,6 +67,8 @@ export const routineOccurrences = sqliteTable("routine_occurrences", {
   completedAt: text("completed_at"),
 });
 
+export const CALENDAR_OTHER_CATEGORY_ID = "other";
+
 export const calendarCategories = sqliteTable("calendar_categories", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -83,6 +88,9 @@ export const calendarEvents = sqliteTable("calendar_events", {
   categoryId: text("category_id").notNull(),
   note: text("note").notNull().default(""),
 });
+
+// 스크랩 태그는 id가 없다 — 문자열 자체가 기본키라 예약값도 문자열 그대로다.
+export const SCRAP_OTHER_TAG = "기타";
 
 export const scrapTags = sqliteTable("scrap_tags", {
   tag: text("tag").primaryKey(),

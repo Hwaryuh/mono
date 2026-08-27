@@ -119,10 +119,16 @@ CREATE TABLE IF NOT EXISTS dashboard_captures (
 );
 `;
 
-// mock-platform-state와 동일하게 "기타" 분류를 예약 id "other"로 항상 존재시킨다.
+// mock-platform-state와 동일하게 모든 모듈에 "기타"를 예약 항목으로 항상 존재시킨다.
+// OR IGNORE라 매 createDb() 호출마다 실행돼도 안전하고, 기존 DB에도 다음 실행 시 자동 채워진다.
 const SEED = `
 INSERT OR IGNORE INTO ledger_categories (id, name, color, order_index)
 VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
+INSERT OR IGNORE INTO todo_labels (id, name, color, order_index)
+VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
+INSERT OR IGNORE INTO calendar_categories (id, name, color, order_index)
+VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
+INSERT OR IGNORE INTO scrap_tags (tag) VALUES ('기타');
 `;
 
 export type Db = ReturnType<typeof drizzle>;

@@ -9,7 +9,7 @@ import {
 } from "@mono/contracts";
 import { asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.ts";
-import { scrapComments, scrapItems, scrapTags } from "../db/schema.ts";
+import { SCRAP_OTHER_TAG, scrapComments, scrapItems, scrapTags } from "../db/schema.ts";
 
 // 서버 Scrap 저장소. 데스크톱 ScrapRepository 인터페이스와 같은 op·에러 시맨틱을 만족한다.
 // 파일 업로드·FileStore 연결은 이번 슬라이스 범위 밖이다(§9 결정). mediaId는 참조 값만 저장한다.
@@ -69,6 +69,19 @@ export class SqliteScrapRepository {
   // 스크랩 태그는 todo 라벨과 달리 별도 id가 없다 — 문자열 자체가 기본키다.
   // 그래서 이름을 바꾸는 건 곧 기본키를 바꾸는 것이고, 이를 참조하는 scrapItems.tag도
   // 함께 옮겨줘야 한다(FK 제약이 없어 DB가 대신 해주지 않는다).
+  // Todo 라벨 삭제(deleteLabel)와 같은 패턴 — 유저가 고른 대체 태그로 스크랩을 옮긴 뒤 지운다.
+  // "기타"는 ledger의 "other"처럼 예약값이라 삭제 대상이 될 수 없다(항상 대체 후보로는 남는다).
+  async deleteTag(tag: string, replacementTag: string): Promise<void> {
+    this.requireTag(tag);
+    if (tag === SCRAP_OTHER_TAG) throw new Error("기타 라벨은 삭제할 수 없습니다.");
+    this.requireTag(replacementTag);
+    if (tag === replacementTag) throw new Error("삭제할 라벨과 이동할 라벨은 달라야 합니다.");
+    this.db.transaction((tx) => {
+      tx.update(scrapItems).set({ tag: replacementTag }).where(eq(scrapItems.tag, tag)).run();
+      tx.delete(scrapTags).where(eq(scrapTags.tag, tag)).run();
+    });
+  }
+
   async renameTag(tag: string, nextTag: string): Promise<void> {
     const parsed = scrapWriteInputSchema.shape.tag.parse(nextTag);
     this.requireTag(tag);

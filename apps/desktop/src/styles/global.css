@@ -2152,6 +2152,7 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 }
 .scrap-label-manager__row > strong { min-width: 0; flex: 1; overflow: hidden; font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .scrap-label-manager__row > span { flex: none; color: var(--color-text-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.scrap-label-manager__row .ui-icon-button { width: 28px; height: 28px; flex: none; }
 .scrap-label-create {
   padding: 12px 16px 14px;
   display: flex;
@@ -2160,11 +2161,24 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-subtle);
 }
-.scrap-label-create > strong { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-label-create__header { min-height: 18px; display: flex; align-items: center; gap: 8px; }
+.scrap-label-create__header > strong { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-label-create__header > button { margin-left: auto; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--color-text-faint); font: inherit; font-size: 10px; cursor: pointer; }
+.scrap-label-create__header > button:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
 .scrap-label-create__controls { display: flex; align-items: center; gap: 8px; }
 .scrap-label-create__controls > .ui-input { min-width: 0; height: 32px; flex: 1; font-size: 11.5px; }
 .scrap-label-create__controls > .ui-button { height: 32px; flex: none; }
 .scrap-label-create[aria-busy="true"] { opacity: 0.68; }
+.scrap-label-delete-modal { width: min(400px, 100%); }
+.scrap-label-delete-modal,
+.scrap-label-delete-modal .ui-overlay__body { overflow: visible; }
+.scrap-label-delete-modal .ui-overlay__header > svg { color: var(--color-danger); }
+.scrap-label-delete { display: flex; flex-direction: column; gap: 11px; }
+.scrap-label-delete > p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.6; }
+.scrap-label-delete > p strong { color: var(--color-text); }
+.scrap-label-delete > label { display: flex; flex-direction: column; gap: 5px; color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-label-delete > label .ui-select { width: 100%; }
+.scrap-label-delete > small { color: var(--color-text-faint); font-size: 10.5px; line-height: 1.5; }
 
 .ledger-page {
   height: 100%;

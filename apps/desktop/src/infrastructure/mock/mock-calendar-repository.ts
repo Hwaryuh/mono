@@ -24,10 +24,11 @@ class MockCalendarRepository implements CalendarRepository {
   async createCategory(input: Parameters<CalendarRepository["createCategory"]>[0]) {
     const parsed = calendarCategoryWriteInputSchema.parse(input);
     this.assertUniqueCategoryName(parsed.name);
-    this.state.calendar.categories = [...this.state.calendar.categories, {
-      id: `calendar-category-${this.state.nextCalendarCategoryId++}`,
-      ...parsed,
-    }];
+    const category = { id: `calendar-category-${this.state.nextCalendarCategoryId++}`, ...parsed };
+    // "기타"는 항상 마지막에 남긴다.
+    const fallbackIndex = this.state.calendar.categories.findIndex((candidate) => candidate.id === "other");
+    if (fallbackIndex < 0) this.state.calendar.categories = [...this.state.calendar.categories, category];
+    else this.state.calendar.categories = [...this.state.calendar.categories.slice(0, fallbackIndex), category, ...this.state.calendar.categories.slice(fallbackIndex)];
   }
 
   async updateCategory(categoryId: string, input: Parameters<CalendarRepository["updateCategory"]>[1]) {
@@ -49,6 +50,7 @@ class MockCalendarRepository implements CalendarRepository {
 
   async deleteCategory(categoryId: string, replacementCategoryId: string) {
     requireCategory(this.state.calendar.categories, categoryId);
+    if (categoryId === "other") throw new Error("기타 분류는 삭제할 수 없습니다.");
     requireCategory(this.state.calendar.categories, replacementCategoryId);
     if (categoryId === replacementCategoryId) throw new Error("삭제할 분류와 이동할 분류는 달라야 합니다.");
     if (this.state.calendar.categories.length === 1) throw new Error("마지막 분류는 삭제할 수 없습니다.");

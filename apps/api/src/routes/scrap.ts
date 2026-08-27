@@ -24,6 +24,11 @@ export function registerScrapRoutes(app: FastifyInstance, repo: SqliteScrapRepos
     return { ok: true };
   });
 
+  app.delete<{ Params: { tag: string }; Body: { replacementTag: string } }>("/scrap/tags/:tag", async (request) => {
+    await repo.deleteTag(request.params.tag, request.body.replacementTag);
+    return { ok: true };
+  });
+
   app.post<{ Params: { id: string } }>("/scrap/items/:id/comments", async (request, reply) => {
     await repo.addComment(request.params.id, request.body as never);
     return reply.code(201).send({ ok: true });

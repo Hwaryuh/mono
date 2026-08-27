@@ -149,6 +149,7 @@ export function createMockPlatformState(): MockPlatformState {
         { id: "work", name: "업무", color: "oklch(0.604 0.149 260.322)" },
         { id: "health", name: "건강", color: "oklch(0.564 0.129 37.329)" },
         { id: "money", name: "재무", color: "oklch(0.502 0.132 309.199)" },
+        { id: "other", name: "기타", color: "oklch(0.645 0.009 106.643)" },
       ],
       items: [
         { id: "task-1", title: "설거지 하기", labelId: "home", dueDate: "2026-08-05", dueTime: null, note: "", done: false, completedAt: null },
@@ -166,6 +167,7 @@ export function createMockPlatformState(): MockPlatformState {
         { id: "hobby", name: "취미", color: "oklch(0.502 0.132 309.199)" },
         { id: "personal", name: "개인", color: "oklch(0.539 0.082 160.129)" },
         { id: "finance", name: "재무", color: "oklch(0.603 0.109 75.876)" },
+        { id: "other", name: "기타", color: "oklch(0.645 0.009 106.643)" },
       ],
       events: [
         { id: "event-1", title: "팀 회의", startDate: "2026-08-05", startTime: "10:00", endDate: "2026-08-05", endTime: "11:00", location: "회의실 B", categoryId: "work", note: "" },
@@ -178,7 +180,7 @@ export function createMockPlatformState(): MockPlatformState {
       ],
     }),
     scrap: scrapSnapshotSchema.parse({
-      tags: ["요리", "레퍼런스", "음악", "전시", "수집"],
+      tags: ["요리", "레퍼런스", "음악", "전시", "수집", "기타"],
       items: [
         {
           id: "scrap-1", kind: "image", title: "들기름 파스타 레시피", memo: "트위터에서 본 캡처. 마늘 6쪽, 국간장 반 스푼.", tag: "요리", savedAt: "7월 6일", url: null,

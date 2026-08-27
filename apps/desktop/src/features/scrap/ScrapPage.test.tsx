@@ -20,6 +20,7 @@ function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepositor
     delete: vi.fn(async () => {}),
     addTag: vi.fn(async () => {}),
     renameTag: vi.fn(async () => {}),
+    deleteTag: vi.fn(async () => {}),
     addComment: vi.fn(async () => {}),
     updateComment: vi.fn(async () => {}),
     deleteComment: vi.fn(async () => {}),
@@ -275,6 +276,26 @@ describe("ScrapPage", () => {
     const snapshot = await repository.getSnapshot();
     expect(snapshot.tags).not.toContain("요리");
     expect(snapshot.tags).toContain("레시피");
+    expect(snapshot.items.filter((item) => item.tag === "요리")).toHaveLength(0);
+  });
+
+  it("라벨 관리 Modal에서 라벨을 삭제하면 참조하던 스크랩이 대체 라벨로 옮겨간다", async () => {
+    const repository = createMockScrapRepository();
+    renderPage(repository, "/scrap?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    fireEvent.click(within(modal).getByRole("button", { name: "관리" }));
+    const manager = await screen.findByRole("dialog", { name: "라벨 관리" });
+
+    expect(within(manager).getByRole("button", { name: "기타 삭제 불가" })).toBeDisabled();
+
+    fireEvent.click(within(manager).getByRole("button", { name: "요리 삭제" }));
+    const confirmation = await screen.findByRole("dialog", { name: "라벨 삭제" });
+    expect(within(confirmation).getByRole("combobox", { name: "이동할 라벨" })).toBeInTheDocument();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "라벨 삭제" })).not.toBeInTheDocument());
+    const snapshot = await repository.getSnapshot();
+    expect(snapshot.tags).not.toContain("요리");
     expect(snapshot.items.filter((item) => item.tag === "요리")).toHaveLength(0);
   });
 

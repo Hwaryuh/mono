@@ -8,7 +8,7 @@ describe("MockTodoRepository", () => {
 
     expect(snapshot.items.filter((item) => item.routineId === null)).toHaveLength(5);
     expect(snapshot.items.filter((item) => item.routineId !== null)).toHaveLength(2);
-    expect(snapshot.labels.map((label) => label.name)).toEqual(["집안일", "업무", "건강", "재무"]);
+    expect(snapshot.labels.map((label) => label.name)).toEqual(["집안일", "업무", "건강", "재무", "기타"]);
   });
 
   it("생성, 수정, 완료, 삭제를 같은 상태에 반영한다", async () => {
@@ -31,7 +31,7 @@ describe("MockTodoRepository", () => {
     const repository = createMockTodoRepository();
     await repository.createLabel({ name: "  개인 프로젝트  ", color: "#AABBCC" });
 
-    expect((await repository.getSnapshot()).labels.at(-1)).toMatchObject({
+    expect((await repository.getSnapshot()).labels.find((label) => label.id === "label-1")).toMatchObject({
       id: "label-1",
       name: "개인 프로젝트",
       color: "oklch(0.784 0.031 248.218)",
@@ -42,10 +42,10 @@ describe("MockTodoRepository", () => {
   it("라벨을 수정하고 순서를 변경한다", async () => {
     const repository = createMockTodoRepository();
     await repository.updateLabel("home", { name: "집", color: "#123456" });
-    await repository.reorderLabels(["work", "home", "health", "money"]);
+    await repository.reorderLabels(["work", "home", "health", "money", "other"]);
 
     const snapshot = await repository.getSnapshot();
-    expect(snapshot.labels.map((label) => label.id)).toEqual(["work", "home", "health", "money"]);
+    expect(snapshot.labels.map((label) => label.id)).toEqual(["work", "home", "health", "money", "other"]);
     expect(snapshot.labels.find((label) => label.id === "home")).toMatchObject({ name: "집", color: "oklch(0.319 0.072 251.168)" });
   });
 

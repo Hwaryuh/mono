@@ -40,6 +40,10 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const [tagInput, setTagInput] = useState("");
   const [tagError, setTagError] = useState<string | null>(null);
   const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [deleteTagName, setDeleteTagName] = useState<string | null>(null);
+  const [replacementTag, setReplacementTag] = useState("");
+  const [tagDeletePending, setTagDeletePending] = useState(false);
+  const [tagDeleteError, setTagDeleteError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const handledModalRef = useRef(false);
   const tagRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -156,6 +160,33 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     setTagInput("");
     setTagError(null);
     setEditingTag(null);
+    setDeleteTagName(null);
+  }
+
+  function openDeleteTag(tag: string) {
+    const replacement = snapshot.tags.find((candidate) => candidate !== tag);
+    if (!replacement) return;
+    setDeleteTagName(tag);
+    setReplacementTag(replacement);
+    setTagDeleteError(null);
+  }
+
+  async function confirmDeleteTag() {
+    if (!deleteTagName || !replacementTag) return;
+    setTagDeletePending(true);
+    setTagDeleteError(null);
+    try {
+      await repository.deleteTag(deleteTagName, replacementTag);
+      await invalidateSnapshots();
+      setActiveTag((current) => current === deleteTagName ? null : current);
+      setDraft((current) => current.tag === deleteTagName ? { ...current, tag: replacementTag } : current);
+      setEditingTag((current) => current === deleteTagName ? null : current);
+      setDeleteTagName(null);
+    } catch (error) {
+      setTagDeleteError(errorMessage(error));
+    } finally {
+      setTagDeletePending(false);
+    }
   }
 
   function editTag(tag: string) {
@@ -276,6 +307,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
                 <strong>{tag}</strong>
                 <span>{snapshot.items.filter((item) => item.tag === tag).length}개</span>
                 <IconButton aria-label={`${tag} 편집`} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title="편집" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
+                <IconButton aria-label={tag === "기타" ? `${tag} 삭제 불가` : `${tag} 삭제`} disabled={tagSaving || tag === "기타"} onClick={() => openDeleteTag(tag)} size="small" title={tag === "기타" ? "기타 라벨은 삭제할 수 없습니다" : "삭제"} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
               </div>
             ))}
           </div>
@@ -290,6 +322,31 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
             </div>
             {tagError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
           </form>
+        </div>
+      </Modal>
+
+      <Modal
+        className="scrap-label-delete-modal"
+        footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>취소</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">삭제</Button></>}
+        icon="alert"
+        onClose={() => { if (!tagDeletePending) setDeleteTagName(null); }}
+        open={deleteTagName !== null}
+        title="라벨 삭제"
+      >
+        <div className="scrap-label-delete">
+          <p><strong>{deleteTagName}</strong> 라벨을 삭제할까요?</p>
+          <label>
+            <span>기존 스크랩 이동</span>
+            <Select
+              disabled={tagDeletePending}
+              label="이동할 라벨"
+              onChange={setReplacementTag}
+              options={snapshot.tags.filter((tag) => tag !== deleteTagName).map((tag) => ({ value: tag, label: tag }))}
+              value={replacementTag}
+            />
+          </label>
+          <small>기존 스크랩은 모두 선택한 라벨로 이동합니다.</small>
+          {tagDeleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
         </div>
       </Modal>
     </div>
