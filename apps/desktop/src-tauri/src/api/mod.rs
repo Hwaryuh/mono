@@ -5,6 +5,7 @@
 mod color;
 mod db;
 mod error;
+mod ledger;
 mod proxy;
 mod todo;
 
@@ -76,7 +77,8 @@ fn build_router(database: db::Db) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        .merge(todo::routes(database))
+        .merge(todo::routes(database.clone()))
+        .merge(ledger::routes(database))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
