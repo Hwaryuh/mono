@@ -80,8 +80,6 @@ impl SecretCrypto {
         format!("{}:{}:{}", encode_hex(&iv), encode_hex(&tag), encode_hex(&sealed))
     }
 
-    // AI 경계 포팅 시 getApiKey(복호화)가 쓴다. 지금은 테스트만.
-    #[allow(dead_code)]
     fn decrypt(&self, payload: &str) -> ApiResult<String> {
         let fail = || ApiError::Internal("비밀 값을 복호화하지 못했습니다.".into());
         let mut parts = payload.splitn(3, ':');
@@ -183,6 +181,38 @@ fn has_r2(conn: &Connection) -> ApiResult<bool> {
         }
     }
     Ok(true)
+}
+
+// media 경계가 쓴다 — 복호화한 R2 자격증명.
+pub(super) struct R2Config {
+    pub(super) account_id: String,
+    pub(super) access_key_id: String,
+    pub(super) secret_access_key: String,
+    pub(super) bucket: String,
+}
+
+pub(super) fn get_r2_config(
+    conn: &Connection,
+    crypto: &SecretCrypto,
+) -> ApiResult<Option<R2Config>> {
+    let read = |key: &str| -> ApiResult<Option<String>> {
+        match conn
+            .query_row("SELECT value FROM secrets WHERE key = ?1", [key], |r| r.get::<_, String>(0))
+            .optional()?
+        {
+            Some(enc) => Ok(Some(crypto.decrypt(&enc)?)),
+            None => Ok(None),
+        }
+    };
+    let (Some(account_id), Some(access_key_id), Some(secret_access_key), Some(bucket)) = (
+        read("r2_account_id")?,
+        read("r2_access_key_id")?,
+        read("r2_secret_access_key")?,
+        read("r2_bucket")?,
+    ) else {
+        return Ok(None);
+    };
+    Ok(Some(R2Config { account_id, access_key_id, secret_access_key, bucket }))
 }
 
 fn set_r2(conn: &Connection, crypto: &SecretCrypto, creds: &R2Credentials) -> ApiResult<()> {

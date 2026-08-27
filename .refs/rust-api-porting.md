@@ -39,15 +39,23 @@ dev도 동일 — `npm run dev -w @mono/api`가 4175, `npm run desktop:dev`의 R
 | `f8500d9` | routine (+ todo read-model join) | `src/api/routine.rs`, `src/api/todo.rs` |
 | `9881bd8` | inbox | `src/api/inbox.rs`, `src/api/ledger.rs` (create_expense 노출) |
 | `bbdb8f6` | dashboard (snapshot + toggleTask, capture 제외) | `src/api/dashboard.rs`, `src/api/todo.rs` (toggle_complete 노출) |
-| (this) | secret-store + crypto (AI 키 · R2 자격증명 CRUD) | `src/api/secret.rs`, `mod.rs`, `lib.rs`, `Cargo.toml` |
+| `b0b8908` | secret-store + crypto (AI 키 · R2 자격증명 CRUD) | `src/api/secret.rs`, `mod.rs`, `lib.rs`, `Cargo.toml` |
+| (this) | R2 media store (`/media/*` 전부) | `src/api/media.rs`, `src/api/secret.rs` (get_r2_config 노출), `Cargo.toml` |
 
-`cargo test --lib` 87개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
+`cargo test --lib` 94개 통과. `cargo build --release` 클린. JS 스위트 무변경(api 142 / desktop 147).
 
-네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*`
-  `/dashboard/snapshot` `/dashboard/tasks/{id}/toggle`
-  `GET|POST|DELETE /ai/keys/{provider}` `GET|POST /ai/provider` `GET|POST|DELETE /media/credentials`
-프록시 중: `POST /dashboard/capture`(AI 얽힘), `/media/*` 업로드/다운로드,
-  `POST /ai/keys/{p}/test` · `POST /media/credentials/test`(외부 연결 확인), `/link-previews/*`
+네이티브 처리 중: `/todo/*` `/ledger/*` `/calendar/*` `/scrap/*` `/routine/*` `/inbox/*` `/media/*`
+  `/dashboard/snapshot` `/dashboard/tasks/{id}/toggle` `/ai/keys/{provider}` `/ai/provider`
+프록시 중: `POST /dashboard/capture`(AI 얽힘), `POST /ai/keys/{p}/test`(provider 연결 확인), `/link-previews/*`
+
+media 노트:
+- aws-sdk 대신 SigV4 손수 서명(`hmac`+`sha2`) + `reqwest`. 6개 op만: put/get/delete/head-bucket/list.
+  서명은 AWS 문서 "GET Object" 벡터로 유닛 테스트(canonical request + signing key 전체 검증).
+- 배치 DeleteObjects 안 씀 — 개별 DELETE 루프(GC는 드묾, Content-MD5/XML 회피).
+- ListObjectsV2 페이지네이션 미구현(페이지당 1000, 미디어 수가 그보다 적음). XML은 손수 태그 추출.
+- `/media` 멀티파트는 axum `multipart` feature. R2 자격증명은 `secret::get_r2_config`로 복호화.
+- **R2 왕복 자체는 in-repo 검증 없음** — JS도 S3 SDK를 목킹해 실제 HTTP는 안 침. 서명·파싱·참조계산만 테스트.
+- `SecretState { db, crypto }`를 secret·media 두 라우터가 공유(`build_router`에서 clone).
 
 secret 노트:
 - `secret-crypto.ts` 이식: AES-256-GCM, `iv:tag:ciphertext` 전부 hex(`aes-gcm` + `getrandom`
@@ -142,9 +150,7 @@ routine 노트:
 ### 2. 인프라 청크
 
 - **secret-store + secret-crypto** — ✅ 완료. 위 "secret 노트" 참고.
-- **R2 media store** — `aws-sdk-s3` 또는 `rust-s3`/`object_store`. S3 호환.
-  `/media` 라우트 (multipart 업로드, 스트림 다운로드). `r2-media-store.ts` +
-  `media-reference-repository.ts`. 이거 넘어가면 proxy 바디 버퍼링 이슈 무의미해짐.
+- **R2 media store** — ✅ 완료. 위 "media 노트" 참고.
 - **AI capture-analysis** — `reqwest`. OpenAI + Gemini provider
   (`openai-capture-analysis-provider.ts`, `gemini-capture-analysis-provider.ts`),
   프롬프트 빌드(`capture-analysis-prompt.ts`), 응답 검증(`capture-analysis-validation.ts`),

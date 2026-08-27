@@ -19,7 +19,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 # 임베드 API 서버(src/api). Node/Fastify(apps/api)를 대체하는 중 — 포팅 안 된 라우트는
 # proxy.rs가 Node sidecar로 넘긴다.
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros"] }
 tower-http = { version = "0.6", features = ["cors"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
@@ -30,6 +30,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 aes-gcm = "0.10"
 getrandom = "0.2"
+hmac = "0.12"
+sha2 = "0.10"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -9,6 +9,7 @@ mod db;
 mod error;
 mod inbox;
 mod ledger;
+mod media;
 mod proxy;
 mod routine;
 mod scrap;
@@ -93,6 +94,8 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>) -> Router {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers(Any);
 
+    let secret_state = SecretState { db: database.clone(), crypto };
+
     Router::new()
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
@@ -101,7 +104,8 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>) -> Router {
         .merge(scrap::routes(database.clone()))
         .merge(inbox::routes(database.clone()))
         .merge(dashboard::routes(database.clone()))
-        .merge(secret::routes(SecretState { db: database, crypto }))
+        .merge(secret::routes(secret_state.clone()))
+        .merge(media::routes(secret_state))
         .fallback(proxy::handler)
         // 프록시로 넘어가는 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록.
         // 실제 상한은 업스트림(Node) 또는 포팅된 라우트가 각자 검증한다.
