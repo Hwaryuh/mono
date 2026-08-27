@@ -48,6 +48,9 @@ export function buildServer(db: Db = createDb()) {
       "tauri://localhost",
       "http://tauri.localhost",
     ],
+    // @fastify/cors 기본값은 GET,HEAD,POST뿐이다 — PUT/DELETE 라우트(라벨 수정·삭제 등)가
+    // 실제 브라우저 preflight에서 전부 막혀 있었다. 쓰는 메서드를 명시한다.
+    methods: ["GET", "POST", "PUT", "DELETE"],
   });
   app.register(multipart, { limits: { fileSize: MEDIA_UPLOAD_LIMIT_BYTES, files: 1 } });
 
