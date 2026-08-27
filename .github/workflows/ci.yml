@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 빠른 검증 — 모든 push/PR. 프론트 + 임베드 API 서버 유닛 테스트.
+  # 빠른 검증 — 모든 push/PR/태그. 프론트 + 임베드 API 서버 유닛 테스트.
   check:
     strategy:
       fail-fast: false
@@ -16,7 +16,7 @@ jobs:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v4
         with:
@@ -39,16 +39,18 @@ jobs:
       - name: API server release build
         run: cargo build --release --manifest-path apps/desktop/src-tauri/Cargo.toml
 
-  # 전체 번들 — push(main/master)·태그·수동 실행만. PR에서는 스킵(느림).
+  # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
-    if: github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v4
         with:
@@ -63,11 +65,12 @@ jobs:
           workspaces: apps/desktop/src-tauri
 
       # macOS 러너는 Apple Silicon → aarch64 .app/.dmg. Intel Mac 대상은 별도 매트릭스 필요.
-      # 코드 서명·공증은 APPLE_* 시크릿이 있을 때만. 없으면 미서명 번들이 나온다.
+      # 코드 서명·공증은 APPLE_* 시크릿이 있을 때만. 없으면 미서명 번들.
       - name: Tauri build
         run: npm run tauri --workspace @mono/desktop -- build
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: mono-${{ matrix.os }}
           path: |
@@ -75,3 +78,14 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/macos/*.app
             apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: warn
+
+      # 태그일 때만 GitHub Release에 첨부. matrix 두 레그가 같은 릴리스에 파일 추가.
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          fail_on_unmatched_files: false
+          files: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
