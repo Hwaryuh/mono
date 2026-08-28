@@ -8,6 +8,8 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { createAppRouter } from "./app/router";
 import { createHttpRepositories } from "./infrastructure/http/http-repositories";
+import { PlatformApiEndpointProvider } from "./infrastructure/http/api-endpoint";
+import { configureApiBaseUrl } from "./infrastructure/http/http-client";
 import { HttpAiSettingsStore } from "./infrastructure/http/http-ai-settings-store";
 import { HttpMediaMaintenance } from "./infrastructure/http/http-media-maintenance";
 import { HttpMediaStore } from "./infrastructure/http/http-media-store";
@@ -35,6 +37,7 @@ const queryClient = new QueryClient({
 });
 
 async function start() {
+  configureApiBaseUrl(await PlatformApiEndpointProvider.of().resolve());
   const {
     dashboardRepository,
     inboxRepository,

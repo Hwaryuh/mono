@@ -366,7 +366,7 @@ async fn r2_delete(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn crypto() -> SecretCrypto {
         SecretCrypto { key: [3u8; 32] }

@@ -534,7 +534,7 @@ async fn toggle_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
     use rusqlite::params;
 
     fn today() -> String {
@@ -673,8 +673,8 @@ mod tests {
         assert_eq!(snap.routines[0].period, "∞");
     }
 
-    fn state(db: crate::api::db::Db) -> SecretState {
-        SecretState { db, crypto: crate::api::secret::SecretCrypto::test_arc() }
+    fn state(db: crate::db::Db) -> SecretState {
+        SecretState { db, crypto: crate::secret::SecretCrypto::test_arc() }
     }
 
     #[tokio::test]

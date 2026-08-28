@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up Mono SQLite database and master key
+After=mono-api.service
+
+[Service]
+Type=oneshot
+User=mono
+Group=mono
+EnvironmentFile=/etc/mono/mono.env
+ExecStart=/opt/mono/mono-api backup /var/backups/mono --keep 14
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mono /var/backups/mono

@@ -1,4 +1,10 @@
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4174";
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:4174";
+
+export let API_BASE_URL = DEFAULT_API_BASE_URL;
+
+export function configureApiBaseUrl(value: string): void {
+  API_BASE_URL = value.replace(/\/$/, "");
+}
 
 function extractErrorMessage(body: unknown): string | null {
   if (body === null || typeof body !== "object") return null;

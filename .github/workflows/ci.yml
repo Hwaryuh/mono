@@ -31,13 +31,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/desktop/src-tauri
+          workspaces: .
 
       - name: API server tests
-        run: cargo test --lib --manifest-path apps/desktop/src-tauri/Cargo.toml
+        run: cargo test --lib -p mono-api
 
-      - name: API server release build
-        run: cargo build --release --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Workspace release build
+        run: cargo build --release --workspace
 
   # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
@@ -62,7 +62,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/desktop/src-tauri
+          workspaces: .
 
       # macOS 러너는 Apple Silicon → aarch64 .dmg. Intel Mac 대상은 별도 매트릭스 필요.
       # APPLE_SIGNING_IDENTITY: '-' → ad-hoc 서명. 없으면 arm64 미서명 앱이 "손상됨"으로
@@ -78,8 +78,8 @@ jobs:
         with:
           name: mono-${{ matrix.os }}
           path: |
-            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/nsis/*-setup.exe
           if-no-files-found: warn
 
       # 태그일 때만 GitHub Release에 첨부. matrix 두 레그가 같은 릴리스에 파일 추가.
@@ -90,5 +90,5 @@ jobs:
           draft: true
           fail_on_unmatched_files: false
           files: |
-            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/nsis/*-setup.exe

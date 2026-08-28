@@ -409,7 +409,7 @@ async fn toggle_today_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn today() -> String {
         chrono::Local::now().date_naive().to_string()

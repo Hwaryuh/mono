@@ -60,7 +60,7 @@ iOS와 PC는 UI 구현 코드를 공유하지 않는다. 공유하는 것은 API
 
 ```text
 apps/
-  desktop/      React/Vite UI + Tauri 셸 + 임베드 axum API 서버(src-tauri/src/api)
+  desktop/      React/Vite UI + Tauri 셸 (API 서버는 crates/mono-api를 임베드)
 packages/
   domain/       프레임워크 비의존 도메인 규칙
   contracts/    Zod 스키마와 OpenAPI 계약

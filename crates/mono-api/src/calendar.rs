@@ -414,7 +414,7 @@ async fn delete_category_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::db;
+    use crate::db;
 
     fn category_input(name: &str) -> CategoryWriteInput {
         CategoryWriteInput { name: name.into(), color: "#b03a55".into() }
