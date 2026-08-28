@@ -32,6 +32,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
+          # v1: check 프로필 dep 아티팩트를 캐시에 새로 태우려고 한 번 bump.
+          # 이전 캐시는 release 빌드 기준이라 cargo check가 매번 dep를 새로 컴파일했다.
+          prefix-key: v1-rust
 
       - name: API server tests
         run: cargo test --lib -p mono-api
