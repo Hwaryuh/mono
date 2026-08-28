@@ -54,9 +54,16 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            release_asset: target/release/bundle/nsis/*-setup.exe
+            # -setup.exe = 신규 설치용 + updater 타깃. .sig는 latest.json 서명에 쓴다.
+            release_assets: |
+              target/release/bundle/nsis/*-setup.exe
+              target/release/bundle/nsis/*-setup.exe.sig
           - os: macos-26
-            release_asset: target/release/bundle/dmg/*.dmg
+            # .dmg = 신규 설치용. .app.tar.gz(+ .sig) = updater 타깃(darwin-aarch64).
+            release_assets: |
+              target/release/bundle/dmg/*.dmg
+              target/release/bundle/macos/*.app.tar.gz
+              target/release/bundle/macos/*.app.tar.gz.sig
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -76,17 +83,20 @@ jobs:
       # macos-26은 공식 arm64 label → aarch64 .dmg. Intel Mac 대상은 별도 매트릭스 필요.
       # APPLE_SIGNING_IDENTITY: '-' → ad-hoc 서명. 없으면 arm64 미서명 앱이 "손상됨"으로
       # 안 뜬다. 정식 배포는 Developer ID + 공증(APPLE_ID/APPLE_TEAM_ID 시크릿).
+      # TAURI_SIGNING_*: updater 아티팩트(.sig) 서명. 개인키는 repo secret, 비번은 없음(빈 문자열).
+      # 공개키는 tauri.conf.json plugins.updater.pubkey — 앱이 이걸로 서명을 검증한다.
       - name: Tauri build
         env:
           APPLE_SIGNING_IDENTITY: "-"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri --workspace @mono/desktop -- build
 
-      # .app은 zip으로 압축하면 심볼릭 링크·실행 권한이 깨진다 — .dmg만 올린다(mac 배포 형식).
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: mono-${{ matrix.os }}
-          path: ${{ matrix.release_asset }}
+          path: ${{ matrix.release_assets }}
           if-no-files-found: error
 
   publish-draft-release:
@@ -105,6 +115,34 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      # tauri-plugin-updater가 조회하는 매니페스트. 플랫폼별 서명(.sig 내용) + 다운로드 URL을
+      # 담는다. URL은 태그에 고정 — "latest" 플래그와 무관하게 항상 이 릴리스를 가리킨다.
+      - name: Build latest.json
+        env:
+          VERSION: ${{ github.ref_name }}
+          BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          mac_archive="$(basename "$(ls release-assets/*.app.tar.gz)")"
+          win_installer="$(basename "$(ls release-assets/*-setup.exe)")"
+          mac_sig="$(cat release-assets/*.app.tar.gz.sig)"
+          win_sig="$(cat release-assets/*-setup.exe.sig)"
+          [[ -n "$mac_sig" && -n "$win_sig" ]] || { echo "서명 파일이 비어 있다 — TAURI_SIGNING_PRIVATE_KEY secret 확인." >&2; exit 1; }
+          jq -n \
+            --arg version "$version" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mac_sig "$mac_sig" --arg mac_url "$BASE_URL/$mac_archive" \
+            --arg win_sig "$win_sig" --arg win_url "$BASE_URL/$win_installer" \
+            '{
+              version: $version,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
+                "windows-x86_64": { signature: $win_sig, url: $win_url }
+              }
+            }' > release-assets/latest.json
+          cat release-assets/latest.json
+
       - name: Attach desktop bundles to draft release
         id: release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -114,6 +152,8 @@ jobs:
           files: |
             release-assets/*-setup.exe
             release-assets/*.dmg
+            release-assets/*.app.tar.gz
+            release-assets/latest.json
 
   verify-release-assets:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -134,7 +174,9 @@ jobs:
 
           windows_count="$(printf '%s\n' "$names" | grep -Ec -- '-setup\.exe$' || true)"
           macos_count="$(printf '%s\n' "$names" | grep -Ec -- '\.dmg$' || true)"
-          if [[ "$windows_count" -ne 1 || "$macos_count" -ne 1 ]]; then
-            echo "Windows setup exe 1개와 macOS DMG 1개를 기대했다." >&2
+          mac_updater_count="$(printf '%s\n' "$names" | grep -Ec -- '\.app\.tar\.gz$' || true)"
+          manifest_count="$(printf '%s\n' "$names" | grep -Ec -- '^latest\.json$' || true)"
+          if [[ "$windows_count" -ne 1 || "$macos_count" -ne 1 || "$mac_updater_count" -ne 1 || "$manifest_count" -ne 1 ]]; then
+            echo "Windows setup exe·macOS DMG·macOS .app.tar.gz·latest.json 각 1개를 기대했다." >&2
             exit 1
           fi
