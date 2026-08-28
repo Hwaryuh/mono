@@ -16,6 +16,7 @@ import { HttpMediaStore } from "./infrastructure/http/http-media-store";
 import { HttpR2SettingsStore } from "./infrastructure/http/http-r2-settings-store";
 import { TauriServerSettingsStore } from "./infrastructure/server/tauri-server-settings-store";
 import { MediaStoreProvider } from "./infrastructure/media/media-store-context";
+import { AppUpdater } from "./features/updater/AppUpdater";
 import "@mono/ui/tokens.css";
 import "@mono/ui/styles.css";
 import "./styles/global.css";
@@ -60,6 +61,7 @@ async function start() {
       <QueryClientProvider client={queryClient}>
         <MediaStoreProvider value={mediaStore}>
           <RouterProvider router={router} />
+          <AppUpdater />
         </MediaStoreProvider>
       </QueryClientProvider>
     </StrictMode>,

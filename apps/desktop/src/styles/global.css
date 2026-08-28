@@ -261,6 +261,11 @@ li {
 .settings-group > header > strong { color: var(--color-text); font-size: 12.5px; }
 .settings-group > header > span { color: var(--color-text-faint); font-size: 10.5px; }
 .settings-group + .settings-group { margin-top: 14px; }
+.app-updater { display: flex; flex-direction: column; gap: 12px; font-size: 12px; color: var(--color-text-muted); }
+.app-updater p { margin: 0; }
+.app-updater strong { color: var(--color-text); }
+.app-updater__notes { margin: 0; max-height: 200px; overflow: auto; padding: 12px; border-radius: var(--radius-control); background: var(--color-surface-sunken, var(--color-surface)); box-shadow: var(--shadow-border); font: 11px/1.5 var(--font-code); white-space: pre-wrap; }
+.app-updater__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .settings-accent-control { min-height: 34px; display: flex; align-items: center; gap: 12px; }
 .settings-accent-control > span { position: relative; top: -1px; color: var(--color-text-muted); font: 11px var(--font-code); font-variant-numeric: tabular-nums; }
 .settings-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
