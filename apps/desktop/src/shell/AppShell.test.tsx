@@ -258,7 +258,7 @@ describe("AppShell", () => {
   });
 
   it("서버 설정에서 원격 모드로 전환하고 저장하면 재시작 안내가 뜬다", async () => {
-    const store = new InMemoryServerSettingsStore({ reachable: ["http://100.89.224.115:4174"] });
+    const store = new InMemoryServerSettingsStore({ reachable: ["http://100.80.12.34:4174"] });
     renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
@@ -274,7 +274,7 @@ describe("AppShell", () => {
     const saveButton = within(settingsModal).getByRole("button", { name: "저장" });
     expect(saveButton).toBeDisabled();
 
-    fireEvent.change(urlInput, { target: { value: "http://100.89.224.115:4174" } });
+    fireEvent.change(urlInput, { target: { value: "http://100.80.12.34:4174" } });
     fireEvent.click(within(settingsModal).getByRole("button", { name: "연결 테스트" }));
     expect(await within(settingsModal).findByText(/mono 서버가 응답합니다/)).toBeInTheDocument();
 
@@ -283,7 +283,7 @@ describe("AppShell", () => {
 
     expect(await within(settingsModal).findByText("다시 시작하면 적용됩니다")).toBeInTheDocument();
     const applied = await store.read();
-    expect(applied).toMatchObject({ mode: "remote", remoteUrl: "http://100.89.224.115:4174", restartRequired: true });
+    expect(applied).toMatchObject({ mode: "remote", remoteUrl: "http://100.80.12.34:4174", restartRequired: true });
 
     fireEvent.click(within(settingsModal).getByRole("button", { name: "지금 다시 시작" }));
     await waitFor(async () => expect((await store.read()).runningEmbedded).toBe(false));

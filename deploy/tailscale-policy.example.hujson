@@ -1,5 +1,6 @@
 {
   // 기존 tagOwners, grants, nodeAttrs, tests에 각 항목을 병합한다.
+  // 100.80.12.34는 자리표시자다 — 실제 VPS의 Tailscale IPv4로 교체한다.
   "tagOwners": {
     "tag:github-deploy": [],
   },
@@ -7,7 +8,7 @@
   "grants": [
     {
       "src": ["tag:github-deploy"],
-      "dst": ["100.89.224.115"],
+      "dst": ["100.80.12.34"],
       "ip": ["tcp:22"],
     },
   ],
@@ -16,7 +17,7 @@
   // 여는 근거는 앱 레벨 베어러 토큰(MONO_API_TOKEN)이다.
   "nodeAttrs": [
     {
-      "target": ["100.89.224.115"],
+      "target": ["100.80.12.34"],
       "attr": ["funnel"],
     },
   ],
@@ -25,8 +26,8 @@
     {
       // 배포 노드는 SSH 전용 — API 포트에는 접근하지 않는다.
       "src": "tag:github-deploy",
-      "accept": ["100.89.224.115:22"],
-      "deny": ["100.89.224.115:4174"],
+      "accept": ["100.80.12.34:22"],
+      "deny": ["100.80.12.34:4174"],
     },
   ],
 }

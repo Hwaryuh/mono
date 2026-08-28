@@ -310,12 +310,12 @@ mod tests {
         let written = write_stored_connection(
             &directory,
             ServerMode::Remote,
-            Some("  http://100.89.224.115:4174/  "),
+            Some("  http://100.80.12.34:4174/  "),
             Some("  s3cr3t  "),
         )
         .unwrap();
         assert_eq!(written.mode, ServerMode::Remote);
-        assert_eq!(written.remote_url, "http://100.89.224.115:4174");
+        assert_eq!(written.remote_url, "http://100.80.12.34:4174");
         assert_eq!(written.remote_token, "s3cr3t");
 
         let stored = read_stored_connection(&directory).unwrap();
@@ -323,7 +323,7 @@ mod tests {
 
         // 파일은 유효한 RuntimeServer로 다시 로드된다.
         let config = RuntimeServer::load_with_override(&directory, None).unwrap();
-        assert_eq!(config.api_base_url(), "http://100.89.224.115:4174");
+        assert_eq!(config.api_base_url(), "http://100.80.12.34:4174");
         assert_eq!(config.api_token(), Some("s3cr3t"));
         assert!(!config.uses_embedded_server());
         std::fs::remove_dir_all(directory).unwrap();

@@ -7,7 +7,7 @@ import {
 
 describe("looksLikeRemoteApiUrl", () => {
   it("accepts http on 4174 and https on 443 or 4174", () => {
-    expect(looksLikeRemoteApiUrl("http://100.89.224.115:4174")).toBe(true);
+    expect(looksLikeRemoteApiUrl("http://100.80.12.34:4174")).toBe(true);
     expect(looksLikeRemoteApiUrl("https://mono.example.com")).toBe(true);
     expect(looksLikeRemoteApiUrl("https://mono.example.com:4174")).toBe(true);
     expect(looksLikeRemoteApiUrl("  http://mono-server:4174/  ")).toBe(true);
@@ -37,9 +37,9 @@ describe("InMemoryServerSettingsStore", () => {
     await expect(store.save({ mode: "remote", remoteUrl: "" })).rejects.toThrow(/주소를 입력/);
     await expect(store.save({ mode: "remote", remoteUrl: "http://host:9999" })).rejects.toThrow(/포트/);
 
-    const saved = await store.save({ mode: "remote", remoteUrl: "  http://100.89.224.115:4174/ " });
+    const saved = await store.save({ mode: "remote", remoteUrl: "  http://100.80.12.34:4174/ " });
     expect(saved.mode).toBe("remote");
-    expect(saved.remoteUrl).toBe("http://100.89.224.115:4174");
+    expect(saved.remoteUrl).toBe("http://100.80.12.34:4174");
     expect(saved.restartRequired).toBe(true);
     expect(saved.runningEmbedded).toBe(true);
 
@@ -48,14 +48,14 @@ describe("InMemoryServerSettingsStore", () => {
     expect(applied).toMatchObject({
       mode: "remote",
       runningEmbedded: false,
-      effectiveApiBaseUrl: "http://100.89.224.115:4174",
+      effectiveApiBaseUrl: "http://100.80.12.34:4174",
       restartRequired: false,
     });
   });
 
   it("probe resolves only for reachable base urls", async () => {
-    const store = new InMemoryServerSettingsStore({ reachable: ["http://100.89.224.115:4174"] });
-    await expect(store.probe("http://100.89.224.115:4174/")).resolves.toBeUndefined();
+    const store = new InMemoryServerSettingsStore({ reachable: ["http://100.80.12.34:4174"] });
+    await expect(store.probe("http://100.80.12.34:4174/")).resolves.toBeUndefined();
     await expect(store.probe("http://127.0.0.1:4174")).resolves.toBeUndefined();
     await expect(store.probe("http://10.0.0.9:4174")).rejects.toThrow(/연결할 수 없습니다/);
   });
