@@ -129,8 +129,12 @@ describe("LedgerPage", () => {
     const saveButton = within(modal).getByRole("button", { name: "저장" });
     saveButton.focus();
 
-    fireEvent.keyDown(window, { key: "Tab" });
-    expect(within(modal).getByRole("button", { name: "닫기" })).toHaveFocus();
+    // waitFor re-fires Tab until the Modal's keydown listener (registered in an
+    // effect) is attached — under parallel CI load the effect can lag findByRole.
+    await waitFor(() => {
+      fireEvent.keyDown(window, { key: "Tab" });
+      expect(within(modal).getByRole("button", { name: "닫기" })).toHaveFocus();
+    });
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "지출 추가" })).not.toBeInTheDocument());
   });
