@@ -1,0 +1,5 @@
+# 배포 스크립트와 설정은 Linux VPS에서 실행·파싱된다. CRLF가 섞이면
+# `#!/usr/bin/env bash\r` 같은 깨진 셔뱅이나 systemd 파싱 오류가 난다.
+deploy/** text eol=lf
+*.sh text eol=lf
+.github/workflows/*.yml text eol=lf

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly PROTOCOL_VERSION="1"
+readonly DEPLOY_USER="mono-deploy"
+readonly STAGING_ROOT="/var/tmp/mono-deploy"
+readonly INSTALL_DIR="/opt/mono"
+readonly TARGET="${INSTALL_DIR}/mono-api"
+readonly ENV_FILE="/etc/mono/mono.env"
+readonly BACKUP_DIR="/var/backups/mono"
+readonly SERVICE="mono-api.service"
+readonly LOCK_FILE="/run/lock/mono-api-deploy.lock"
+readonly SYSTEMD_DIR="/etc/systemd/system"
+readonly UNITS=(
+  "mono-api.service"
+  "mono-api-backup.service"
+  "mono-api-backup.timer"
+)
+
+die() {
+  echo "deploy failed: $*" >&2
+  exit 1
+}
+
+if [[ "${1:-}" == "--protocol-version" && "$#" -eq 1 ]]; then
+  printf '%s\n' "$PROTOCOL_VERSION"
+  exit 0
+fi
+
+[[ "$EUID" -eq 0 ]] || die "must run as root"
+[[ "$#" -eq 2 ]] || die "usage: deploy-mono-api <40-char-release-id> <sha256>"
+
+release_id="$1"
+expected_sha="$2"
+[[ "$release_id" =~ ^[0-9a-f]{40}$ ]] || die "invalid release id"
+[[ "$expected_sha" =~ ^[0-9a-f]{64}$ ]] || die "invalid SHA-256"
+
+exec 9>"$LOCK_FILE"
+flock -n 9 || die "another deployment is running"
+
+staging_dir="${STAGING_ROOT}/${release_id}"
+source_binary="${staging_dir}/mono-api"
+[[ -f "$source_binary" && ! -L "$source_binary" ]] || die "staged binary missing or unsafe"
+[[ "$(realpath -e -- "$source_binary")" == "$source_binary" ]] || die "staged binary escaped staging directory"
+[[ "$(stat -c '%U' -- "$source_binary")" == "$DEPLOY_USER" ]] || die "staged binary owner is not $DEPLOY_USER"
+[[ "$(sha256sum -- "$source_binary" | cut -d ' ' -f 1)" == "$expected_sha" ]] || die "binary checksum mismatch"
+
+for unit in "${UNITS[@]}"; do
+  staged_unit="${staging_dir}/systemd/${unit}"
+  installed_unit="${SYSTEMD_DIR}/${unit}"
+  [[ -f "$staged_unit" && ! -L "$staged_unit" ]] || die "staged unit missing or unsafe: $unit"
+  [[ "$(realpath -e -- "$staged_unit")" == "$staged_unit" ]] || die "staged unit escaped staging directory: $unit"
+  cmp -s -- "$staged_unit" "$installed_unit" || die "systemd unit drift: $unit; run reviewed bootstrap first"
+done
+
+[[ -f "$TARGET" && -x "$TARGET" && ! -L "$TARGET" ]] || die "current binary missing or unsafe"
+[[ -r "$ENV_FILE" ]] || die "environment file missing: $ENV_FILE"
+
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+[[ -n "${MONO_BIND_ADDR:-}" ]] || die "MONO_BIND_ADDR is empty"
+
+bind_host="${MONO_BIND_ADDR%:*}"
+tailscale_ipv4="$(tailscale ip -4)"
+[[ "$tailscale_ipv4" == "$bind_host" ]] || die "MONO_BIND_ADDR is not this server's Tailscale IPv4"
+health_url="http://${MONO_BIND_ADDR}/health"
+
+wait_for_health() {
+  local attempt response
+  for attempt in {1..20}; do
+    response="$(curl --silent --show-error --fail --max-time 2 "$health_url" 2>/dev/null || true)"
+    if [[ "$response" == "ok" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+candidate="$(mktemp --tmpdir="$INSTALL_DIR" .mono-api.candidate.XXXXXX)"
+rollback="$(mktemp --tmpdir="$INSTALL_DIR" .mono-api.rollback.XXXXXX)"
+
+cleanup() {
+  rm -f -- "$candidate" "$rollback"
+  if [[ -d "$staging_dir" && "$(realpath -e -- "$staging_dir")" == "$staging_dir" ]]; then
+    rm -rf --one-file-system -- "$staging_dir"
+  fi
+}
+trap cleanup EXIT
+
+install -o root -g root -m 0755 -- "$source_binary" "$candidate"
+"$candidate" --help >/dev/null
+install -o root -g root -m 0755 -- "$TARGET" "$rollback"
+
+echo "Creating pre-deployment backup..."
+runuser --user mono -- "$TARGET" backup "$BACKUP_DIR" --keep 14
+
+mv -fT -- "$candidate" "$TARGET"
+sync -f "$TARGET"
+
+deployment_ok=true
+systemctl daemon-reload || deployment_ok=false
+if [[ "$deployment_ok" == true ]]; then
+  systemctl restart "$SERVICE" || deployment_ok=false
+fi
+if [[ "$deployment_ok" == true ]]; then
+  wait_for_health || deployment_ok=false
+fi
+
+if [[ "$deployment_ok" == true ]]; then
+  rm -f -- "$rollback"
+  echo "Deployed $release_id; health ok."
+  exit 0
+fi
+
+echo "New binary failed health check; rolling back." >&2
+systemctl stop "$SERVICE" || true
+mv -fT -- "$rollback" "$TARGET"
+sync -f "$TARGET"
+systemctl daemon-reload || true
+
+if systemctl restart "$SERVICE" && wait_for_health; then
+  echo "Rollback completed; previous binary health ok." >&2
+  exit 1
+fi
+
+echo "CRITICAL: rollback health check also failed; inspect journalctl -u $SERVICE." >&2
+exit 2

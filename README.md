@@ -36,3 +36,4 @@ npm run desktop:build
 - [PC 데스크톱 구현 인계](.refs/desktop-implementation-handoff.md)
 - [API 서버 Rust 이관](.refs/rust-api-porting.md)
 - [원격 서버 배포와 백업](.refs/server-deployment.md)
+- [데스크톱 Release](.refs/desktop-release.md)
