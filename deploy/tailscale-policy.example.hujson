@@ -1,5 +1,5 @@
 {
-  // 기존 tagOwners, grants, tests에 각 항목을 병합한다.
+  // 기존 tagOwners, grants, nodeAttrs, tests에 각 항목을 병합한다.
   "tagOwners": {
     "tag:github-deploy": [],
   },
@@ -12,8 +12,18 @@
     },
   ],
 
+  // VPS만 공개 인터넷에 서비스 노출(Funnel)을 허용한다. mono-api를 Tailscale 밖으로
+  // 여는 근거는 앱 레벨 베어러 토큰(MONO_API_TOKEN)이다.
+  "nodeAttrs": [
+    {
+      "target": ["100.89.224.115"],
+      "attr": ["funnel"],
+    },
+  ],
+
   "tests": [
     {
+      // 배포 노드는 SSH 전용 — API 포트에는 접근하지 않는다.
       "src": "tag:github-deploy",
       "accept": ["100.89.224.115:22"],
       "deny": ["100.89.224.115:4174"],
