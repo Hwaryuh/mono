@@ -36,6 +36,7 @@ Tailscale IP로 바꾼다. `0.0.0.0:4174`로 공인 NIC에 바인드하지 않�
 
 ```bash
 sudo useradd --system --home /var/lib/mono --shell /usr/sbin/nologin mono
+sudo install -d -o root -g root -m 755 /opt/mono
 sudo install -d -o mono -g mono -m 700 /var/lib/mono /var/backups/mono
 sudo install -d -o root -g mono -m 750 /etc/mono
 sudo install -o root -g root -m 755 target/release/mono-api /opt/mono/mono-api

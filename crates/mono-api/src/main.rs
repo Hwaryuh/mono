@@ -62,7 +62,7 @@ fn print_help() {
     );
 }
 
-fn serve() {
+fn serve() -> Result<(), mono_api::ServeError> {
     let config = mono_api::Config {
         bind_addr: env_or("MONO_BIND_ADDR", "0.0.0.0:4174"),
         db_path: PathBuf::from(env_or("MONO_DB_PATH", "mono.sqlite")),
@@ -79,14 +79,18 @@ fn serve() {
             .unwrap_or_default(),
     };
     eprintln!("mono-api: binding {}", config.bind_addr);
-    mono_api::serve(config);
+    mono_api::serve(config)
 }
 
 fn main() -> ExitCode {
     match parse_command(std::env::args().skip(1)) {
         Ok(Command::Serve) => {
-            serve();
-            ExitCode::SUCCESS
+            if let Err(error) = serve() {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            }
         }
         Ok(Command::Backup { destination, keep }) => {
             let database_path = PathBuf::from(env_or("MONO_DB_PATH", "mono.sqlite"));

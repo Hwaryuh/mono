@@ -22,6 +22,7 @@ mod todo;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::{error::Error, fmt};
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method};
@@ -43,6 +44,44 @@ pub struct Config {
     pub cors_origins: Vec<String>,
 }
 
+#[derive(Debug)]
+pub enum ServeError {
+    Database(rusqlite::Error),
+    SecretKey(std::io::Error),
+    Runtime(std::io::Error),
+    Bind {
+        address: String,
+        source: std::io::Error,
+    },
+    Server(std::io::Error),
+}
+
+impl fmt::Display for ServeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Database(error) => write!(formatter, "API DB 초기화 실패: {error}"),
+            Self::SecretKey(error) => write!(formatter, "마스터 키 로드 실패: {error}"),
+            Self::Runtime(error) => write!(formatter, "API 런타임 생성 실패: {error}"),
+            Self::Bind { address, source } => {
+                write!(formatter, "API 서버 바인딩 실패({address}): {source}")
+            }
+            Self::Server(error) => write!(formatter, "API 서버 종료: {error}"),
+        }
+    }
+}
+
+impl Error for ServeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Database(error) => Some(error),
+            Self::SecretKey(error)
+            | Self::Runtime(error)
+            | Self::Bind { source: error, .. }
+            | Self::Server(error) => Some(error),
+        }
+    }
+}
+
 // 임베드 모드 진입점. 시그니처 유지 — Tauri `lib.rs`가 그대로 호출한다.
 // mono.sqlite + mono.secret.key 경로를 받아 스레드에 서버를 띄운다.
 pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
@@ -54,50 +93,38 @@ pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
     };
     thread::Builder::new()
         .name("mono-api".into())
-        .spawn(move || serve(config))
+        .spawn(move || {
+            if let Err(error) = serve(config) {
+                eprintln!("{error} - 화면에 연결 오류가 뜰 수 있습니다.");
+            }
+        })
         .expect("API 서버 스레드 생성 실패")
 }
 
 /// standalone 진입점 — 현재 스레드를 블로킹한다.
-pub fn serve(config: Config) {
-    let database = match db::open(&config.db_path) {
-        Ok(database) => database,
-        Err(error) => {
-            eprintln!("API DB 초기화 실패: {error} - 화면에 연결 오류가 뜰 수 있습니다.");
-            return;
-        }
-    };
-
-    let crypto = match SecretCrypto::load_or_create(&config.secret_key_path) {
-        Ok(crypto) => Arc::new(crypto),
-        Err(error) => {
-            eprintln!("마스터 키 로드 실패: {error} - AI/미디어 자격증명 라우트가 실패합니다.");
-            return;
-        }
-    };
-
-    let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            eprintln!("API 런타임 생성 실패: {error}");
-            return;
-        }
-    };
+pub fn serve(config: Config) -> Result<(), ServeError> {
+    let database = db::open(&config.db_path).map_err(ServeError::Database)?;
+    let crypto = Arc::new(
+        SecretCrypto::load_or_create(&config.secret_key_path).map_err(ServeError::SecretKey)?,
+    );
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(ServeError::Runtime)?;
 
     let bind_addr = config.bind_addr;
     let router = build_router(database, crypto, &config.cors_origins);
     runtime.block_on(async move {
-        let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
-            Ok(listener) => listener,
-            Err(error) => {
-                eprintln!("API 서버 바인딩 실패({bind_addr}): {error}");
-                return;
-            }
-        };
-        if let Err(error) = axum::serve(listener, router).await {
-            eprintln!("API 서버 종료: {error}");
-        }
-    });
+        let listener = tokio::net::TcpListener::bind(&bind_addr)
+            .await
+            .map_err(|source| ServeError::Bind {
+                address: bind_addr,
+                source,
+            })?;
+        axum::serve(listener, router)
+            .await
+            .map_err(ServeError::Server)
+    })
 }
 
 fn build_router(database: db::Db, crypto: Arc<SecretCrypto>, cors_origins: &[String]) -> Router {

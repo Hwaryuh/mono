@@ -1,7 +1,7 @@
 [Unit]
 Description=Mono personal API server
 After=network-online.target tailscaled.service
-Wants=network-online.target
+Wants=network-online.target tailscaled.service
 
 [Service]
 Type=simple
