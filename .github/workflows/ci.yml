@@ -36,8 +36,9 @@ jobs:
       - name: API server tests
         run: cargo test --lib -p mono-api
 
-      - name: Workspace release build
-        run: cargo build --release --workspace
+      # 매 push의 컴파일 검증만. 진짜 release 빌드(LTO+codegen-units=1)는 태그 걸린 bundle 잡이 함.
+      - name: Workspace compile check
+        run: cargo check --workspace
 
   # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
