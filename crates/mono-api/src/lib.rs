@@ -4,6 +4,7 @@
 // 예전 Node/Fastify(apps/api)를 전 경계 Rust로 재작성 완료(Option C) — sidecar·proxy 제거됨.
 
 mod ai;
+pub mod backup;
 mod calendar;
 mod color;
 mod dashboard;

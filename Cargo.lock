@@ -2345,9 +2345,12 @@ name = "mono-desktop"
 version = "0.1.1"
 dependencies = [
  "mono-api",
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "url",
 ]
 
 [[package]]
