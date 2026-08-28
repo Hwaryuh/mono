@@ -14,6 +14,7 @@ import { HttpAiSettingsStore } from "./infrastructure/http/http-ai-settings-stor
 import { HttpMediaMaintenance } from "./infrastructure/http/http-media-maintenance";
 import { HttpMediaStore } from "./infrastructure/http/http-media-store";
 import { HttpR2SettingsStore } from "./infrastructure/http/http-r2-settings-store";
+import { TauriServerSettingsStore } from "./infrastructure/server/tauri-server-settings-store";
 import { MediaStoreProvider } from "./infrastructure/media/media-store-context";
 import "@mono/ui/tokens.css";
 import "@mono/ui/styles.css";
@@ -49,7 +50,7 @@ async function start() {
   } = createHttpRepositories();
   const router = createAppRouter(
     dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository,
-    new HttpAiSettingsStore(), new HttpMediaMaintenance(), new HttpR2SettingsStore(),
+    new HttpAiSettingsStore(), new HttpMediaMaintenance(), new HttpR2SettingsStore(), new TauriServerSettingsStore(),
   );
 
   createRoot(document.getElementById("root")!).render(

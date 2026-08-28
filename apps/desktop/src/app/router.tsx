@@ -18,6 +18,8 @@ import { RouteErrorScreen } from "./RouteErrorScreen";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
 import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
+import type { ServerSettingsStore } from "../infrastructure/server/server-settings-store";
+import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
 
 export function createAppRouter(
   dashboardRepository: DashboardRepository, inboxRepository: InboxRepository, todoRepository: TodoRepository, routineRepository: RoutineRepository,
@@ -25,11 +27,12 @@ export function createAppRouter(
   aiSettingsStore: AiSettingsStore = new InMemoryAiSettingsStore(),
   mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(),
   r2SettingsStore: R2SettingsStore = new InMemoryR2SettingsStore(),
+  serverSettingsStore: ServerSettingsStore = new TauriServerSettingsStore(),
 ) {
   return createHashRouter([
     {
       path: "/",
-      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} r2SettingsStore={r2SettingsStore} routineRepository={routineRepository} todoRepository={todoRepository} />,
+      element: <AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} r2SettingsStore={r2SettingsStore} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />,
       errorElement: <RouteErrorScreen />,
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },
