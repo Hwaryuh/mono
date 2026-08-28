@@ -1,0 +1,13 @@
+{
+  "name": "@mono/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@mono/domain": "0.1.0",
+    "zod": "^4.1.5"
+  }
+}

@@ -1,0 +1,65 @@
+@font-face {
+  font-family: "SUIT Variable";
+  src: url("../assets/fonts/SUIT-Variable.woff2") format("woff2-variations");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "Orbit";
+  src: url("../assets/fonts/Orbit-Regular.woff2") format("woff2");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
+:root {
+  color-scheme: light;
+  --color-bg: oklch(0.973 0.001 106.424);
+  --color-surface: oklch(1 0 0);
+  --color-surface-subtle: oklch(0.985 0.001 106.423);
+  --color-text: oklch(0.222 0.002 106.554);
+  --color-text-muted: oklch(0.473 0.006 106.638);
+  --color-text-faint: oklch(0.645 0.009 106.643);
+  --color-border: oklch(0.918 0.004 106.478);
+  --color-border-strong: oklch(0.865 0.007 106.541);
+  --color-hover: oklch(0.958 0.003 106.449);
+  --color-accent: oklch(0.3861 0.0109 264.44);
+  --color-accent-hover: color-mix(in srgb, var(--color-accent) 88%, black);
+  --color-accent-foreground: oklch(1 0 0);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  --color-warning: oklch(0.6 0.127 69.132);
+  --color-danger: oklch(0.543 0.174 29.697);
+  --color-success: oklch(0.539 0.082 160.129);
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-overlay: 10px;
+  --shadow-border: 0 0 0 1px oklch(0.222 0.002 106.554 / 6%), 0 1px 2px -1px oklch(0.222 0.002 106.554 / 7%), 0 2px 4px oklch(0.222 0.002 106.554 / 4%);
+  --shadow-border-hover: 0 0 0 1px oklch(0.222 0.002 106.554 / 9%), 0 1px 2px -1px oklch(0.222 0.002 106.554 / 8%), 0 2px 5px oklch(0.222 0.002 106.554 / 7%);
+  --shadow-overlay: 0 20px 60px oklch(0.169 0.018 5.951 / 22%);
+  --font-sans: "SUIT Variable", "SUIT", system-ui, sans-serif;
+  --font-code: "Orbit", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --layer-overlay: 60;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: oklch(0.187 0 0);
+  --color-surface: oklch(0.226 0.002 106.551);
+  --color-surface-subtle: oklch(0.256 0.002 106.529);
+  --color-text: oklch(0.955 0.004 91.447);
+  --color-text-muted: oklch(0.82 0.008 106.607);
+  --color-text-faint: oklch(0.77 0.014 106.821);
+  --color-border: oklch(0.296 0.004 106.614);
+  --color-border-strong: oklch(0.359 0.007 106.735);
+  --color-hover: oklch(0.268 0.002 106.522);
+  --color-accent-hover: color-mix(in srgb, var(--color-accent) 82%, white);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 24%, var(--color-surface));
+  --color-warning: oklch(0.731 0.13 73.34);
+  --color-danger: oklch(0.655 0.156 27.314);
+  --color-success: oklch(0.681 0.086 157.749);
+  --shadow-border: 0 0 0 1px oklch(1 0 0 / 8%);
+  --shadow-border-hover: 0 0 0 1px oklch(1 0 0 / 13%);
+  --shadow-overlay: 0 20px 60px oklch(0 0 0 / 45%);
+}

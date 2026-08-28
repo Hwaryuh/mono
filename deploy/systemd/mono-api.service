@@ -1,0 +1,21 @@
+[Unit]
+Description=Mono personal API server
+After=network-online.target tailscaled.service
+Wants=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+User=mono
+Group=mono
+EnvironmentFile=/etc/mono/mono.env
+ExecStart=/opt/mono/mono-api serve
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mono
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+{
+  "name": "@mono/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./tokens.css": "./src/styles/tokens.css",
+    "./styles.css": "./src/styles/components.css"
+  },
+  "peerDependencies": {
+    "react": "^19.1.1"
+  },
+  "dependencies": {
+    "@mono/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "react": "^19.1.1"
+  }
+}

@@ -1,0 +1,26 @@
+[package]
+name = "mono-desktop"
+version = "0.1.4"
+description = "개인 관리 플랫폼 데스크톱 앱"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "mono_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+url = "2"
+
+# API 서버는 별도 크레이트(crates/mono-api). lib.rs가 `mono_api::spawn`으로 임베드한다.
+# standalone 바이너리는 그 크레이트의 [[bin]] — tauri 의존 없이 linux에서 빌드된다.
+mono-api = { path = "../../../crates/mono-api" }
+
+# profile.release는 워크스페이스 루트 Cargo.toml로 이동함.
