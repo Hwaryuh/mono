@@ -37,6 +37,7 @@ const paths = {
   edit: "M5 19h14M7 15l9-9 2 2-9 9H7z",
   trash: "M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13M10 11v5M14 11v5",
   sync: "M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7",
+  server: "M4 5h16v6H4zM4 13h16v6H4zM7.5 8h.01M7.5 16h.01M12 8h5M12 16h5",
   settings: "M4 7h6M14 7h6M12 5v4M4 12h10M18 12h2M16 10v4M4 17h2M10 17h10M8 15v4",
 } as const;
 

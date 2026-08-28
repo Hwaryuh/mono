@@ -25,8 +25,9 @@ import { createMockDashboardRepository } from "../infrastructure/mock/mock-dashb
 import type { DashboardRepository } from "../features/dashboard/dashboard-repository";
 import { ACCENT_COLOR_STORAGE_KEY } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
+import { InMemoryServerSettingsStore, type ServerSettingsStore } from "../infrastructure/server/server-settings-store";
 
-function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance()) {
+function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(), serverSettingsStore: ServerSettingsStore = new InMemoryServerSettingsStore()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const todoRepository = createMockTodoRepository();
   return render(
@@ -34,7 +35,7 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
       <MediaStoreProvider value={mediaStore}>
         <MemoryRouter initialEntries={["/dashboard"]}>
           <Routes>
-            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} todoRepository={todoRepository} />}>
+            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />}>
               <Route path="dashboard" element={<div>대시보드 경로</div>} />
               <Route path="inbox" element={<div>수집함 경로</div>} />
               <Route path="todo" element={<TodoPage repository={todoRepository} />} />
@@ -254,6 +255,55 @@ describe("AppShell", () => {
     expect(geminiSection).toHaveClass("settings-ai--inactive");
     expect(openaiSection).toHaveClass("settings-ai--active");
     await expect(store.getActiveProvider()).resolves.toBe("openai");
+  });
+
+  it("서버 설정에서 원격 모드로 전환하고 저장하면 재시작 안내가 뜬다", async () => {
+    const store = new InMemoryServerSettingsStore({ reachable: ["http://100.89.224.115:4174"] });
+    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "서버" }));
+
+    expect(await within(settingsModal).findByText("연결됨")).toBeInTheDocument();
+    expect(within(settingsModal).queryByRole("textbox", { name: "원격 서버 주소" })).not.toBeInTheDocument();
+
+    const modeGroup = within(settingsModal).getByRole("radiogroup", { name: "서버 연결 모드" });
+    fireEvent.click(within(modeGroup).getByRole("radio", { name: /원격 서버/ }));
+
+    const urlInput = within(settingsModal).getByRole("textbox", { name: "원격 서버 주소" });
+    const saveButton = within(settingsModal).getByRole("button", { name: "저장" });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(urlInput, { target: { value: "http://100.89.224.115:4174" } });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "연결 테스트" }));
+    expect(await within(settingsModal).findByText(/mono 서버가 응답합니다/)).toBeInTheDocument();
+
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    expect(await within(settingsModal).findByText("다시 시작하면 적용됩니다")).toBeInTheDocument();
+    const applied = await store.read();
+    expect(applied).toMatchObject({ mode: "remote", remoteUrl: "http://100.89.224.115:4174", restartRequired: true });
+
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "지금 다시 시작" }));
+    await waitFor(async () => expect((await store.read()).runningEmbedded).toBe(false));
+  });
+
+  it("잘못된 원격 주소는 저장을 막고 오류를 알린다", async () => {
+    const store = new InMemoryServerSettingsStore();
+    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "서버" }));
+    await within(settingsModal).findByText("연결됨");
+
+    const modeGroup = within(settingsModal).getByRole("radiogroup", { name: "서버 연결 모드" });
+    fireEvent.click(within(modeGroup).getByRole("radio", { name: /원격 서버/ }));
+    fireEvent.change(within(settingsModal).getByRole("textbox", { name: "원격 서버 주소" }), { target: { value: "http://host:8080" } });
+
+    expect(within(settingsModal).getByRole("button", { name: "저장" })).toBeDisabled();
+    expect(within(settingsModal).getByRole("button", { name: "연결 테스트" })).toBeDisabled();
+    expect(within(settingsModal).getByRole("textbox", { name: "원격 서버 주소" })).toHaveAttribute("aria-invalid", "true");
   });
 
   async function openStoragePanel(mediaMaintenance: MediaMaintenance) {

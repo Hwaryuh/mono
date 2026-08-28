@@ -1,4 +1,4 @@
-import { Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, type IconName } from "@mono/ui";
+import { Badge, Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, StatusIndicator, type IconName } from "@mono/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -14,6 +14,14 @@ import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./ac
 import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
 import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
+import {
+  looksLikeRemoteApiUrl,
+  trimBaseUrl,
+  type ServerConnection,
+  type ServerMode,
+  type ServerSettingsStore,
+} from "../infrastructure/server/server-settings-store";
+import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
 
 type NavigationItem = {
   to: string;
@@ -24,7 +32,7 @@ type NavigationItem = {
 };
 
 type Theme = "light" | "dark";
-type SettingsSectionId = "appearance" | "ai" | "storage" | "about";
+type SettingsSectionId = "appearance" | "server" | "ai" | "storage" | "about";
 
 interface SettingsSectionDefinition {
   id: SettingsSectionId;
@@ -34,6 +42,7 @@ interface SettingsSectionDefinition {
 
 const settingsSections: SettingsSectionDefinition[] = [
   { id: "appearance", label: "화면", icon: "sun" },
+  { id: "server", label: "서버", icon: "server" },
   { id: "ai", label: "AI", icon: "sparkles" },
   { id: "storage", label: "저장공간", icon: "layers" },
   { id: "about", label: "정보", icon: "note" },
@@ -43,6 +52,7 @@ const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(win
 const defaultAiSettingsStore = new InMemoryAiSettingsStore();
 const defaultMediaMaintenance = new InMemoryMediaMaintenance();
 const defaultR2SettingsStore = new InMemoryR2SettingsStore();
+const defaultServerSettingsStore = new TauriServerSettingsStore();
 
 const routeMeta: Record<string, { title: string; subtitle: string; icon: IconName; action?: string }> = {
   "/dashboard": { title: "대시보드", subtitle: "", icon: "grid" },
@@ -56,10 +66,10 @@ const routeMeta: Record<string, { title: string; subtitle: string; icon: IconNam
 
 export function AppShell({
   aiSettingsStore = defaultAiSettingsStore, dashboardRepository, inboxRepository, mediaMaintenance = defaultMediaMaintenance,
-  r2SettingsStore = defaultR2SettingsStore, todoRepository, routineRepository, calendarRepository,
+  r2SettingsStore = defaultR2SettingsStore, serverSettingsStore = defaultServerSettingsStore, todoRepository, routineRepository, calendarRepository,
 }: {
   aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; mediaMaintenance?: MediaMaintenance;
-  r2SettingsStore?: R2SettingsStore; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository;
+  r2SettingsStore?: R2SettingsStore; serverSettingsStore?: ServerSettingsStore; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
@@ -257,6 +267,7 @@ export function AppShell({
         onThemeChange={setTheme}
         open={settingsOpen}
         r2SettingsStore={r2SettingsStore}
+        serverSettingsStore={serverSettingsStore}
         theme={theme}
       />
       <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
@@ -269,7 +280,7 @@ export function AppShell({
   );
 }
 
-function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, aiSettingsStore, mediaMaintenance, r2SettingsStore }: {
+function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, aiSettingsStore, mediaMaintenance, r2SettingsStore, serverSettingsStore }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
@@ -279,6 +290,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
   aiSettingsStore: AiSettingsStore;
   mediaMaintenance: MediaMaintenance;
   r2SettingsStore: R2SettingsStore;
+  serverSettingsStore: ServerSettingsStore;
 }) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance");
   return (
@@ -328,6 +340,8 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
               </section>
             </>
           )}
+
+          {activeSection === "server" && <ServerSettingsPanel store={serverSettingsStore} />}
 
           {activeSection === "ai" && <AiSettingsPanel store={aiSettingsStore} />}
 
@@ -641,6 +655,222 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
         <p className="settings-ai__notice-text">{meta.dataNotice}</p>
       </div>
     </section>
+  );
+}
+
+const SERVER_MODE_OPTIONS: { id: ServerMode; label: string; description: string }[] = [
+  { id: "embedded", label: "이 기기", description: "이 기기에서 API 서버를 직접 실행하고 데이터를 로컬에 저장합니다." },
+  { id: "remote", label: "원격 서버", description: "다른 기기의 mono 서버에 연결해 여러 기기가 같은 데이터를 봅니다." },
+];
+
+type CurrentConnectionStatus = { state: "checking" } | { state: "online" } | { state: "offline"; detail: string };
+
+function CurrentConnectionBadge({ status }: { status: CurrentConnectionStatus }) {
+  if (status.state === "online") return <StatusIndicator icon="check" label="연결됨" tone="success" />;
+  if (status.state === "offline") return <StatusIndicator icon="alert" label="응답 없음" tone="danger" />;
+  return <StatusIndicator icon="sync" label="확인 중" tone="neutral" />;
+}
+
+/**
+ * 이 기기가 어느 mono API 서버를 쓸지 정한다. 설정은 server.json에 저장되고 적용은 다음
+ * 실행부터다 — lib.rs가 실행 시 한 번만 연결을 결정한다. 그래서 "저장"과 "다시 시작"이
+ * 분리돼 있고, restartRequired로 둘의 어긋남을 드러낸다.
+ */
+function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
+  const [connection, setConnection] = useState<ServerConnection | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [draftMode, setDraftMode] = useState<ServerMode>("embedded");
+  const [draftUrl, setDraftUrl] = useState("");
+  const [current, setCurrent] = useState<CurrentConnectionStatus>({ state: "checking" });
+  const [recheckNonce, setRecheckNonce] = useState(0);
+  const [pending, setPending] = useState<"save" | "test" | "restart" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function applyConnection(next: ServerConnection) {
+    setConnection(next);
+    setDraftMode(next.mode);
+    setDraftUrl(next.remoteUrl);
+  }
+
+  useEffect(() => {
+    let active = true;
+    store.read()
+      .then((next) => { if (active) applyConnection(next); })
+      .catch((cause: unknown) => { if (active) setLoadError(messageOf(cause)); });
+    return () => { active = false; };
+  }, [store]);
+
+  const effectiveApiBaseUrl = connection?.effectiveApiBaseUrl;
+  useEffect(() => {
+    if (!effectiveApiBaseUrl) return;
+    let active = true;
+    setCurrent({ state: "checking" });
+    store.probe(effectiveApiBaseUrl)
+      .then(() => { if (active) setCurrent({ state: "online" }); })
+      .catch((cause: unknown) => { if (active) setCurrent({ state: "offline", detail: messageOf(cause) }); });
+    return () => { active = false; };
+  }, [store, effectiveApiBaseUrl, recheckNonce]);
+
+  const dirty = Boolean(connection) && (
+    draftMode !== connection?.mode
+    || (draftMode === "remote" && trimBaseUrl(draftUrl) !== connection?.remoteUrl)
+  );
+  const draftUrlValid = draftMode === "embedded" || looksLikeRemoteApiUrl(draftUrl);
+  const canSave = Boolean(connection?.manageable) && dirty && draftUrlValid && pending === null;
+
+  async function save() {
+    setPending("save");
+    setMessage(null);
+    setError(null);
+    try {
+      const next = await store.save({ mode: draftMode, remoteUrl: draftUrl });
+      applyConnection(next);
+      setTestResult(null);
+      setMessage(next.restartRequired ? "저장했습니다. 아래에서 다시 시작하면 적용됩니다." : "저장했습니다. 이미 적용된 상태입니다.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function testConnection() {
+    setPending("test");
+    setMessage(null);
+    setError(null);
+    setTestResult(null);
+    try {
+      await store.probe(trimBaseUrl(draftUrl));
+      setTestResult({ ok: true, text: "연결됨 — 이 주소에서 mono 서버가 응답합니다." });
+    } catch (cause) {
+      setTestResult({ ok: false, text: messageOf(cause) });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function restart() {
+    setPending("restart");
+    setError(null);
+    try {
+      await store.restart();
+    } catch (cause) {
+      setError(messageOf(cause));
+      setPending(null);
+    }
+  }
+
+  return (
+    <>
+      <SettingsHeading description="이 기기가 어느 mono API 서버와 데이터를 주고받을지 정합니다." title="서버 연결" />
+
+      {loadError && <p className="settings-ai__error" role="alert">{loadError}</p>}
+
+      {connection && (
+        <>
+          <section aria-label="현재 서버 연결" className="settings-group">
+            <header>
+              <strong>현재 연결</strong>
+              <span>연결은 앱을 시작할 때 결정됩니다.</span>
+            </header>
+            <div className="settings-server__current">
+              <span className={`settings-server__tag ${connection.runningEmbedded ? "" : "settings-server__tag--remote"}`}>
+                {connection.runningEmbedded ? "이 기기" : "원격 서버"}
+              </span>
+              <code className="settings-server__url" title={connection.effectiveApiBaseUrl}>{connection.effectiveApiBaseUrl}</code>
+              <CurrentConnectionBadge status={current} />
+            </div>
+            <button
+              className="settings-server__recheck"
+              disabled={current.state === "checking"}
+              onClick={() => setRecheckNonce((value) => value + 1)}
+              type="button"
+            >
+              <Icon name="sync" size={11} />다시 확인
+            </button>
+            {current.state === "offline" && <p className="settings-ai__error" role="alert">{current.detail}</p>}
+            {connection.envOverride && (
+              <p className="settings-ai__notice-text">
+                환경 변수 <code>MONO_API_BASE_URL</code>이 설정되어 있어 이 값이 우선합니다. 아래 설정은 저장되지만 적용되지 않습니다.
+              </p>
+            )}
+          </section>
+
+          <section aria-label="서버 연결 모드" className="settings-group">
+            <header>
+              <strong>연결 모드</strong>
+              <span>다음에 앱을 시작할 때 사용할 방식입니다.</span>
+            </header>
+            <div aria-label="서버 연결 모드" className="settings-server__modes" role="radiogroup">
+              {SERVER_MODE_OPTIONS.map((option) => (
+                <button
+                  aria-checked={draftMode === option.id}
+                  className="settings-server__mode"
+                  disabled={!connection.manageable || pending !== null}
+                  key={option.id}
+                  onClick={() => { setDraftMode(option.id); setMessage(null); setError(null); }}
+                  role="radio"
+                  type="button"
+                >
+                  <span className="settings-server__mode-name">{option.label}</span>
+                  <span className="settings-server__mode-desc">{option.description}</span>
+                </button>
+              ))}
+            </div>
+
+            {draftMode === "remote" && (
+              <div className="settings-server__remote">
+                <form onSubmit={(event) => { event.preventDefault(); void testConnection(); }}>
+                  <Input
+                    aria-label="원격 서버 주소"
+                    autoComplete="off"
+                    disabled={!connection.manageable}
+                    invalid={draftUrl.trim().length > 0 && !draftUrlValid}
+                    inputMode="url"
+                    onChange={(event) => { setDraftUrl(event.target.value); setTestResult(null); }}
+                    placeholder="http://100.80.12.34:4174"
+                    spellCheck={false}
+                    value={draftUrl}
+                  />
+                  <Button disabled={!looksLikeRemoteApiUrl(draftUrl) || pending !== null} loading={pending === "test"} type="submit">
+                    연결 테스트
+                  </Button>
+                </form>
+                <p className="settings-server__hint">Tailscale로 연결한 기기의 주소. HTTP는 4174, HTTPS는 443 또는 4174 포트만 됩니다.</p>
+                {testResult && (
+                  <p
+                    className={testResult.ok ? "settings-ai__message" : "settings-ai__error"}
+                    role={testResult.ok ? "status" : "alert"}
+                  >
+                    {testResult.text}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="settings-server__actions">
+              <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">저장</Button>
+              {dirty && <span className="settings-server__dirty">저장하지 않은 변경이 있습니다.</span>}
+            </div>
+
+            {message && <p className="settings-ai__message" role="status">{message}</p>}
+            {error && <p className="settings-ai__error" role="alert">{error}</p>}
+          </section>
+
+          {connection.restartRequired && (
+            <section aria-label="재시작 안내" className="settings-server__restart">
+              <div>
+                <strong>다시 시작하면 적용됩니다</strong>
+                <span>저장한 연결 설정은 앱을 다시 시작한 뒤부터 사용됩니다.</span>
+              </div>
+              <Button loading={pending === "restart"} onClick={() => void restart()} type="button" variant="primary">지금 다시 시작</Button>
+            </section>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
