@@ -25,4 +25,14 @@ describe("PlatformApiEndpointProvider", () => {
 
     await expect(PlatformApiEndpointProvider.of().resolve()).resolves.toBe("http://127.0.0.1:4174");
   });
+
+  it("Tauri에서는 Rust가 준 베어러 토큰을 사용하고, 브라우저에서는 빈 문자열이다", async () => {
+    tauri.isTauri.mockReturnValue(true);
+    tauri.invoke.mockResolvedValue("s3cr3t");
+    await expect(PlatformApiEndpointProvider.of().resolveToken()).resolves.toBe("s3cr3t");
+    expect(tauri.invoke).toHaveBeenCalledWith("server_api_token");
+
+    tauri.isTauri.mockReturnValue(false);
+    await expect(PlatformApiEndpointProvider.of().resolveToken()).resolves.toBe("");
+  });
 });

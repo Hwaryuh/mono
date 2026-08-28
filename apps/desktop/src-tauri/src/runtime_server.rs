@@ -12,6 +12,9 @@ struct ServerSettings {
     mode: ServerMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     api_base_url: Option<String>,
+    /// remote 모드에서 서버가 `MONO_API_TOKEN`을 요구할 때 보낼 베어러 토큰. 없으면 미전송.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    api_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
@@ -27,11 +30,14 @@ pub(super) enum ServerMode {
 pub(super) struct StoredConnection {
     pub(super) mode: ServerMode,
     pub(super) remote_url: String,
+    /// 저장된 베어러 토큰. 없으면 빈 문자열.
+    pub(super) remote_token: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub(super) struct RuntimeServer {
     api_base_url: String,
+    api_token: Option<String>,
     embedded: bool,
     env_override: bool,
 }
@@ -49,7 +55,11 @@ impl RuntimeServer {
         environment_api_base_url: Option<&str>,
     ) -> Result<Self, String> {
         if let Some(api_base_url) = environment_api_base_url {
-            let mut server = Self::remote(api_base_url)?;
+            let token = std::env::var("MONO_API_TOKEN")
+                .ok()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let mut server = Self::remote(api_base_url, token)?;
             server.env_override = true;
             return Ok(server);
         }
@@ -65,7 +75,9 @@ impl RuntimeServer {
             (ServerMode::Embedded, Some(_)) => {
                 Err("embedded 모드에는 apiBaseUrl을 지정할 수 없습니다.".into())
             }
-            (ServerMode::Remote, Some(api_base_url)) => Self::remote(&api_base_url),
+            (ServerMode::Remote, Some(api_base_url)) => {
+                Self::remote(&api_base_url, normalize_token(settings.api_token))
+            }
             (ServerMode::Remote, None) => Err("remote 모드에는 apiBaseUrl이 필요합니다.".into()),
         }
     }
@@ -73,14 +85,16 @@ impl RuntimeServer {
     fn embedded() -> Self {
         Self {
             api_base_url: DEFAULT_API_BASE_URL.into(),
+            api_token: None,
             embedded: true,
             env_override: false,
         }
     }
 
-    fn remote(value: &str) -> Result<Self, String> {
+    fn remote(value: &str, token: Option<String>) -> Result<Self, String> {
         Ok(Self {
             api_base_url: normalize_remote_url(value)?,
+            api_token: token,
             embedded: false,
             env_override: false,
         })
@@ -88,6 +102,10 @@ impl RuntimeServer {
 
     pub(super) fn api_base_url(&self) -> &str {
         &self.api_base_url
+    }
+
+    pub(super) fn api_token(&self) -> Option<&str> {
+        self.api_token.as_deref()
     }
 
     pub(super) fn uses_embedded_server(&self) -> bool {
@@ -106,13 +124,22 @@ pub(super) fn read_stored_connection(app_data_directory: &Path) -> Result<Stored
         return Ok(StoredConnection {
             mode: ServerMode::Embedded,
             remote_url: String::new(),
+            remote_token: String::new(),
         });
     }
     let settings = read_settings_file(&settings_path)?;
     Ok(StoredConnection {
         mode: settings.mode,
         remote_url: settings.api_base_url.unwrap_or_default(),
+        remote_token: normalize_token(settings.api_token).unwrap_or_default(),
     })
+}
+
+/// 공백만 있거나 빈 토큰은 "없음"으로 취급한다.
+fn normalize_token(value: Option<String>) -> Option<String> {
+    value
+        .map(|token| token.trim().to_string())
+        .filter(|token| !token.is_empty())
 }
 
 /// `server.json`을 원자적으로 교체한다(임시 파일 → rename). remote 주소는 저장 전에
@@ -121,11 +148,13 @@ pub(super) fn write_stored_connection(
     app_data_directory: &Path,
     mode: ServerMode,
     remote_url: Option<&str>,
+    api_token: Option<&str>,
 ) -> Result<StoredConnection, String> {
     let settings = match mode {
         ServerMode::Embedded => ServerSettings {
             mode: ServerMode::Embedded,
             api_base_url: None,
+            api_token: None,
         },
         ServerMode::Remote => {
             let raw = remote_url
@@ -135,6 +164,7 @@ pub(super) fn write_stored_connection(
             ServerSettings {
                 mode: ServerMode::Remote,
                 api_base_url: Some(normalize_remote_url(raw)?),
+                api_token: normalize_token(api_token.map(str::to_string)),
             }
         }
     };
@@ -154,6 +184,7 @@ pub(super) fn write_stored_connection(
     Ok(StoredConnection {
         mode: settings.mode,
         remote_url: settings.api_base_url.unwrap_or_default(),
+        remote_token: settings.api_token.unwrap_or_default(),
     })
 }
 
@@ -280,10 +311,12 @@ mod tests {
             &directory,
             ServerMode::Remote,
             Some("  http://100.89.224.115:4174/  "),
+            Some("  s3cr3t  "),
         )
         .unwrap();
         assert_eq!(written.mode, ServerMode::Remote);
         assert_eq!(written.remote_url, "http://100.89.224.115:4174");
+        assert_eq!(written.remote_token, "s3cr3t");
 
         let stored = read_stored_connection(&directory).unwrap();
         assert_eq!(stored, written);
@@ -291,32 +324,53 @@ mod tests {
         // 파일은 유효한 RuntimeServer로 다시 로드된다.
         let config = RuntimeServer::load_with_override(&directory, None).unwrap();
         assert_eq!(config.api_base_url(), "http://100.89.224.115:4174");
+        assert_eq!(config.api_token(), Some("s3cr3t"));
         assert!(!config.uses_embedded_server());
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
-    fn writing_embedded_removes_remote_url_and_targets_localhost() {
+    fn writing_embedded_removes_remote_url_and_token() {
         let directory = test_directory("write-embedded");
-        write_stored_connection(&directory, ServerMode::Remote, Some("https://mono.example.com"))
-            .unwrap();
-        let stored = write_stored_connection(&directory, ServerMode::Embedded, None).unwrap();
+        write_stored_connection(
+            &directory,
+            ServerMode::Remote,
+            Some("https://mono.example.com"),
+            Some("s3cr3t"),
+        )
+        .unwrap();
+        let stored = write_stored_connection(&directory, ServerMode::Embedded, None, None).unwrap();
         assert_eq!(stored.mode, ServerMode::Embedded);
         assert_eq!(stored.remote_url, "");
+        assert_eq!(stored.remote_token, "");
         assert_eq!(target_api_base_url(&stored).unwrap(), DEFAULT_API_BASE_URL);
 
         let raw = std::fs::read_to_string(directory.join(SETTINGS_FILE)).unwrap();
         assert!(!raw.contains("apiBaseUrl"));
+        assert!(!raw.contains("apiToken"));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn remote_without_token_is_allowed_and_omits_the_field() {
+        let directory = test_directory("write-no-token");
+        let written =
+            write_stored_connection(&directory, ServerMode::Remote, Some("https://mono.example.com"), None)
+                .unwrap();
+        assert_eq!(written.remote_token, "");
+        let raw = std::fs::read_to_string(directory.join(SETTINGS_FILE)).unwrap();
+        assert!(!raw.contains("apiToken"));
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn rejects_saving_remote_without_or_with_bad_url() {
         let directory = test_directory("write-bad");
-        assert!(write_stored_connection(&directory, ServerMode::Remote, None).is_err());
-        assert!(write_stored_connection(&directory, ServerMode::Remote, Some("   ")).is_err());
+        assert!(write_stored_connection(&directory, ServerMode::Remote, None, None).is_err());
+        assert!(write_stored_connection(&directory, ServerMode::Remote, Some("   "), None).is_err());
         assert!(
-            write_stored_connection(&directory, ServerMode::Remote, Some("ftp://host:4174")).is_err()
+            write_stored_connection(&directory, ServerMode::Remote, Some("ftp://host:4174"), None)
+                .is_err()
         );
         // 실패한 저장은 파일을 만들지 않는다.
         assert!(!directory.join(SETTINGS_FILE).exists());

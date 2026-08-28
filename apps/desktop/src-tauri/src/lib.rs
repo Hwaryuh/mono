@@ -11,6 +11,7 @@ use runtime_server::{RuntimeServer, ServerMode, StoredConnection};
 /// 설정을 바꾸면 `server.json`만 갱신되고, 적용은 다음 실행부터다.
 struct RunningServer {
     api_base_url: String,
+    api_token: Option<String>,
     embedded: bool,
     env_override: bool,
     data_directory: PathBuf,
@@ -23,6 +24,8 @@ struct ServerConnectionDto {
     mode: &'static str,
     /// 저장된 원격 주소. embedded이거나 미설정이면 빈 문자열.
     remote_url: String,
+    /// 저장된 베어러 토큰. 없으면 빈 문자열.
+    remote_token: String,
     /// 지금 실행 중인 앱이 사용하는 주소.
     effective_api_base_url: String,
     /// 지금 실행 중인 앱이 임베드 서버를 켰는지.
@@ -37,16 +40,19 @@ struct ServerConnectionDto {
 
 fn describe_connection(running: &RunningServer) -> Result<ServerConnectionDto, String> {
     let stored = runtime_server::read_stored_connection(&running.data_directory)?;
+    let running_token = running.api_token.clone().unwrap_or_default();
     let restart_required = if running.env_override {
         false
     } else {
         runtime_server::target_api_base_url(&stored)? != running.api_base_url
+            || stored.remote_token != running_token
     };
     Ok(ServerConnectionDto {
         mode: match stored.mode {
             ServerMode::Embedded => "embedded",
             ServerMode::Remote => "remote",
         },
+        remote_token: stored.remote_token,
         remote_url: stored.remote_url,
         effective_api_base_url: running.api_base_url.clone(),
         running_embedded: running.embedded,
@@ -62,6 +68,11 @@ fn server_api_base_url(state: tauri::State<'_, RunningServer>) -> String {
 }
 
 #[tauri::command]
+fn server_api_token(state: tauri::State<'_, RunningServer>) -> String {
+    state.api_token.clone().unwrap_or_default()
+}
+
+#[tauri::command]
 fn server_connection(state: tauri::State<'_, RunningServer>) -> Result<ServerConnectionDto, String> {
     describe_connection(&state)
 }
@@ -71,6 +82,7 @@ fn save_server_connection(
     state: tauri::State<'_, RunningServer>,
     mode: String,
     api_base_url: Option<String>,
+    api_token: Option<String>,
 ) -> Result<ServerConnectionDto, String> {
     if state.env_override {
         return Err(
@@ -87,6 +99,7 @@ fn save_server_connection(
         &state.data_directory,
         mode,
         api_base_url.as_deref(),
+        api_token.as_deref(),
     )?;
     describe_connection(&state)
 }
@@ -106,6 +119,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             server_api_base_url,
+            server_api_token,
             server_connection,
             save_server_connection,
             restart_app
@@ -130,6 +144,7 @@ pub fn run() {
             }
             app.manage(RunningServer {
                 api_base_url: server.api_base_url().to_string(),
+                api_token: server.api_token().map(str::to_string),
                 embedded: server.uses_embedded_server(),
                 env_override: server.env_override(),
                 data_directory,

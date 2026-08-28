@@ -681,6 +681,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draftMode, setDraftMode] = useState<ServerMode>("embedded");
   const [draftUrl, setDraftUrl] = useState("");
+  const [draftToken, setDraftToken] = useState("");
   const [current, setCurrent] = useState<CurrentConnectionStatus>({ state: "checking" });
   const [recheckNonce, setRecheckNonce] = useState(0);
   const [pending, setPending] = useState<"save" | "test" | "restart" | null>(null);
@@ -692,6 +693,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
     setConnection(next);
     setDraftMode(next.mode);
     setDraftUrl(next.remoteUrl);
+    setDraftToken(next.remoteToken);
   }
 
   useEffect(() => {
@@ -716,6 +718,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   const dirty = Boolean(connection) && (
     draftMode !== connection?.mode
     || (draftMode === "remote" && trimBaseUrl(draftUrl) !== connection?.remoteUrl)
+    || (draftMode === "remote" && draftToken.trim() !== connection?.remoteToken)
   );
   const draftUrlValid = draftMode === "embedded" || looksLikeRemoteApiUrl(draftUrl);
   const canSave = Boolean(connection?.manageable) && dirty && draftUrlValid && pending === null;
@@ -725,7 +728,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
     setMessage(null);
     setError(null);
     try {
-      const next = await store.save({ mode: draftMode, remoteUrl: draftUrl });
+      const next = await store.save({ mode: draftMode, remoteUrl: draftUrl, token: draftToken });
       applyConnection(next);
       setTestResult(null);
       setMessage(next.restartRequired ? "저장했습니다. 아래에서 다시 시작하면 적용됩니다." : "저장했습니다. 이미 적용된 상태입니다.");
@@ -742,7 +745,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
     setError(null);
     setTestResult(null);
     try {
-      await store.probe(trimBaseUrl(draftUrl));
+      await store.probe(trimBaseUrl(draftUrl), draftToken.trim() || undefined);
       setTestResult({ ok: true, text: "연결됨 — 이 주소에서 mono 서버가 응답합니다." });
     } catch (cause) {
       setTestResult({ ok: false, text: messageOf(cause) });
@@ -838,7 +841,20 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                     연결 테스트
                   </Button>
                 </form>
-                <p className="settings-server__hint">Tailscale로 연결한 기기의 주소. HTTP는 4174, HTTPS는 443 또는 4174 포트만 됩니다.</p>
+                <Input
+                  aria-label="API 토큰"
+                  autoComplete="off"
+                  disabled={!connection.manageable}
+                  onChange={(event) => { setDraftToken(event.target.value); setTestResult(null); }}
+                  placeholder="API 토큰 (서버에 MONO_API_TOKEN을 설정한 경우)"
+                  spellCheck={false}
+                  type="password"
+                  value={draftToken}
+                />
+                <p className="settings-server__hint">
+                  주소는 Tailscale로 연결한 기기의 것. HTTP는 4174, HTTPS는 443 또는 4174 포트만 됩니다.
+                  공개 서버라면 <code>MONO_API_TOKEN</code>을 설정하고 그 값을 토큰란에 넣으세요.
+                </p>
                 {testResult && (
                   <p
                     className={testResult.ok ? "settings-ai__message" : "settings-ai__error"}

@@ -1,9 +1,21 @@
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:4174";
 
 export let API_BASE_URL = DEFAULT_API_BASE_URL;
+let apiToken = "";
 
 export function configureApiBaseUrl(value: string): void {
   API_BASE_URL = value.replace(/\/$/, "");
+}
+
+/** 원격 모드에서 서버가 요구할 때 보낼 베어러 토큰. 빈 문자열이면 헤더 미전송. */
+export function configureApiToken(value: string): void {
+  apiToken = value.trim();
+}
+
+/** 모든 요청 init에 Authorization 헤더를 얹는다(토큰이 있을 때만). */
+function withAuth(init: RequestInit = {}): RequestInit {
+  if (!apiToken) return init;
+  return { ...init, headers: { ...init.headers, Authorization: `Bearer ${apiToken}` } };
 }
 
 function extractErrorMessage(body: unknown): string | null {
@@ -27,7 +39,7 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, init);
+    response = await fetch(`${API_BASE_URL}${path}`, withAuth(init));
   } catch (error) {
     throw new Error(`API 서버(${API_BASE_URL})에 연결할 수 없습니다.`, { cause: error });
   }
@@ -49,7 +61,7 @@ export async function httpUpload(path: string, formData: FormData): Promise<void
   // Content-Type을 직접 지정하면 안 된다 — fetch가 FormData의 multipart boundary를 스스로 설정한다.
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { method: "POST", body: formData });
+    response = await fetch(`${API_BASE_URL}${path}`, withAuth({ method: "POST", body: formData }));
   } catch (error) {
     throw new Error(`API 서버(${API_BASE_URL})에 연결할 수 없습니다.`, { cause: error });
   }
@@ -62,7 +74,7 @@ export async function httpUpload(path: string, formData: FormData): Promise<void
 export async function httpGetBlob(path: string): Promise<Blob | null> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`);
+    response = await fetch(`${API_BASE_URL}${path}`, withAuth());
   } catch (error) {
     throw new Error(`API 서버(${API_BASE_URL})에 연결할 수 없습니다.`, { cause: error });
   }

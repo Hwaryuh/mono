@@ -7,6 +7,7 @@
 //   MONO_DB_PATH          기본 ./mono.sqlite
 //   MONO_SECRET_KEY_PATH  기본 ./mono.secret.key
 //   MONO_CORS_ORIGINS     콤마 구분. 없으면 데스크톱 앱 기본 origin 목록.
+//   MONO_API_TOKEN        설정 시 /health 외 모든 요청에 Bearer 토큰 요구. 없으면 인증 없음.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -77,6 +78,10 @@ fn serve() -> Result<(), mono_api::ServeError> {
                     .collect()
             })
             .unwrap_or_default(),
+        api_token: std::env::var("MONO_API_TOKEN")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
     };
     eprintln!("mono-api: binding {}", config.bind_addr);
     mono_api::serve(config)

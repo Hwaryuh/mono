@@ -4,6 +4,7 @@
 // 예전 Node/Fastify(apps/api)를 전 경계 Rust로 재작성 완료(Option C) — sidecar·proxy 제거됨.
 
 mod ai;
+mod auth;
 pub mod backup;
 mod calendar;
 mod color;
@@ -42,6 +43,9 @@ pub struct Config {
     pub secret_key_path: PathBuf,
     /// 허용 CORS origin. 비면 하드코딩 목록(데스크톱 앱 origin은 서버 위치와 무관하게 고정).
     pub cors_origins: Vec<String>,
+    /// 설정되면 `/health` 외 모든 요청에 `Authorization: Bearer <token>`을 요구한다.
+    /// 비면 인증 없음(임베드·Tailscale 전용 배포).
+    pub api_token: Option<String>,
 }
 
 #[derive(Debug)]
@@ -90,6 +94,7 @@ pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
         db_path,
         secret_key_path,
         cors_origins: Vec::new(),
+        api_token: None,
     };
     thread::Builder::new()
         .name("mono-api".into())
@@ -113,7 +118,7 @@ pub fn serve(config: Config) -> Result<(), ServeError> {
         .map_err(ServeError::Runtime)?;
 
     let bind_addr = config.bind_addr;
-    let router = build_router(database, crypto, &config.cors_origins);
+    let router = build_router(database, crypto, &config.cors_origins, config.api_token.as_deref());
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(&bind_addr)
             .await
@@ -127,7 +132,12 @@ pub fn serve(config: Config) -> Result<(), ServeError> {
     })
 }
 
-fn build_router(database: db::Db, crypto: Arc<SecretCrypto>, cors_origins: &[String]) -> Router {
+fn build_router(
+    database: db::Db,
+    crypto: Arc<SecretCrypto>,
+    cors_origins: &[String],
+    api_token: Option<&str>,
+) -> Router {
     // 데스크톱 앱 origin은 서버 위치와 무관하게 고정. standalone에서 다른 origin이 필요하면
     // MONO_CORS_ORIGINS로 덮어쓴다(apps/api/src/server.ts 의 기본 목록과 동일).
     const DEFAULT_ORIGINS: [&str; 4] = [
@@ -149,7 +159,7 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>, cors_origins: &[Str
 
     let secret_state = SecretState { db: database.clone(), crypto };
 
-    Router::new()
+    let router = Router::new()
         .route("/health", get(|| async { "ok" }))
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
@@ -164,8 +174,10 @@ fn build_router(database: db::Db, crypto: Arc<SecretCrypto>, cors_origins: &[Str
         .merge(link_preview::routes(link_preview::state()))
         // 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록. 실제 상한은
         // 각 라우트가 검증한다(media.rs UPLOAD_LIMIT_BYTES, dashboard capture 등).
-        .layer(DefaultBodyLimit::disable())
-        .layer(cors)
+        .layer(DefaultBodyLimit::disable());
+
+    // 베어러 검사는 CORS보다 안쪽 — 401 응답도 CORS 헤더를 달고 나가야 브라우저가 본문을 읽는다.
+    auth::apply(router, api_token).layer(cors)
 }
 
 #[cfg(test)]
@@ -183,7 +195,7 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_serializes_camel_case_and_seeds_other() {
-        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[]);
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
         let response = router
             .oneshot(Request::builder().uri("/todo/snapshot").body(Body::empty()).unwrap())
             .await
@@ -196,7 +208,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_label_and_item_over_http() {
-        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[]);
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
 
         let created = router
             .clone()
@@ -250,7 +262,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_item_toggle_is_404_json() {
-        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[]);
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
         let response = router
             .oneshot(
                 Request::builder()
@@ -268,7 +280,7 @@ mod tests {
 
     #[tokio::test]
     async fn unrouted_path_is_404() {
-        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[]);
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
         let response = router
             .oneshot(Request::builder().uri("/__unrouted__").body(Body::empty()).unwrap())
             .await

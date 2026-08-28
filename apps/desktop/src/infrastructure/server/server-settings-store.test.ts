@@ -60,12 +60,23 @@ describe("InMemoryServerSettingsStore", () => {
     await expect(store.probe("http://10.0.0.9:4174")).rejects.toThrow(/연결할 수 없습니다/);
   });
 
-  it("returning to embedded clears the remote url", async () => {
+  it("probe rejects a missing or wrong token when the server requires one", async () => {
+    const store = new InMemoryServerSettingsStore({
+      reachable: ["https://mono.example.com"],
+      requiredToken: "right",
+    });
+    await expect(store.probe("https://mono.example.com")).rejects.toThrow(/토큰이 필요/);
+    await expect(store.probe("https://mono.example.com", "wrong")).rejects.toThrow(/올바르지 않/);
+    await expect(store.probe("https://mono.example.com", "right")).resolves.toBeUndefined();
+  });
+
+  it("persists a remote token and drops it when returning to embedded", async () => {
     const store = new InMemoryServerSettingsStore();
-    await store.save({ mode: "remote", remoteUrl: "https://mono.example.com" });
+    const saved = await store.save({ mode: "remote", remoteUrl: "https://mono.example.com", token: "  s3cr3t  " });
+    expect(saved.remoteToken).toBe("s3cr3t");
     const back = await store.save({ mode: "embedded" });
     expect(back.remoteUrl).toBe("");
-    expect(back.mode).toBe("embedded");
+    expect(back.remoteToken).toBe("");
   });
 });
 

@@ -1,7 +1,12 @@
 # 원격 서버 배포와 백업
 
-`mono-api`는 앱 인증이 없는 개인용 서버다. API와 SSH 모두 공인 인터넷에 노출하지 않고
-Tailscale 사설망에서만 접근한다. 운영 서버는 소스를 받거나 컴파일하지 않는다.
+`mono-api`는 개인용 서버다. 기본은 Tailscale 사설망 전용이고, 앱 레벨 인증은 선택이다.
+API와 SSH 모두 공인 인터넷에 직접 노출하지 않는다. 운영 서버는 소스를 받거나 컴파일하지 않는다.
+
+Tailscale 밖으로 노출할 때(Caddy reverse proxy, `tailscale funnel` 등)는 `MONO_API_TOKEN`을
+반드시 설정한다 — `/health` 외 모든 요청에 `Authorization: Bearer <값>`을 요구한다. 값 생성은
+`openssl rand -base64 32`, 앱에는 **설정 > 서버 > API 토큰**란에 같은 값을 넣는다. 토큰 비교는
+SHA-256 digest 고정 길이 비교다(`crates/mono-api/src/auth.rs`).
 
 ## 1. 운영 상태와 파일
 
