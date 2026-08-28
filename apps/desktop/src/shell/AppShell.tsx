@@ -357,7 +357,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
               <SettingsHeading description="현재 설치된 앱과 데이터 처리 정보를 확인합니다." title="정보" />
               <section className="settings-group settings-about">
                 <div><span>앱</span><strong>mono</strong></div>
-                <div><span>버전</span><strong>0.1.2</strong></div>
+                <div><span>버전</span><strong>0.1.3</strong></div>
                 <div><span>데이터</span><strong>이 기기에 저장</strong></div>
               </section>
             </>
