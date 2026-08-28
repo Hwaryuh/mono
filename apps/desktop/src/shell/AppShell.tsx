@@ -22,6 +22,7 @@ import {
   type ServerSettingsStore,
 } from "../infrastructure/server/server-settings-store";
 import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
+import { CHECK_UPDATE_EVENT } from "../features/updater/AppUpdater";
 
 type NavigationItem = {
   to: string;
@@ -359,6 +360,10 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
                 <div><span>앱</span><strong>mono</strong></div>
                 <div><span>버전</span><strong>0.1.4</strong></div>
                 <div><span>데이터</span><strong>이 기기에 저장</strong></div>
+              </section>
+              <section aria-label="업데이트" className="settings-group">
+                <header><strong>업데이트</strong><span>새 버전이 있으면 내려받아 설치하고 앱을 다시 시작합니다.</span></header>
+                <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">지금 업데이트 확인</Button>
               </section>
             </>
           )}

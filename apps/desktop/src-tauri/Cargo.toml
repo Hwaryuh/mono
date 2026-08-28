@@ -19,6 +19,11 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 url = "2"
 
+# 자동 업데이트 — GitHub 릴리스의 latest.json을 fetch, 서명 검증 후 설치·재시작.
+[target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
 # API 서버는 별도 크레이트(crates/mono-api). lib.rs가 `mono_api::spawn`으로 임베드한다.
 # standalone 바이너리는 그 크레이트의 [[bin]] — tauri 의존 없이 linux에서 빌드된다.
 mono-api = { path = "../../../crates/mono-api" }
