@@ -52,18 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            # -setup.exe = 신규 설치용 + updater 타깃. .sig는 latest.json 서명에 쓴다.
-            release_assets: |
-              target/release/bundle/nsis/*-setup.exe
-              target/release/bundle/nsis/*-setup.exe.sig
-          - os: macos-26
-            # .dmg = 신규 설치용. .app.tar.gz(+ .sig) = updater 타깃(darwin-aarch64).
-            release_assets: |
-              target/release/bundle/dmg/*.dmg
-              target/release/bundle/macos/*.app.tar.gz
-              target/release/bundle/macos/*.app.tar.gz.sig
+        os: [windows-latest, macos-26]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -92,11 +81,26 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri --workspace @mono/desktop -- build
 
+      # 번들 하위 디렉터리(dmg/·macos/·nsis/)가 플랫폼마다 달라 아티팩트 구조가 어긋난다.
+      # 원하는 파일만 평평한 staging/으로 모아 올린다 — 다운로드 후 글롭이 단순해진다.
+      # .dmg = 신규 설치용. updater 타깃: darwin-aarch64 → .app.tar.gz, windows-x86_64 → -setup.exe.
+      # .sig는 latest.json 서명에만 쓰고 릴리스에는 첨부하지 않는다.
+      - name: Stage release files
+        shell: bash
+        run: |
+          mkdir staging
+          find target/release/bundle -type f \( \
+            -name '*-setup.exe' -o -name '*-setup.exe.sig' \
+            -o -name '*.dmg' \
+            -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \
+          \) -exec cp {} staging/ \;
+          ls -la staging
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: mono-${{ matrix.os }}
-          path: ${{ matrix.release_assets }}
+          path: staging/
           if-no-files-found: error
 
   publish-draft-release:
