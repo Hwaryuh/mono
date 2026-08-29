@@ -8,6 +8,21 @@ if (typeof URL.createObjectURL !== "function") {
   URL.revokeObjectURL = () => {};
 }
 
+// 일부 Node 런타임은 경로 없이 활성화된 내장 localStorage를 노출한다. jsdom 대신 잡히면
+// Storage 메서드가 없으므로 테스트용 구현으로 교체한다.
+if (typeof localStorage.clear !== "function") {
+  const values = new Map<string, string>();
+  const testLocalStorage: Storage = {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => { values.delete(key); },
+    setItem: (key, value) => { values.set(key, String(value)); },
+  };
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: testLocalStorage });
+}
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
