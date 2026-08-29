@@ -688,7 +688,6 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   const [draftUrl, setDraftUrl] = useState("");
   const [draftToken, setDraftToken] = useState("");
   const [current, setCurrent] = useState<CurrentConnectionStatus>({ state: "checking" });
-  const [recheckNonce, setRecheckNonce] = useState(0);
   const [pending, setPending] = useState<"save" | "test" | "restart" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -718,7 +717,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
       .then(() => { if (active) setCurrent({ state: "online" }); })
       .catch((cause: unknown) => { if (active) setCurrent({ state: "offline", detail: messageOf(cause) }); });
     return () => { active = false; };
-  }, [store, effectiveApiBaseUrl, recheckNonce]);
+  }, [store, effectiveApiBaseUrl]);
 
   const dirty = Boolean(connection) && (
     draftMode !== connection?.mode
@@ -772,45 +771,29 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description="이 기기가 어느 mono API 서버와 데이터를 주고받을지 정합니다." title="서버 연결" />
+      <SettingsHeading description="이 기기가 어느 mono API 서버와 데이터를 주고받을지 정합니다. 변경은 앱을 다시 시작한 뒤 적용됩니다." title="서버 연결" />
 
       {loadError && <p className="settings-ai__error" role="alert">{loadError}</p>}
 
       {connection && (
         <>
-          <section aria-label="현재 서버 연결" className="settings-group">
-            <header>
-              <strong>현재 연결</strong>
-              <span>연결은 앱을 시작할 때 결정됩니다.</span>
-            </header>
-            <div className="settings-server__current">
+          <section aria-label="서버 연결" className="settings-group">
+            <div className="settings-server__status">
               <span className={`settings-server__tag ${connection.runningEmbedded ? "" : "settings-server__tag--remote"}`}>
                 {connection.runningEmbedded ? "이 기기" : "원격 서버"}
               </span>
-              <code className="settings-server__url" title={connection.effectiveApiBaseUrl}>{connection.effectiveApiBaseUrl}</code>
               <CurrentConnectionBadge status={current} />
+              {(connection.envOverride || connection.restartRequired) && (
+                <code className="settings-server__url" title={connection.effectiveApiBaseUrl}>{connection.effectiveApiBaseUrl}</code>
+              )}
             </div>
-            <button
-              className="settings-server__recheck"
-              disabled={current.state === "checking"}
-              onClick={() => setRecheckNonce((value) => value + 1)}
-              type="button"
-            >
-              <Icon name="sync" size={11} />다시 확인
-            </button>
-            {current.state === "offline" && <p className="settings-ai__error" role="alert">{current.detail}</p>}
+            {current.state === "offline" && <p className="settings-server__status-detail" role="alert">{current.detail}</p>}
             {connection.envOverride && (
-              <p className="settings-ai__notice-text">
-                환경 변수 <code>MONO_API_BASE_URL</code>이 설정되어 있어 이 값이 우선합니다. 아래 설정은 저장되지만 적용되지 않습니다.
+              <p className="settings-server__status-detail">
+                환경 변수 <code>MONO_API_BASE_URL</code>이 이 값을 고정합니다. 아래 설정은 저장되지만 적용되지 않습니다.
               </p>
             )}
-          </section>
 
-          <section aria-label="서버 연결 모드" className="settings-group">
-            <header>
-              <strong>연결 모드</strong>
-              <span>다음에 앱을 시작할 때 사용할 방식입니다.</span>
-            </header>
             <div aria-label="서버 연결 모드" className="settings-server__modes" role="radiogroup">
               {SERVER_MODE_OPTIONS.map((option) => (
                 <button
@@ -853,14 +836,13 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                   autoComplete="off"
                   disabled={!connection.manageable}
                   onChange={(event) => { setDraftToken(event.target.value); setTestResult(null); }}
-                  placeholder="API 토큰 (서버에 MONO_API_TOKEN을 설정한 경우)"
+                  placeholder="API 토큰 (선택)"
                   spellCheck={false}
                   type="password"
                   value={draftToken}
                 />
                 <p className="settings-server__hint">
-                  다른 기기에서 실행 중인 mono 서버 주소입니다. HTTP는 4174, HTTPS는 443·4174 포트만 됩니다.
-                  서버에 <code>MONO_API_TOKEN</code>이 설정돼 있으면 그 값을 위 토큰란에 넣으세요.
+                  HTTP는 4174, HTTPS는 443·4174 포트만 됩니다. 서버에 <code>MONO_API_TOKEN</code>이 설정돼 있으면 토큰란에 넣으세요.
                 </p>
                 {testResult && (
                   <p
@@ -875,7 +857,6 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
 
             <div className="settings-server__actions">
               <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">저장</Button>
-              {dirty && <span className="settings-server__dirty">저장하지 않은 변경이 있습니다.</span>}
             </div>
 
             {message && <p className="settings-ai__message" role="status">{message}</p>}
