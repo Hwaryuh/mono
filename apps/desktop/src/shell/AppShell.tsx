@@ -355,14 +355,9 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
 
           {activeSection === "about" && (
             <>
-              <SettingsHeading description="현재 설치된 앱과 데이터 처리 정보를 확인합니다." title="정보" />
-              <section className="settings-group settings-about">
-                <div><span>앱</span><strong>mono</strong></div>
-                <div><span>버전</span><strong>0.1.7</strong></div>
-                <div><span>데이터</span><strong>이 기기에 저장</strong></div>
-              </section>
+              <SettingsHeading description="설치된 버전을 확인하고 업데이트합니다." title="정보" />
               <section aria-label="업데이트" className="settings-group">
-                <header><strong>업데이트</strong><span>새 버전이 있으면 내려받아 설치하고 앱을 다시 시작합니다.</span></header>
+                <div className="settings-version"><span>버전</span><strong>0.1.7</strong></div>
                 <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">지금 업데이트 확인</Button>
               </section>
             </>
