@@ -709,15 +709,20 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   }, [store]);
 
   const effectiveApiBaseUrl = connection?.effectiveApiBaseUrl;
+  // 원격 연결이면 저장된 토큰으로 프로브해야 한다 — 안 그러면 토큰이 걸린 서버가
+  // 정상인데도 인증 엔드포인트가 401이라 "응답 없음"으로 뜬다. 임베드는 토큰 없음.
+  const effectiveToken = connection && !connection.runningEmbedded
+    ? connection.remoteToken || undefined
+    : undefined;
   useEffect(() => {
     if (!effectiveApiBaseUrl) return;
     let active = true;
     setCurrent({ state: "checking" });
-    store.probe(effectiveApiBaseUrl)
+    store.probe(effectiveApiBaseUrl, effectiveToken)
       .then(() => { if (active) setCurrent({ state: "online" }); })
       .catch((cause: unknown) => { if (active) setCurrent({ state: "offline", detail: messageOf(cause) }); });
     return () => { active = false; };
-  }, [store, effectiveApiBaseUrl]);
+  }, [store, effectiveApiBaseUrl, effectiveToken]);
 
   const dirty = Boolean(connection) && (
     draftMode !== connection?.mode
