@@ -1,4 +1,4 @@
-import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerWriteInput } from "@mono/contracts";
+import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerWriteInput } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -36,6 +36,8 @@ function errorMessage(error: unknown) {
 
 export function LedgerPage({ repository }: { repository: LedgerRepository }) {
   const [draft, setDraft] = useState<Draft>({ title: "", amountWon: "", date: "", categoryId: "", note: "" });
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
   const [viewMonth, setViewMonth] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -65,6 +67,24 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
       setFormError(errorMessage(error));
       requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#ledger-expense-form input")?.focus());
     },
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ expenseId, input }: { expenseId: string; input: LedgerWriteInput }) => repository.update(expenseId, input),
+    onMutate: () => setFormError(null),
+    onSuccess: async () => {
+      await invalidateSnapshots();
+      closeModal(true);
+    },
+    onError: (error) => setFormError(errorMessage(error)),
+  });
+  const deleteExpenseMutation = useMutation({
+    mutationFn: (expenseId: string) => repository.remove(expenseId),
+    onMutate: () => setFormError(null),
+    onSuccess: async () => {
+      await invalidateSnapshots();
+      closeModal(true);
+    },
+    onError: (error) => setFormError(errorMessage(error)),
   });
   const categoryMutation = useMutation({
     mutationFn: async (command: CategoryCommand) => {
@@ -98,6 +118,8 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
     }
     if (!snapshot || open || handledNewParamRef.current) return;
     handledNewParamRef.current = true;
+    setEditingExpenseId(null);
+    setDeleteExpenseId(null);
     setDraft(blankDraft(snapshot.today, snapshot.categories));
     setFormError(null);
     setOpen(true);
@@ -107,6 +129,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
   if (snapshotQuery.isError) return <div className="ledger-state" role="alert"><Icon name="alert" size={18} />가계부를 불러오지 못했습니다.</div>;
 
   const snapshot = snapshotQuery.data;
+  const editorBusy = createMutation.isPending || updateMutation.isPending || deleteExpenseMutation.isPending;
   const currentMonth = snapshot.today.slice(0, 7);
   const activeMonth = viewMonth ?? currentMonth;
   const isCurrentMonth = activeMonth === currentMonth;
@@ -127,12 +150,22 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
   }
 
   function closeModal(force = false) {
-    if (createMutation.isPending && !force) return;
+    if (editorBusy && !force) return;
     setOpen(false);
+    setEditingExpenseId(null);
+    setDeleteExpenseId(null);
     setCategoryManagerOpen(false);
     setDeleteCategoryId(null);
     setFormError(null);
     if (searchParams.has("modal")) setSearchParams({}, { replace: true });
+  }
+
+  function openEdit(expense: LedgerExpense) {
+    setEditingExpenseId(expense.id);
+    setDeleteExpenseId(null);
+    setDraft({ title: expense.title, amountWon: String(expense.amountWon), date: expense.date, categoryId: expense.categoryId, note: expense.note });
+    setFormError(null);
+    setOpen(true);
   }
 
   function openCategoryManager() {
@@ -188,7 +221,8 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
       setFormError(parsed.error.issues[0]?.message ?? "입력값을 확인해야 합니다.");
       return;
     }
-    createMutation.mutate(parsed.data);
+    if (editingExpenseId) updateMutation.mutate({ expenseId: editingExpenseId, input: parsed.data });
+    else createMutation.mutate(parsed.data);
   }
 
   return (
@@ -223,13 +257,13 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
         {listExpenses.map((expense) => {
           const category = snapshot.categories.find((candidate) => candidate.id === expense.categoryId);
           return (
-            <article className="ledger-expense-row" key={expense.id}>
+            <button aria-label={`${expense.title} 수정`} className="ledger-expense-row" key={expense.id} onClick={() => openEdit(expense)} type="button">
               <time dateTime={expense.date}>{formatDate(expense.date)}</time>
               <i style={{ backgroundColor: category?.color ?? "oklch(0.645 0.009 106.643)" }} />
               <strong title={expense.title}>{expense.title}</strong>
               <span>{category?.name ?? "기타"}</span>
               <b>{formatWon(expense.amountWon)}</b>
-            </article>
+            </button>
           );
         })}
         {listExpenses.length === 0 && (
@@ -239,23 +273,27 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
 
       <Modal
         className="ledger-expense-modal"
-        footer={<><Button disabled={createMutation.isPending} onClick={() => closeModal()}>취소</Button><Button form="ledger-expense-form" loading={createMutation.isPending} type="submit" variant="primary">저장</Button></>}
+        footer={<>
+          {editingExpenseId && <Button className="ledger-expense-modal__delete" disabled={editorBusy} onClick={() => setDeleteExpenseId(editingExpenseId)} variant="ghost">삭제</Button>}
+          <Button disabled={editorBusy} onClick={() => closeModal()}>취소</Button>
+          <Button form="ledger-expense-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">저장</Button>
+        </>}
         icon="wallet"
         onClose={closeModal}
         open={open}
-        title="지출 추가"
+        title={editingExpenseId ? "지출 수정" : "지출 추가"}
       >
-        <form aria-busy={createMutation.isPending} className="ledger-expense-form" id="ledger-expense-form" onSubmit={submit}>
+        <form aria-busy={editorBusy} className="ledger-expense-form" id="ledger-expense-form" onSubmit={submit}>
           <label><span>항목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 점심값" value={draft.title} /></label>
           <div className="ledger-expense-form__pair">
             <label><span>금액</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
             <label><span>날짜</span><DatePicker align="end" label="날짜" onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
           </div>
           <fieldset>
-            <legend className="ledger-expense-form__category-legend"><span>라벨</span><button disabled={createMutation.isPending} onClick={openCategoryManager} type="button">관리</button></legend>
+            <legend className="ledger-expense-form__category-legend"><span>라벨</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button></legend>
             <Select
               align="end"
-              disabled={createMutation.isPending}
+              disabled={editorBusy}
               label="라벨"
               onChange={(categoryId) => setDraft((current) => ({ ...current, categoryId }))}
               options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))}
@@ -263,9 +301,21 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
             />
           </fieldset>
           <label><span>메모 <small>(선택)</small></span><Input maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} value={draft.note} /></label>
-          {createMutation.isPending && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />지출을 저장하고 있습니다.</div>}
+          {(createMutation.isPending || updateMutation.isPending) && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />지출을 저장하고 있습니다.</div>}
           {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
+      </Modal>
+
+      <Modal
+        className="ledger-category-delete-modal"
+        footer={<><Button disabled={deleteExpenseMutation.isPending} onClick={() => setDeleteExpenseId(null)}>취소</Button><Button loading={deleteExpenseMutation.isPending} onClick={() => deleteExpenseId && deleteExpenseMutation.mutate(deleteExpenseId)} variant="danger">삭제</Button></>}
+        icon="alert"
+        onClose={() => { if (!deleteExpenseMutation.isPending) setDeleteExpenseId(null); }}
+        open={deleteExpenseId !== null}
+        title="지출 삭제"
+      >
+        <p><strong>{snapshot.expenses.find((expense) => expense.id === deleteExpenseId)?.title}</strong> 지출을 삭제할까요? 되돌릴 수 없습니다.</p>
+        {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
       <Modal className="ledger-category-manager-modal" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title="라벨 관리">

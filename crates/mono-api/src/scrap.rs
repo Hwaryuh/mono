@@ -251,6 +251,32 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     Ok(())
 }
 
+fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiResult<()> {
+    require_scrap(conn, id)?;
+    let title = validated_title(&input.title)?;
+    let memo = validated_memo(&input.memo)?;
+    let url = validated_url(&input.url)?;
+    let tag = validated_tag(&input.tag)?;
+    let has_media: bool = conn
+        .query_row("SELECT media_id IS NOT NULL FROM scrap_items WHERE id = ?1", [id], |row| row.get(0))?;
+    let kind = if has_media {
+        "image"
+    } else if url.is_empty() {
+        "text"
+    } else {
+        "url"
+    };
+
+    let tx = conn.transaction()?;
+    tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
+    tx.execute(
+        "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5 WHERE id = ?6",
+        params![kind, title, memo, tag, if url.is_empty() { None } else { Some(url) }, id],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn delete_scrap(conn: &mut Connection, id: &str) -> ApiResult<()> {
     require_scrap(conn, id)?;
     let tx = conn.transaction()?;
@@ -336,7 +362,10 @@ pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/scrap/snapshot", get(snapshot_handler))
         .route("/scrap/items", post(create_scrap_handler))
-        .route("/scrap/items/{id}", axum::routing::delete(delete_scrap_handler))
+        .route(
+            "/scrap/items/{id}",
+            put(update_scrap_handler).delete(delete_scrap_handler),
+        )
         .route("/scrap/tags", post(add_tag_handler))
         .route(
             "/scrap/tags/{tag}",
@@ -368,6 +397,15 @@ async fn create_scrap_handler(
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
     create_scrap(&mut db.lock().unwrap(), input)?;
     Ok(created())
+}
+
+async fn update_scrap_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<ScrapWriteInput>,
+) -> ApiResult<Json<Value>> {
+    update_scrap(&mut db.lock().unwrap(), &id, input)?;
+    Ok(ok())
 }
 
 async fn delete_scrap_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
@@ -503,6 +541,55 @@ mod tests {
         assert!(
             matches!(err, ApiError::Validation(messages) if messages.iter().any(|message| message.contains("미디어 id")))
         );
+    }
+
+    #[test]
+    fn update_scrap_edits_fields_and_reclassifies_kind() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        create_scrap(&mut conn, write_input("메모 스크랩", "", "읽을거리")).unwrap();
+        let id = first_scrap_id(&conn);
+
+        update_scrap(
+            &mut conn,
+            &id,
+            write_input("링크로 승격", "https://example.com", "레퍼런스"),
+        )
+        .unwrap();
+
+        let snapshot = get_snapshot(&conn).unwrap();
+        let item = &snapshot.items[0];
+        assert_eq!(item.title, "링크로 승격");
+        assert_eq!(item.tag, "레퍼런스");
+        assert_eq!(item.kind, "url");
+        assert_eq!(item.url.as_deref(), Some("https://example.com"));
+        assert!(snapshot.tags.contains(&"레퍼런스".to_string()));
+    }
+
+    #[test]
+    fn update_scrap_keeps_image_kind_when_media_present() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let mut input = write_input("사진 스크랩", "", "사진");
+        input.media_id = Some("00000000-0000-4000-8000-000000000001".into());
+        create_scrap(&mut conn, input).unwrap();
+        let id = first_scrap_id(&conn);
+
+        update_scrap(&mut conn, &id, write_input("사진 제목 수정", "", "사진")).unwrap();
+
+        let item = &get_snapshot(&conn).unwrap().items[0];
+        assert_eq!(item.title, "사진 제목 수정");
+        assert_eq!(item.kind, "image");
+    }
+
+    #[test]
+    fn update_scrap_missing_is_not_found() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        assert!(matches!(
+            update_scrap(&mut conn, "nope", write_input("x", "", "태그")).unwrap_err(),
+            ApiError::NotFound(_)
+        ));
     }
 
     #[test]

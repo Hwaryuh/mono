@@ -14,6 +14,17 @@ class MockLedgerRepository implements LedgerRepository {
     this.state.ledger.expenses = [{ id: `expense-${this.state.nextLedgerId++}`, ...parsed }, ...this.state.ledger.expenses];
   }
 
+  async update(expenseId: string, input: LedgerWriteInput) {
+    this.requireExpense(expenseId);
+    const parsed = ledgerWriteInputSchema.parse(input);
+    this.state.ledger.expenses = this.state.ledger.expenses.map((expense) => expense.id === expenseId ? { ...expense, ...parsed } : expense);
+  }
+
+  async remove(expenseId: string) {
+    this.requireExpense(expenseId);
+    this.state.ledger.expenses = this.state.ledger.expenses.filter((expense) => expense.id !== expenseId);
+  }
+
   async createCategory(input: LedgerCategoryWriteInput) {
     const parsed = ledgerCategoryWriteInputSchema.parse(input);
     this.assertUniqueName(parsed.name);
@@ -47,6 +58,12 @@ class MockLedgerRepository implements LedgerRepository {
     if (!fallback) throw new Error("기타 분류를 찾을 수 없습니다.");
     this.state.ledger.expenses = this.state.ledger.expenses.map((expense) => expense.categoryId === categoryId ? { ...expense, categoryId: fallback.id } : expense);
     this.state.ledger.categories = this.state.ledger.categories.filter((category) => category.id !== categoryId);
+  }
+
+  private requireExpense(expenseId: string) {
+    if (!this.state.ledger.expenses.some((expense) => expense.id === expenseId)) {
+      throw new Error(`지출을 찾을 수 없습니다: ${expenseId}`);
+    }
   }
 
   private requireCategory(categoryId: string) {

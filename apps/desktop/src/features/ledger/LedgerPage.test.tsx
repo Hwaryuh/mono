@@ -20,6 +20,8 @@ function repositoryOf(base: LedgerRepository, overrides: Partial<LedgerRepositor
   return {
     getSnapshot: overrides.getSnapshot ?? (() => base.getSnapshot()),
     create: overrides.create ?? ((input) => base.create(input)),
+    update: overrides.update ?? ((expenseId, input) => base.update(expenseId, input)),
+    remove: overrides.remove ?? ((expenseId) => base.remove(expenseId)),
     createCategory: overrides.createCategory ?? ((input) => base.createCategory(input)),
     updateCategory: overrides.updateCategory ?? ((categoryId, input) => base.updateCategory(categoryId, input)),
     reorderCategories: overrides.reorderCategories ?? ((categoryIds) => base.reorderCategories(categoryIds)),
@@ -95,6 +97,35 @@ describe("LedgerPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "지출 추가" })).not.toBeInTheDocument());
     expect(await screen.findByText("저녁 식사")).toBeInTheDocument();
     expect(screen.getAllByText("₩ 12,345").length).toBeGreaterThan(0);
+  });
+
+  it("지출 행을 눌러 항목과 금액을 수정한다", async () => {
+    renderLedger();
+    fireEvent.click(await screen.findByRole("button", { name: "점심값 수정" }));
+
+    const modal = await screen.findByRole("dialog", { name: "지출 수정" });
+    const title = within(modal).getByRole("textbox", { name: "항목" });
+    expect(title).toHaveValue("점심값");
+    fireEvent.change(title, { target: { value: "점심값(정정)" } });
+    fireEvent.change(within(modal).getByRole("textbox", { name: "금액" }), { target: { value: "9000" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "지출 수정" })).not.toBeInTheDocument());
+    expect(await screen.findByText("점심값(정정)")).toBeInTheDocument();
+    expect(screen.getAllByText("₩ 9,000").length).toBeGreaterThan(0);
+  });
+
+  it("지출을 확인 후 삭제한다", async () => {
+    renderLedger();
+    fireEvent.click(await screen.findByRole("button", { name: "장보기 수정" }));
+
+    const modal = await screen.findByRole("dialog", { name: "지출 수정" });
+    fireEvent.click(within(modal).getByRole("button", { name: "삭제" }));
+
+    const confirm = await screen.findByRole("dialog", { name: "지출 삭제" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => expect(screen.queryByText("장보기")).not.toBeInTheDocument());
   });
 
   it("생성 pending을 Modal 내부에 표시한다", async () => {

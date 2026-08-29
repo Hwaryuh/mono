@@ -328,7 +328,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
         open={detail !== null}
         title={<span className="scrap-detail-title">스크랩{detail && <small>{formatTimestamp(detail.savedAt)} 저장</small>}</span>}
       >
-        {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} urlOpener={urlOpener} />}
+        {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
 
       <Modal
@@ -476,9 +476,39 @@ function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
   return <button className="scrap-list-card" onClick={onOpen} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div><span>{item.tag}</span><span><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
 }
 
-function ScrapDetail({ item, repository, urlOpener, onRequestDelete }: { item: ScrapItem; repository: ScrapRepository; urlOpener: ExternalUrlOpener; onRequestDelete: () => void }) {
+function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void }) {
   const meta = kindMeta[item.kind];
   const externalUrl = item.url ? externalUrlOf(item.url) : null;
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<ScrapWriteInput>({ title: item.title, memo: item.memo, url: item.url ?? "", tag: item.tag });
+  const [editError, setEditError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const editMutation = useMutation({
+    mutationFn: (input: ScrapWriteInput) => repository.update(item.id, input),
+    onMutate: () => setEditError(null),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: scrapQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+      setEditing(false);
+    },
+    onError: (error) => setEditError(errorMessage(error)),
+  });
+
+  function startEditing() {
+    setEditDraft({ title: item.title, memo: item.memo, url: item.url ?? "", tag: item.tag });
+    setEditError(null);
+    setEditing(true);
+  }
+
+  function submitEdit(event: FormEvent) {
+    event.preventDefault();
+    const input = { ...editDraft, title: editDraft.title.trim(), memo: editDraft.memo.trim(), url: editDraft.url.trim() };
+    if (!input.title) { setEditError("제목을 입력해야 합니다."); return; }
+    if (!input.tag) { setEditError("라벨을 선택해야 합니다."); return; }
+    editMutation.mutate(input);
+  }
 
   function openExternalUrl(event: MouseEvent<HTMLAnchorElement>) {
     if (!externalUrl) return;
@@ -486,7 +516,20 @@ function ScrapDetail({ item, repository, urlOpener, onRequestDelete }: { item: S
     void urlOpener.open(externalUrl);
   }
 
-  return <div className="scrap-detail">{item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy"><div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} />)}</div></div>;
+  return <div className="scrap-detail">{item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
+    <form className="scrap-detail__editor" onSubmit={submitEdit}>
+      <label><span>제목</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
+      <label><span>메모</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
+      <label><span>링크 (선택)</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
+      <label><span>라벨</span><Select disabled={editMutation.isPending} label="라벨" onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
+      <div className="scrap-detail__editor-actions">
+        <Button disabled={editMutation.isPending} onClick={() => { setEditing(false); setEditError(null); }} size="small" type="button" variant="ghost">취소</Button>
+        <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">저장</Button>
+      </div>
+      {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
+    </form>
+  ) : (<>
+    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 수정" onClick={startEditing} size="small" title="스크랩 수정" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} />)}</div></div>;
 }
 
 function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string }) {

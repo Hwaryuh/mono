@@ -31,6 +31,17 @@ class MockScrapRepository implements ScrapRepository {
     }, ...this.state.scrap.items];
   }
 
+  async update(scrapId: string, input: Parameters<ScrapRepository["update"]>[1]) {
+    const scrap = requireScrap(this.state, scrapId);
+    const parsed = scrapWriteInputSchema.parse(input);
+    if (!this.state.scrap.tags.includes(parsed.tag)) this.state.scrap.tags.push(parsed.tag);
+    scrap.title = parsed.title;
+    scrap.memo = parsed.memo;
+    scrap.tag = parsed.tag;
+    scrap.url = parsed.url || null;
+    scrap.kind = scrap.mediaId ? "image" : parsed.url ? "url" : "text";
+  }
+
   async delete(scrapId: string) {
     requireScrap(this.state, scrapId);
     this.state.scrap.items = this.state.scrap.items.filter((candidate) => candidate.id !== scrapId);

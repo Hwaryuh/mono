@@ -10,4 +10,6 @@ export interface LedgerCategoryRepository {
 export interface LedgerRepository extends LedgerCategoryRepository {
   getSnapshot(): Promise<LedgerSnapshot>;
   create(input: LedgerWriteInput): Promise<void>;
+  update(expenseId: string, input: LedgerWriteInput): Promise<void>;
+  remove(expenseId: string): Promise<void>;
 }

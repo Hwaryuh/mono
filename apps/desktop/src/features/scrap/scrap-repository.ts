@@ -9,6 +9,7 @@ export interface ScrapCommentRepository {
 export interface ScrapRepository extends ScrapCommentRepository {
   getSnapshot(): Promise<ScrapSnapshot>;
   create(input: ScrapWriteInput): Promise<void>;
+  update(scrapId: string, input: ScrapWriteInput): Promise<void>;
   delete(scrapId: string): Promise<void>;
   addTag(tag: string): Promise<void>;
   renameTag(tag: string, nextTag: string): Promise<void>;

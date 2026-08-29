@@ -287,6 +287,34 @@ pub(super) fn create_expense(conn: &Connection, input: LedgerWriteInput) -> ApiR
     Ok(())
 }
 
+fn require_expense(conn: &Connection, id: &str) -> ApiResult<()> {
+    conn.query_row("SELECT 1 FROM ledger_expenses WHERE id = ?1", [id], |_| Ok(()))
+        .map_err(|_| ApiError::NotFound(format!("지출을 찾을 수 없습니다: {id}")))
+}
+
+pub(super) fn update_expense(conn: &Connection, id: &str, input: LedgerWriteInput) -> ApiResult<()> {
+    require_expense(conn, id)?;
+    let title = validated_title(&input.title)?;
+    let amount = validated_amount(&input.amount_won)?;
+    let date = validated_date(&input.date)?;
+    if input.category_id.is_empty() {
+        return Err(ApiError::validation("라벨을 선택해야 합니다."));
+    }
+    let note = validated_note(&input.note)?;
+    conn.execute(
+        "UPDATE ledger_expenses SET title = ?1, amount_won = ?2, date = ?3, category_id = ?4, note = ?5 \
+         WHERE id = ?6",
+        params![title, amount, date, input.category_id, note, id],
+    )?;
+    Ok(())
+}
+
+fn delete_expense(conn: &Connection, id: &str) -> ApiResult<()> {
+    require_expense(conn, id)?;
+    conn.execute("DELETE FROM ledger_expenses WHERE id = ?1", [id])?;
+    Ok(())
+}
+
 fn create_category(conn: &Connection, input: CategoryWriteInput) -> ApiResult<()> {
     let name = validated_category_name(&input.name)?;
     let color = validated_color(&input.color)?;
@@ -367,6 +395,10 @@ pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/ledger/snapshot", get(snapshot_handler))
         .route("/ledger/expenses", post(create_expense_handler))
+        .route(
+            "/ledger/expenses/{id}",
+            put(update_expense_handler).delete(delete_expense_handler),
+        )
         .route("/ledger/categories", post(create_category_handler))
         .route("/ledger/categories/order", put(reorder_handler))
         .route(
@@ -394,6 +426,20 @@ async fn create_expense_handler(
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
     create_expense(&db.lock().unwrap(), input)?;
     Ok(created())
+}
+
+async fn update_expense_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<LedgerWriteInput>,
+) -> ApiResult<Json<Value>> {
+    update_expense(&db.lock().unwrap(), &id, input)?;
+    Ok(ok())
+}
+
+async fn delete_expense_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    delete_expense(&db.lock().unwrap(), &id)?;
+    Ok(ok())
 }
 
 async fn create_category_handler(
@@ -488,6 +534,43 @@ mod tests {
         let titles: Vec<String> =
             get_snapshot(&conn).unwrap().expenses.into_iter().map(|e| e.title).collect();
         assert_eq!(titles, ["저녁", "점심"]);
+    }
+
+    #[test]
+    fn updates_and_deletes_existing_expense() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let food = seed_category(&conn, "식비");
+        let other = seed_category(&conn, "취미");
+        let month = this_month();
+        create_expense(&conn, expense_input("점심", 12_000, &format!("{month}-05"), &food)).unwrap();
+        let id = get_snapshot(&conn).unwrap().expenses[0].id.clone();
+
+        update_expense(
+            &conn,
+            &id,
+            expense_input("점심(정정)", 9_000, &format!("{month}-06"), &other),
+        )
+        .unwrap();
+        let expense = get_snapshot(&conn).unwrap().expenses.into_iter().next().unwrap();
+        assert_eq!(expense.title, "점심(정정)");
+        assert_eq!(expense.amount_won, 9_000);
+        assert_eq!(expense.category_id, other);
+
+        delete_expense(&conn, &id).unwrap();
+        assert!(get_snapshot(&conn).unwrap().expenses.is_empty());
+    }
+
+    #[test]
+    fn missing_expense_update_and_delete_are_not_found() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let food = seed_category(&conn, "식비");
+        assert!(matches!(
+            update_expense(&conn, "nope", expense_input("x", 1_000, "2026-08-01", &food)).unwrap_err(),
+            ApiError::NotFound(_)
+        ));
+        assert!(matches!(delete_expense(&conn, "nope").unwrap_err(), ApiError::NotFound(_)));
     }
 
     #[test]

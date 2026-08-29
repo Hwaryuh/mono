@@ -30,6 +30,7 @@ function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepositor
   return {
     getSnapshot: async () => structuredClone(snapshot),
     create: vi.fn(async () => {}),
+    update: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
     addTag: vi.fn(async () => {}),
     renameTag: vi.fn(async () => {}),
@@ -237,6 +238,22 @@ describe("ScrapPage", () => {
 
     expect(within(drawer).getByText(commentText)).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: `${commentText} 댓글 삭제` })).toBeInTheDocument();
+  });
+
+  it("스크랩 상세에서 제목과 라벨을 인라인으로 수정한다", async () => {
+    const repository = createMockScrapRepository();
+    renderPage(repository);
+    fireEvent.click(await screen.findByRole("button", { name: /합주실 후보 정리/ }));
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
+    const title = within(drawer).getByRole("textbox", { name: "제목" });
+    expect(title).toHaveValue("합주실 후보 정리");
+    fireEvent.change(title, { target: { value: "합주실 후보 3곳" } });
+    fireEvent.click(within(title.closest("form")!).getByRole("button", { name: "저장" }));
+
+    expect(await within(drawer).findByText("합주실 후보 3곳")).toBeInTheDocument();
+    expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-3")?.title).toBe("합주실 후보 3곳");
   });
 
   it("스크랩을 확인 후 삭제하고 목록·상세에서 제거한다", async () => {

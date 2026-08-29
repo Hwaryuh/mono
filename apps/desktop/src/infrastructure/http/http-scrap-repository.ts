@@ -6,6 +6,7 @@ export function createHttpScrapRepository(): ScrapRepository {
   return {
     getSnapshot: () => httpGet<ScrapSnapshot>("/scrap/snapshot"),
     create: (input) => httpPost("/scrap/items", input),
+    update: (scrapId, input) => httpPut(`/scrap/items/${encodeURIComponent(scrapId)}`, input),
     delete: (scrapId) => httpDelete(`/scrap/items/${encodeURIComponent(scrapId)}`),
     addTag: (tag) => httpPost("/scrap/tags", { tag }),
     renameTag: (tag, nextTag) => httpPut(`/scrap/tags/${encodeURIComponent(tag)}`, { nextTag }),
