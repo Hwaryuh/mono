@@ -1,13 +1,15 @@
 [package]
 name = "mono-desktop"
-version = "0.1.92"
+version = "0.1.93"
 description = "개인 관리 플랫폼 데스크톱 앱"
 edition = "2021"
 rust-version = "1.77.2"
 
+# 데스크톱 전용 — 모바일(staticlib/cdylib) 크레이트 타입은 뺐다. 바이너리가 rlib만 링크한다.
+# ponytail: 모바일 타깃 추가 시 tauri init이 crate-type을 다시 넣는다.
 [lib]
 name = "mono_desktop_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
