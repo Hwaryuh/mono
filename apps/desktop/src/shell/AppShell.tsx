@@ -822,11 +822,13 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                   role="radio"
                   type="button"
                 >
-                  <span className="settings-server__mode-name">{option.label}</span>
-                  <span className="settings-server__mode-desc">{option.description}</span>
+                  {option.label}
                 </button>
               ))}
             </div>
+            <p className="settings-server__mode-hint">
+              {SERVER_MODE_OPTIONS.find((option) => option.id === draftMode)?.description}
+            </p>
 
             {draftMode === "remote" && (
               <div className="settings-server__remote">
@@ -838,7 +840,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                     invalid={draftUrl.trim().length > 0 && !draftUrlValid}
                     inputMode="url"
                     onChange={(event) => { setDraftUrl(event.target.value); setTestResult(null); }}
-                    placeholder="http://100.80.12.34:4174"
+                    placeholder="https://mono.example.com"
                     spellCheck={false}
                     value={draftUrl}
                   />
@@ -857,8 +859,8 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                   value={draftToken}
                 />
                 <p className="settings-server__hint">
-                  주소는 Tailscale로 연결한 기기의 것. HTTP는 4174, HTTPS는 443 또는 4174 포트만 됩니다.
-                  공개 서버라면 <code>MONO_API_TOKEN</code>을 설정하고 그 값을 토큰란에 넣으세요.
+                  다른 기기에서 실행 중인 mono 서버 주소입니다. HTTP는 4174, HTTPS는 443·4174 포트만 됩니다.
+                  서버에 <code>MONO_API_TOKEN</code>이 설정돼 있으면 그 값을 위 토큰란에 넣으세요.
                 </p>
                 {testResult && (
                   <p

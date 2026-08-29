@@ -99,7 +99,7 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
 
   async probe(baseUrl: string, token?: string): Promise<void> {
     if (!this.reachable.has(trimBaseUrl(baseUrl))) {
-      throw new Error("서버에 연결할 수 없습니다. 주소와 Tailscale 연결을 확인하세요.");
+      throw new Error("서버에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요.");
     }
     if (this.requiredToken && (token ?? "").trim() !== this.requiredToken) {
       throw new Error((token ?? "").trim() ? "API 토큰이 올바르지 않습니다." : "이 서버는 API 토큰이 필요합니다.");
