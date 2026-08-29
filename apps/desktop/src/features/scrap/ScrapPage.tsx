@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
-import { API_BASE_URL } from "../../infrastructure/http/http-client";
+import { httpGetBlob } from "../../infrastructure/http/http-client";
 import { useMedia } from "../../infrastructure/media/media-store-context";
 import type { ScrapRepository } from "./scrap-repository";
 
@@ -355,15 +355,31 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   );
 }
 
+// 링크 미리보기 이미지는 인증이 걸린 원격 서버에서도 떠야 하므로 <img src>가 아니라
+// 토큰 헤더를 실은 fetch로 가져와 object URL로 만든다(미디어 이미지와 같은 방식).
+function useLinkPreviewImage(externalUrl: string | null) {
+  return useQuery({
+    queryKey: ["link-preview", externalUrl],
+    queryFn: async () => {
+      try {
+        const blob = await httpGetBlob(`/link-previews/image?url=${encodeURIComponent(externalUrl as string)}`);
+        return blob ? URL.createObjectURL(blob) : null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: Boolean(externalUrl),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
 function ScrapMediaPreview({ item, meta, iconSize }: { item: ScrapItem; meta: { icon: IconName; label: string }; iconSize: number }) {
-  const { data } = useMedia(item.kind === "image" ? item.mediaId : null);
-  const [previewFailed, setPreviewFailed] = useState(false);
+  const { data: mediaSrc } = useMedia(item.kind === "image" ? item.mediaId : null);
   const externalUrl = item.kind === "url" && item.url ? externalUrlOf(item.url) : null;
-  const previewUrl = externalUrl
-    ? `${API_BASE_URL}/link-previews/image?url=${encodeURIComponent(externalUrl)}`
-    : null;
-  if (data) return <img alt={item.title} src={data} />;
-  if (previewUrl && !previewFailed) return <img alt="" decoding="async" loading="lazy" onError={() => setPreviewFailed(true)} src={previewUrl} />;
+  const { data: previewSrc } = useLinkPreviewImage(externalUrl);
+  const src = mediaSrc ?? previewSrc;
+  if (src) return <img alt={item.kind === "image" ? item.title : ""} decoding="async" loading="lazy" src={src} />;
   return <><Icon name={meta.icon} size={iconSize} strokeWidth={1.4} /><span>{meta.label}</span></>;
 }
 

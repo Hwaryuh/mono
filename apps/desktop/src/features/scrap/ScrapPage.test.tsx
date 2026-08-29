@@ -2,11 +2,21 @@ import type { ScrapSnapshot } from "@mono/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExternalUrlOpener } from "../../infrastructure/external-url-opener";
 import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import { ScrapPage } from "./ScrapPage";
 import type { ScrapRepository } from "./scrap-repository";
+
+const httpClient = vi.hoisted(() => ({ httpGetBlob: vi.fn() }));
+vi.mock("../../infrastructure/http/http-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../infrastructure/http/http-client")>()),
+  httpGetBlob: httpClient.httpGetBlob,
+}));
+
+beforeEach(() => {
+  httpClient.httpGetBlob.mockReset().mockResolvedValue(new Blob(["img"], { type: "image/png" }));
+});
 
 function renderPage(repository: ScrapRepository = createMockScrapRepository(), initialEntry = "/scrap", urlOpener?: ExternalUrlOpener) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -104,19 +114,29 @@ describe("ScrapPage", () => {
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "link-preview", kind: "url", title: "관련 사진", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, comments: [] }] }));
 
     const card = await screen.findByRole("button", { name: /관련 사진/ });
-    const cardImage = within(card).getByRole("presentation");
-    expect(cardImage).toHaveAttribute("src", expect.stringContaining(`/link-previews/image?url=${encodeURIComponent(url)}`));
+    expect(await within(card).findByRole("presentation")).toHaveAttribute("src", "blob:mock");
+    // 원격 서버 인증을 위해 <img src>가 아니라 토큰 헤더를 실은 fetch로 가져온다.
+    expect(httpClient.httpGetBlob).toHaveBeenCalledWith(`/link-previews/image?url=${encodeURIComponent(url)}`);
 
     fireEvent.click(card);
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
-    expect(within(drawer).getByRole("presentation")).toHaveAttribute("src", expect.stringContaining("/link-previews/image?url="));
+    expect(await within(drawer).findByRole("presentation")).toHaveAttribute("src", "blob:mock");
+  });
+
+  it("링크 미리보기 이미지를 못 받으면 플레이스홀더로 남는다", async () => {
+    httpClient.httpGetBlob.mockRejectedValue(new Error("401"));
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "no-preview", kind: "url", title: "미리보기 없음", memo: "", tag: "수집", savedAt: "오늘", url: "https://example.com/x", mediaId: null, comments: [] }] }));
+
+    const card = await screen.findByRole("button", { name: /미리보기 없음/ });
+    expect(await within(card).findByText("링크 미리보기")).toBeInTheDocument();
+    expect(within(card).queryByRole("presentation")).not.toBeInTheDocument();
   });
 
   it("프로토콜 없는 URL도 HTTPS로 정규화해 미리보기한다", async () => {
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "bare-link", kind: "url", title: "프로토콜 없는 링크", memo: "", tag: "수집", savedAt: "오늘", url: "example.com/article", mediaId: null, comments: [] }] }));
 
-    const image = within(await screen.findByRole("button", { name: /프로토콜 없는 링크/ })).getByRole("presentation");
-    expect(image).toHaveAttribute("src", expect.stringContaining(encodeURIComponent("https://example.com/article")));
+    await within(await screen.findByRole("button", { name: /프로토콜 없는 링크/ })).findByRole("presentation");
+    expect(httpClient.httpGetBlob).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("https://example.com/article")));
   });
 
   it("웹 URL이 아닌 값은 외부 링크로 만들지 않는다", async () => {
