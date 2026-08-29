@@ -255,6 +255,21 @@ impl R2Client {
         }
     }
 
+    // 쓰기 권한까지 실제로 확인 — HEAD(읽기)만으로는 Object Read only 토큰을 못 잡아
+    // "연결 성공"이 뜬 뒤 업로드가 403으로 실패한다. probe 객체를 PUT한 뒤 지운다.
+    async fn verify_write(&self) -> ApiResult<()> {
+        const PROBE_KEY: &str = ".mono-connection-probe";
+        self.put(PROBE_KEY, b"ok".to_vec(), "text/plain").await.map_err(|error| match error {
+            ApiError::BadRequest(detail) => ApiError::BadRequest(format!(
+                "쓰기 권한 확인 실패 — R2 토큰에 Object Read & Write 권한이 필요합니다. {detail}"
+            )),
+            other => other,
+        })?;
+        // 정리 실패는 무시 — 쓰기 검증은 이미 통과했고 남은 probe는 미디어 GC가 정리한다.
+        let _ = self.delete(PROBE_KEY).await;
+        Ok(())
+    }
+
     // ponytail: 페이지네이션 미구현 — R2 ListObjectsV2는 페이지당 1000개, 미디어 수가
     // 그보다 적으면 무의미. 넘어가면 continuation-token 루프 추가.
     async fn list_all(&self) -> ApiResult<Vec<(String, i64)>> {
@@ -458,7 +473,9 @@ async fn orphan_stats_handler(State(state): State<SecretState>) -> ApiResult<Jso
 }
 
 async fn credentials_test_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> {
-    client_from(&state)?.head_bucket().await?;
+    let client = client_from(&state)?;
+    client.head_bucket().await?;
+    client.verify_write().await?;
     Ok(Json(json!({ "ok": true })))
 }
 

@@ -493,7 +493,7 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
         <strong>{hasCredentials === null ? "확인 중" : hasCredentials ? "설정됨" : "설정 안 됨"}</strong>
         <Button disabled={!hasCredentials} loading={pending === "test"} onClick={() => void run("test", async () => {
           await store.testConnection();
-          setMessage("R2 연결에 성공했습니다.");
+          setMessage("R2 읽기·쓰기 연결에 성공했습니다.");
         })} type="button">연결 테스트</Button>
         <Button disabled={!hasCredentials} loading={pending === "delete"} onClick={() => void run("delete", async () => {
           await store.deleteCredentials();
