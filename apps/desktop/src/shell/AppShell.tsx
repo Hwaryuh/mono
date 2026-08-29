@@ -22,6 +22,7 @@ import {
   type ServerSettingsStore,
 } from "../infrastructure/server/server-settings-store";
 import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
+import { checkServerCompatibility, serverBehindOf } from "../infrastructure/server/server-compatibility";
 import { CHECK_UPDATE_EVENT } from "../features/updater/AppUpdater";
 
 type NavigationItem = {
@@ -77,6 +78,14 @@ export function AppShell({
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [serverWarningDismissed, setServerWarningDismissed] = useState(false);
+  const serverCompatQuery = useQuery({
+    queryKey: ["server-compatibility"],
+    queryFn: checkServerCompatibility,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const serverBehind = serverBehindOf(serverCompatQuery.data);
   const isMacintosh = navigator.userAgent.includes("Macintosh");
   const shortcutModifier = isMacintosh ? "⌘" : "Ctrl+";
   const { pathname } = useLocation();
@@ -245,6 +254,16 @@ export function AppShell({
       </aside>
 
       <main className="workspace">
+        {serverBehind && !serverWarningDismissed && (
+          <div className="server-warning" role="status">
+            <Icon name="alert" size={14} strokeWidth={1.8} />
+            <p>
+              서버 버전이 앱보다 낮습니다 (서버 <strong>{serverBehind.serverVersion}</strong> · 앱 <strong>{serverBehind.appVersion}</strong>).
+              최근 기능이 조용히 동작하지 않을 수 있으니 서버를 재배포하세요.
+            </p>
+            <IconButton aria-label="경고 닫기" onClick={() => setServerWarningDismissed(true)} size="small" title="닫기" variant="ghost"><Icon name="close" size={13} /></IconButton>
+          </div>
+        )}
         <header className="topbar">
           <Icon name={meta.icon} size={17} strokeWidth={1.5} />
           <div className="topbar__title">
@@ -357,7 +376,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
             <>
               <SettingsHeading description="설치된 버전을 확인하고 업데이트합니다." title="정보" />
               <section aria-label="업데이트" className="settings-group">
-                <div className="settings-version"><span>버전</span><strong>0.1.96</strong></div>
+                <div className="settings-version"><span>버전</span><strong>{__APP_VERSION__}</strong></div>
                 <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">지금 업데이트 확인</Button>
               </section>
             </>

@@ -1,8 +1,9 @@
 // 선택적 베어러 토큰 게이트. `MONO_API_TOKEN`이 설정된 경우에만 켜진다 —
 // 임베드 모드와 Tailscale 전용 배포는 토큰 없이 그대로 동작한다.
 //
-// `/health`와 CORS preflight(OPTIONS)는 항상 통과시킨다. preflight에는 인증 헤더가
-// 실리지 않으므로 여기서 막으면 브라우저가 401 본문을 읽지 못한다.
+// `/health`, `/version`, CORS preflight(OPTIONS)는 항상 통과시킨다. preflight에는 인증 헤더가
+// 실리지 않으므로 여기서 막으면 브라우저가 401 본문을 읽지 못한다. `/version`은 토큰이
+// 틀렸을 때도 앱↔서버 버전 비교가 가능해야 해서 공개다(민감 정보 아님).
 //
 // ponytail: 전 기기 공유 단일 토큰. 기기별 폐기가 필요하면(기기 분실, 3대 이상)
 // 해시 토큰 테이블로 바꾼다 — `apply`가 "1개 digest 비교" → "테이블 조회"로만 바뀜.
@@ -29,7 +30,8 @@ pub(crate) fn apply(router: Router, token: Option<&str>) -> Router {
     router.layer(axum::middleware::from_fn(move |request: Request, next: Next| {
         let expected = expected.clone();
         async move {
-            if request.method() == Method::OPTIONS || request.uri().path() == "/health" {
+            let path = request.uri().path();
+            if request.method() == Method::OPTIONS || path == "/health" || path == "/version" {
                 return next.run(request).await;
             }
             let presented = request

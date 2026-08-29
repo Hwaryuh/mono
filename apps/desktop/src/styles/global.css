@@ -377,6 +377,21 @@ li {
   color: var(--color-text-muted);
 }
 
+.server-warning {
+  flex: none;
+  padding: 8px 14px 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface));
+  color: var(--color-text);
+}
+.server-warning > svg { flex: none; color: var(--color-warning); }
+.server-warning > p { margin: 0; flex: 1; min-width: 0; font-size: 11.5px; line-height: 1.45; }
+.server-warning strong { font-variant-numeric: tabular-nums; }
+.server-warning > .ui-icon-button { flex: none; color: var(--color-text-faint); }
+
 .topbar__title {
   min-width: 0;
   display: flex;

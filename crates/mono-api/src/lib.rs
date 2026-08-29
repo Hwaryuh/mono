@@ -161,6 +161,13 @@ fn build_router(
 
     let router = Router::new()
         .route("/health", get(|| async { "ok" }))
+        // 클라이언트가 앱↔서버 버전 드리프트를 감지하는 데 쓴다(원격 모드에서 서버만 뒤처지는 상황).
+        .route(
+            "/version",
+            get(|| async {
+                axum::Json(serde_json::json!({ "version": env!("CARGO_PKG_VERSION") }))
+            }),
+        )
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
         .merge(calendar::routes(database.clone()))
@@ -286,5 +293,16 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn version_endpoint_reports_crate_version_without_auth() {
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], Some("s3cr3t"));
+        let response = router
+            .oneshot(Request::builder().uri("/version").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(body_json(response).await["version"], env!("CARGO_PKG_VERSION"));
     }
 }
