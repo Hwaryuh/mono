@@ -86,7 +86,10 @@ describe("CalendarPage", () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository, "/calendar?modal=new");
     const eventModal = await screen.findByRole("dialog", { name: "새 일정" });
-    fireEvent.click(within(eventModal).getByRole("button", { name: "관리" }));
+    const labelGroup = within(eventModal).getByRole("group", { name: "라벨" });
+    const manageButton = within(labelGroup).getByRole("button", { name: "관리" });
+    expect(manageButton.closest("legend")).toBeNull();
+    fireEvent.click(manageButton);
     const manager = screen.getByRole("dialog", { name: "라벨 관리" });
     const nameInput = within(manager).getByRole("textbox", { name: "라벨 이름" });
 

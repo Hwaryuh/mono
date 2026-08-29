@@ -349,8 +349,11 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
           <DateTimeFields draft={draft} label="시작" onChange={setDraftField} prefix="start" />
           <DateTimeFields draft={draft} label="종료" onChange={setDraftField} prefix="end" />
           <label className="calendar-event-form__location-field"><span>장소</span><div className="calendar-event-form__location"><Icon name="location" size={12} /><Input maxLength={500} onChange={(event) => setDraftField("location", event.target.value)} value={draft.location} /></div></label>
-          <fieldset className="calendar-event-form__category">
-            <legend className="calendar-event-form__category-legend"><span>라벨</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button></legend>
+          <fieldset aria-labelledby="calendar-event-category-label" className="calendar-event-form__category">
+            <div className="calendar-event-form__category-header">
+              <span id="calendar-event-category-label">라벨</span>
+              <button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button>
+            </div>
             <Select align="end" label="라벨" onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
           </fieldset>
           <label className="calendar-event-form__note"><span>메모</span><TextArea maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>

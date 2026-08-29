@@ -1942,7 +1942,8 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event-form > label,
 .calendar-event-form > fieldset { min-width: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; border: 0; }
 .calendar-event-form label > span,
-.calendar-event-form legend { color: var(--color-text-faint); font-size: 10.5px; }
+.calendar-event-form legend,
+.calendar-event-form__category-header > span { color: var(--color-text-faint); font-size: 10.5px; }
 .calendar-event-form__title,
 .calendar-event-form__location-field,
 .calendar-event-form__category,
@@ -1954,8 +1955,8 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event-form__location,
 .calendar-event-form__category { position: relative; min-width: 0; }
 .calendar-event-form__category > .ui-select { width: 100%; }
-.calendar-event-form__category-legend { width: 100%; margin-bottom: 5px; display: flex; align-items: center; }
-.calendar-event-form__category-legend > button {
+.calendar-event-form__category-header { width: 100%; display: flex; align-items: center; }
+.calendar-event-form__category-header > button {
   appearance: none;
   margin: -3px 0 -3px auto;
   padding: 3px 5px;
@@ -1970,9 +1971,9 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-.calendar-event-form__category-legend > button:hover:not(:disabled) { background: var(--color-accent-soft); }
-.calendar-event-form__category-legend > button:active:not(:disabled) { scale: 0.96; }
-.calendar-event-form__category-legend > button:disabled { cursor: default; opacity: 0.4; }
+.calendar-event-form__category-header > button:hover:not(:disabled) { background: var(--color-accent-soft); }
+.calendar-event-form__category-header > button:active:not(:disabled) { scale: 0.96; }
+.calendar-event-form__category-header > button:disabled { cursor: default; opacity: 0.4; }
 .calendar-event-form__location > svg { position: absolute; left: 9px; top: 50%; z-index: 1; transform: translateY(-50%); pointer-events: none; }
 .calendar-event-form__location > svg { color: var(--color-text-faint); }
 .calendar-event-form__location .ui-input { padding-left: 28px; }
