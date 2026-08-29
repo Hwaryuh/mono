@@ -434,6 +434,10 @@ async fn upload_handler(
     let id = id.ok_or_else(|| ApiError::BadRequest("업로드할 파일이 없습니다.".into()))?;
     require_media_id(&id)?;
     let (bytes, content_type) = file.ok_or_else(|| ApiError::BadRequest("업로드할 파일이 없습니다.".into()))?;
+    // 0바이트를 그대로 R2에 올리면 "저장은 성공, 사진은 없음"이 되어 조용히 깨진다. 명시적으로 거부.
+    if bytes.is_empty() {
+        return Err(ApiError::validation("빈 파일은 업로드할 수 없습니다."));
+    }
     client_from(&state)?.put(&id, bytes, &content_type).await?;
     Ok((StatusCode::CREATED, Json(json!({ "ok": true }))))
 }
