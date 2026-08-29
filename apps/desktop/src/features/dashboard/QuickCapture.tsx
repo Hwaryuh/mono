@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Link } from "react-router";
 import { useMediaStore } from "../../infrastructure/media/media-store-context";
+import { newMediaId } from "../../infrastructure/media/media-store";
 import type { DashboardRepository } from "./dashboard-repository";
 
 // 편집 중에는 원본(File+미리보기 data URL)을 메모리에만 들고, 제출 시 R2에 업로드하고 mediaId만 넘긴다.
@@ -100,7 +101,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
   const captureMutation = useMutation({
     mutationFn: async (pending: { raw: string; images: PendingMedia[]; videos: PendingMedia[] }) => {
       const persist = async ({ dataUrl: _dataUrl, file, ...meta }: PendingMedia) => {
-        const mediaId = crypto.randomUUID();
+        const mediaId = newMediaId();
         await mediaStore.save(mediaId, file);
         return { ...meta, mediaId };
       };

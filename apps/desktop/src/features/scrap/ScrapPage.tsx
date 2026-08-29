@@ -7,6 +7,7 @@ import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
 import { httpGetBlob } from "../../infrastructure/http/http-client";
 import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
+import { newMediaId } from "../../infrastructure/media/media-store";
 import type { ScrapRepository } from "./scrap-repository";
 
 export const scrapQueryKey = ["scrap"] as const;
@@ -64,6 +65,9 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const handledModalRef = useRef(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoPreviewUrlRef = useRef<string | null>(null);
+  // pendingPhoto 상태가 렌더 사이에 유실돼도(WKWebView 파일 다이얼로그 특이 동작) 저장 시
+  // 사진을 잃지 않도록, 선택된 파일 자체는 ref에 따로 붙든다. 미리보기는 상태로만 그린다.
+  const photoFileRef = useRef<File | null>(null);
   const tagRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const queryClient = useQueryClient();
   const mediaStore = useMediaStore();
@@ -79,7 +83,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const createMutation = useMutation({
     mutationFn: async ({ input, photo }: { input: ScrapWriteInput; photo: File | null }) => {
       if (!photo) return repository.create(input);
-      const mediaId = crypto.randomUUID();
+      const mediaId = newMediaId();
       await mediaStore.save(mediaId, photo);
       try {
         await repository.create({ ...input, mediaId });
@@ -109,15 +113,15 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     onError: (error) => setDeleteError(errorMessage(error)),
   });
 
+  // URL로 열리는 경우(딥링크, AppShell의 "+ 스크랩 추가")의 초안 세팅만 담당한다.
+  // handledModalRef는 openCreate/closeCreate가 관리하므로, 파일 다이얼로그 포커스 이벤트로
+  // searchParams가 잠깐 흔들려도 이 이펙트가 작성 중인 초안·사진을 초기화하지 않는다.
   useEffect(() => {
-    const shouldOpen = searchParams.get("modal") === "new";
-    if (shouldOpen && !handledModalRef.current && snapshotQuery.data) {
-      handledModalRef.current = true;
-      replacePhoto();
-      setDraft({ ...blankDraft, tag: snapshotQuery.data.tags.includes("수집") ? "수집" : snapshotQuery.data.tags[0] ?? "수집" });
-      setFormError(null);
-    }
-    if (!shouldOpen) handledModalRef.current = false;
+    if (searchParams.get("modal") !== "new" || handledModalRef.current || !snapshotQuery.data) return;
+    handledModalRef.current = true;
+    replacePhoto();
+    setDraft({ ...blankDraft, tag: snapshotQuery.data.tags.includes("수집") ? "수집" : snapshotQuery.data.tags[0] ?? "수집" });
+    setFormError(null);
   }, [searchParams, snapshotQuery.data]);
 
   useEffect(() => () => {
@@ -138,6 +142,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const createOpen = searchParams.get("modal") === "new";
 
   function openCreate() {
+    handledModalRef.current = true;
     replacePhoto();
     setDraft({ ...blankDraft, tag: snapshot.tags.includes("수집") ? "수집" : snapshot.tags[0] ?? "수집" });
     setFormError(null);
@@ -148,6 +153,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
   function closeCreate(force = false) {
     if (createMutation.isPending && !force) return;
+    handledModalRef.current = false;
     replacePhoto();
     setFormError(null);
     setTagManagerOpen(false);
@@ -161,12 +167,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     const input = { ...draft, title: draft.title.trim(), memo: draft.memo.trim(), url: draft.url.trim() };
     if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
     if (!input.tag) { setFormError("라벨을 선택해야 합니다."); return; }
-    createMutation.mutate({ input, photo: pendingPhoto?.file ?? null });
+    createMutation.mutate({ input, photo: photoFileRef.current ?? pendingPhoto?.file ?? null });
   }
 
   function replacePhoto(next: PendingPhoto | null = null) {
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
     photoPreviewUrlRef.current = next?.previewUrl ?? null;
+    photoFileRef.current = next?.file ?? null;
     setPendingPhoto(next);
     if (photoInputRef.current) photoInputRef.current.value = "";
   }
@@ -175,6 +182,10 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setFormError("사진 파일만 추가할 수 있습니다.");
+      return;
+    }
+    if (file.size === 0) {
+      setFormError("사진 파일을 읽지 못했습니다. 다시 선택해 주세요.");
       return;
     }
     if (file.size > maxPhotoBytes) {
@@ -486,6 +497,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoPreviewUrlRef = useRef<string | null>(null);
+  const photoFileRef = useRef<File | null>(null);
   const queryClient = useQueryClient();
   const mediaStore = useMediaStore();
   const { data: existingPhotoSrc } = useMedia(item.mediaId);
@@ -498,9 +510,10 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
     mutationFn: async (input: ScrapWriteInput) => {
       let mediaId: string | null = item.mediaId;
       let stagedMediaId: string | null = null;
-      if (pendingPhoto) {
-        stagedMediaId = crypto.randomUUID();
-        await mediaStore.save(stagedMediaId, pendingPhoto.file);
+      const photo = photoFileRef.current ?? pendingPhoto?.file ?? null;
+      if (photo) {
+        stagedMediaId = newMediaId();
+        await mediaStore.save(stagedMediaId, photo);
         mediaId = stagedMediaId;
       } else if (photoRemoved) {
         mediaId = null;
@@ -527,6 +540,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   function resetPhotoDraft() {
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
     photoPreviewUrlRef.current = null;
+    photoFileRef.current = null;
     setPendingPhoto(null);
     setPhotoRemoved(false);
     if (photoInputRef.current) photoInputRef.current.value = "";
@@ -535,9 +549,11 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   function choosePhoto(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setEditError("사진 파일만 추가할 수 있습니다."); return; }
+    if (file.size === 0) { setEditError("사진 파일을 읽지 못했습니다. 다시 선택해 주세요."); return; }
     if (file.size > maxPhotoBytes) { setEditError("사진은 10MB를 넘을 수 없습니다."); return; }
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
     photoPreviewUrlRef.current = URL.createObjectURL(file);
+    photoFileRef.current = file;
     setPendingPhoto({ file, previewUrl: photoPreviewUrlRef.current });
     setPhotoRemoved(false);
     setEditError(null);
@@ -547,6 +563,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   function removePhoto() {
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
     photoPreviewUrlRef.current = null;
+    photoFileRef.current = null;
     setPendingPhoto(null);
     setPhotoRemoved(true);
     if (photoInputRef.current) photoInputRef.current.value = "";

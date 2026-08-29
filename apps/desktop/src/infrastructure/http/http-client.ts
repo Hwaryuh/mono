@@ -57,18 +57,27 @@ export const httpPut = <T = void>(path: string, body?: unknown): Promise<T> => r
 export const httpDelete = <T = void>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit("DELETE", body));
 
 // request()는 항상 JSON 응답을 가정한다. 미디어 업로드·다운로드는 바이너리라 별도 경로가 필요하다.
-export async function httpUpload(path: string, formData: FormData): Promise<void> {
-  // Content-Type을 직접 지정하면 안 된다 — fetch가 FormData의 multipart boundary를 스스로 설정한다.
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, withAuth({ method: "POST", body: formData }));
-  } catch (error) {
-    throw new Error(`API 서버(${API_BASE_URL})에 연결할 수 없습니다.`, { cause: error });
-  }
-  if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    throw new Error(extractErrorMessage(body) ?? `요청이 실패했습니다. (${response.status})`);
-  }
+//
+// fetch가 아니라 XMLHttpRequest를 쓴다 — macOS WKWebView(Tauri)에서 fetch + FormData
+// 멀티파트 업로드가 본문을 비워 보내는 사례가 있다. XHR은 같은 환경에서 안정적이다.
+export function httpUpload(path: string, formData: FormData): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}${path}`);
+    // Content-Type은 지정하지 않는다 — XHR이 FormData의 multipart boundary를 스스로 붙인다.
+    if (apiToken) xhr.setRequestHeader("Authorization", `Bearer ${apiToken}`);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      let body: unknown = null;
+      try { body = JSON.parse(xhr.responseText); } catch { /* 비 JSON 응답 */ }
+      reject(new Error(extractErrorMessage(body) ?? `요청이 실패했습니다. (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error(`API 서버(${API_BASE_URL})에 연결할 수 없습니다.`));
+    xhr.send(formData);
+  });
 }
 
 export async function httpGetBlob(path: string): Promise<Blob | null> {
