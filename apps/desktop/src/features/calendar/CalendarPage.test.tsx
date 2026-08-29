@@ -49,6 +49,33 @@ describe("CalendarPage", () => {
     expect(within(dayDialog).getByRole("button", { name: /가계부 정리/ })).toBeInTheDocument();
   });
 
+  it("여러 날 일정을 이어지는 막대로 그리고, 끼인 날에서도 일정 창에 넣는다", async () => {
+    const { container } = renderCalendar();
+    await screen.findByText("2026년 8월");
+
+    // 제주 워크샵 8/12–8/14 는 한 주 안이라 세그먼트 1개, 8/12에서 8/14까지 columns를 잇는다.
+    const workshop = [...container.querySelectorAll<HTMLElement>(".calendar-span")]
+      .find((bar) => bar.textContent?.includes("제주 워크샵"));
+    expect(workshop).toBeDefined();
+    // 8/12(수)–8/14(금) → 3번째~5번째 열, grid-column 4 / 7
+    expect(workshop?.style.gridColumn.replace(/\s+/g, " ").trim()).toBe("4 / 7");
+    expect(workshop?.style.gridRow).toBe("3");
+
+    // 부산 여행 8/22–8/24 는 토→월이라 주 경계에서 두 세그먼트로 쪼개진다.
+    const busan = container.querySelectorAll(".calendar-span");
+    expect([...busan].filter((bar) => bar.textContent?.includes("부산 여행"))).toHaveLength(2);
+
+    // 막대를 누르면 수정 모달이 열린다.
+    fireEvent.click(workshop!);
+    expect(await screen.findByRole("dialog", { name: "일정 수정" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    // 끼인 날(8/13)의 날짜 숫자로도 그 일정이 든 창이 열린다.
+    fireEvent.click(await screen.findByRole("button", { name: "8월 13일 일정 1개 보기" }));
+    const dialog = screen.getByRole("dialog", { name: /8월 13일/ });
+    expect(within(dialog).getByRole("button", { name: /제주 워크샵/ })).toBeInTheDocument();
+  });
+
   it("앱 스타일 날짜 선택기에서 날짜를 변경하고 입력 버튼으로 focus를 복귀한다", async () => {
     renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 일정" });

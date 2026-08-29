@@ -8,6 +8,8 @@ import type { CalendarRepository } from "./calendar-repository";
 export const calendarQueryKey = ["calendar"] as const;
 const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 const maxVisibleEventsPerDay = 3;
+// 월간 셀에서 이어지는 일정 막대를 몇 줄까지 그릴지. 넘치는 건 날짜별 일정 창에서 본다.
+const maxSpanLanes = 3;
 
 type CalendarView = "month" | "agenda";
 type EditorItem = CalendarEvent | "new" | null;
@@ -79,6 +81,82 @@ function categoryOf(snapshot: CalendarSnapshot, event: CalendarEvent) {
 
 function sortEvents(events: CalendarEvent[]) {
   return [...events].sort((left, right) => `${left.startDate} ${left.startTime ?? ""}`.localeCompare(`${right.startDate} ${right.startTime ?? ""}`));
+}
+
+function isMultiDay(event: CalendarEvent) {
+  return event.startDate < event.endDate;
+}
+
+function coversDate(event: CalendarEvent, date: string) {
+  return event.startDate <= date && event.endDate >= date;
+}
+
+type SpanSegment = {
+  event: CalendarEvent;
+  category?: CalendarCategory;
+  week: number;
+  startCol: number;
+  endCol: number;
+  lane: number;
+  continuesLeft: boolean;
+  continuesRight: boolean;
+};
+
+// 여러 날 이어지는 일정을 주 단위로 잘라, 겹치지 않게 줄(lane)을 배정한 막대 세그먼트로 만든다.
+// laneByDate: 각 날짜 셀이 위쪽에 비워 둬야 할 막대 줄 수(그만큼 단일 일정 칩을 아래로 민다).
+function computeMonthSpans(cells: Array<{ date: string }>, snapshot: CalendarSnapshot) {
+  const multiDay = snapshot.events.filter(isMultiDay);
+  const segments: SpanSegment[] = [];
+  const laneByDate = new Map<string, number>();
+  if (multiDay.length === 0) return { segments, laneByDate };
+
+  for (let week = 0; week < cells.length / 7; week += 1) {
+    const weekDates = cells.slice(week * 7, week * 7 + 7).map((cell) => cell.date);
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[6];
+    const weekSegments = multiDay
+      .filter((event) => event.startDate <= weekEnd && event.endDate >= weekStart)
+      .map<SpanSegment>((event) => {
+        const startInWeek = event.startDate < weekStart;
+        const endInWeek = event.endDate > weekEnd;
+        const startCol = startInWeek ? 0 : Math.max(0, weekDates.indexOf(event.startDate));
+        const rawEndCol = weekDates.indexOf(event.endDate);
+        return {
+          event,
+          category: categoryOf(snapshot, event),
+          week,
+          startCol,
+          endCol: endInWeek || rawEndCol === -1 ? 6 : rawEndCol,
+          lane: 0,
+          continuesLeft: startInWeek,
+          continuesRight: endInWeek,
+        };
+      })
+      .sort((left, right) =>
+        left.startCol - right.startCol
+        || (right.endCol - right.startCol) - (left.endCol - left.startCol)
+        || left.event.startDate.localeCompare(right.event.startDate)
+        || left.event.id.localeCompare(right.event.id));
+
+    const laneEnd: number[] = [];
+    for (const segment of weekSegments) {
+      let lane = laneEnd.findIndex((end) => end < segment.startCol);
+      if (lane === -1) {
+        lane = laneEnd.length;
+        laneEnd.push(segment.endCol);
+      } else {
+        laneEnd[lane] = segment.endCol;
+      }
+      if (lane >= maxSpanLanes) continue;
+      segment.lane = lane;
+      segments.push(segment);
+      for (let col = segment.startCol; col <= segment.endCol; col += 1) {
+        const date = weekDates[col];
+        laneByDate.set(date, Math.max(laneByDate.get(date) ?? 0, lane + 1));
+      }
+    }
+  }
+  return { segments, laneByDate };
 }
 
 export function CalendarPage({ repository }: { repository: CalendarRepository }) {
@@ -172,7 +250,8 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const monthEvents = sortEvents(snapshot.events.filter((event) => event.startDate.startsWith(visibleMonth)));
   const editorBusy = createMutation.isPending || updateMutation.isPending;
   const cells = monthCells(visibleMonth, snapshot.today, snapshot.events);
-  const dayEvents = dayDialogDate ? sortEvents(snapshot.events.filter((event) => event.startDate === dayDialogDate)) : [];
+  const monthSpans = computeMonthSpans(cells, snapshot);
+  const dayEvents = dayDialogDate ? sortEvents(snapshot.events.filter((event) => coversDate(event, dayDialogDate))) : [];
 
   function moveMonth(offset: number) {
     const [year, month] = visibleMonth.split("-").map(Number);
@@ -312,16 +391,47 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
             {cells.map((cell) => {
               const dayClassName = cell.today ? "calendar-cell__day calendar-cell__day--today" : "calendar-cell__day";
               const dayNumber = Number(cell.date.slice(-2));
+              const spanLanes = monthSpans.laneByDate.get(cell.date) ?? 0;
+              const coveringCount = snapshot.events.filter((event) => coversDate(event, cell.date)).length;
               return (
                 <div className={cell.inMonth ? "calendar-cell" : "calendar-cell calendar-cell--outside"} key={cell.date}>
-                  {cell.events.length > 0
-                    ? <button aria-label={`${formatDay(cell.date)} 일정 ${cell.events.length}개 보기`} className={dayClassName} onClick={() => setDayDialogDate(cell.date)} type="button">{dayNumber}</button>
+                  {coveringCount > 0
+                    ? <button aria-label={`${formatDay(cell.date)} 일정 ${coveringCount}개 보기`} className={dayClassName} onClick={() => setDayDialogDate(cell.date)} type="button">{dayNumber}</button>
                     : <span className={dayClassName}>{dayNumber}</span>}
+                  {spanLanes > 0 && <div className="calendar-cell__span-reserve" style={{ height: `calc(${spanLanes} * var(--cal-span-lane))` }} />}
                   {cell.events.slice(0, maxVisibleEventsPerDay).map((item) => <CalendarEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}
                   {cell.events.length > maxVisibleEventsPerDay && <span className="calendar-cell__more">+{cell.events.length - maxVisibleEventsPerDay}개 더</span>}
                 </div>
               );
             })}
+            {monthSpans.segments.length > 0 && (
+              <div className="calendar-span-layer">
+                {monthSpans.segments.map((segment) => (
+                  <button
+                    className={[
+                      "calendar-span",
+                      segment.continuesLeft && "calendar-span--from-before",
+                      segment.continuesRight && "calendar-span--into-after",
+                    ].filter(Boolean).join(" ")}
+                    key={`${segment.event.id}-w${segment.week}`}
+                    onClick={() => openEditor(segment.event)}
+                    style={{
+                      gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
+                      gridRow: segment.week + 1,
+                      marginTop: `calc(var(--cal-span-top) + ${segment.lane} * var(--cal-span-lane))`,
+                      "--event-color": segment.category?.color ?? "oklch(0.645 0.009 106.643)",
+                    } as React.CSSProperties}
+                    title={`${segment.event.title} · ${formatRange(segment.event)}`}
+                    type="button"
+                  >
+                    {segment.continuesLeft && <Icon name="arrowLeft" size={10} />}
+                    {!segment.continuesLeft && segment.event.startTime && <time>{segment.event.startTime}</time>}
+                    <span>{segment.event.title}</span>
+                    {segment.continuesRight && <Icon name="chevronRight" size={10} />}
+                  </button>
+                ))}
+              </div>
+            )}
             {monthEvents.length === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
           </div>
         </div>
@@ -425,7 +535,8 @@ function monthCells(visibleMonth: string, today: string, events: CalendarEvent[]
   return Array.from({ length: 42 }, (_, index) => {
     const date = dateOf(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + index);
     const key = isoDate(date);
-    return { date: key, inMonth: key.startsWith(visibleMonth), today: key === today, events: sortEvents(events.filter((event) => event.startDate === key)) };
+    // 여러 날 일정은 셀 칩이 아니라 이어지는 막대로 그린다.
+    return { date: key, inMonth: key.startsWith(visibleMonth), today: key === today, events: sortEvents(events.filter((event) => event.startDate === key && !isMultiDay(event))) };
   });
 }
 

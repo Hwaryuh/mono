@@ -21,7 +21,7 @@ describe("MockCalendarRepository", () => {
     expect(created).toMatchObject({ location: "동네 치과", startTime: "15:00" });
     await repository.update(created.id, { ...created, title: "정기 치과 검진", note: "" });
     expect((await repository.getSnapshot()).events.find((event) => event.id === created.id)?.title).toBe("정기 치과 검진");
-    expect(before.events).toHaveLength(7);
+    expect(before.events).toHaveLength(9);
   });
 
   it("없는 일정 수정은 실패한다", async () => {

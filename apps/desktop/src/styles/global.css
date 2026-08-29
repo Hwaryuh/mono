@@ -1893,6 +1893,50 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event span { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-cell__more { align-self: flex-start; padding: 1px 3px; color: var(--color-text-faint); font-size: 9.5px; }
 
+/* 여러 날 이어지는 일정: 셀 위에 겹쳐 그리는 막대. 셀은 --span-reserve 만큼 위를 비워 둔다. */
+.calendar-grid { --cal-span-lane: 17px; --cal-span-top: 23px; }
+.calendar-cell__span-reserve { flex: none; pointer-events: none; }
+.calendar-span-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  pointer-events: none;
+}
+.calendar-span {
+  --event-color: oklch(0.645 0.009 106.643);
+  z-index: 1;
+  align-self: start;
+  min-width: 0;
+  height: 15px;
+  margin-inline: 3px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--event-color) 22%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--event-color) 22%, transparent);
+  color: var(--color-text);
+  font: inherit;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: filter 120ms ease-out;
+}
+[data-theme="dark"] .calendar-span { background: color-mix(in srgb, var(--event-color) 30%, var(--color-surface)); }
+.calendar-span--from-before { margin-inline-start: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.calendar-span--into-after { margin-inline-end: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.calendar-span > time { flex: none; color: var(--color-text-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.calendar-span > span { min-width: 0; overflow: hidden; font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-span > svg { flex: none; color: var(--color-text-muted); }
+.calendar-span:hover { filter: brightness(0.97); }
+[data-theme="dark"] .calendar-span:hover { filter: brightness(1.12); }
+.calendar-span:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+
 .calendar-agenda { min-height: 0; flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
 .calendar-agenda__group { display: flex; align-items: flex-start; gap: 14px; }
 .calendar-agenda__date { width: 110px; flex: 0 0 110px; padding-top: 4px; display: flex; flex-direction: column; gap: 1px; }
