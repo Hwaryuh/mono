@@ -170,6 +170,50 @@ describe("CalendarPage", () => {
     expect(await screen.findByRole("button", { name: /정기 치과 검진/ })).toHaveFocus();
   });
 
+  it("반복 프리셋으로 일정을 만들면 월간 보기에 회차로 펼쳐진다", async () => {
+    const repository = createMockCalendarRepository();
+    renderCalendar(repository, "/calendar?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "새 일정" });
+
+    // 기본 시작일 = mock today 2026-08-05(화). "매주" → 매주 수요일.
+    fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "요가" } });
+    fireEvent.click(within(modal).getByRole("combobox", { name: "반복" }));
+    fireEvent.click(await screen.findByRole("option", { name: "매주" }));
+    expect(within(modal).getByText(/매주 수/)).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole("button", { name: "생성" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "새 일정" })).not.toBeInTheDocument());
+    const chips = await screen.findAllByRole("button", { name: /요가/ });
+    expect(chips.length).toBeGreaterThanOrEqual(4);
+
+    const snapshot = await repository.getSnapshot({ from: "2026-08-01", to: "2026-08-31" });
+    expect(snapshot.events.filter((event) => event.title === "요가").map((event) => event.startDate))
+      .toEqual(["2026-08-05", "2026-08-12", "2026-08-19", "2026-08-26"]);
+  });
+
+  it("반복 회차를 수정하면 범위를 묻고 이 일정만 반영한다", async () => {
+    const repository = createMockCalendarRepository();
+    await repository.create({
+      title: "루틴 미팅", startDate: "2026-08-03", startTime: "09:00", endDate: "2026-08-03", endTime: "09:30",
+      location: "", categoryId: "work", note: "", recurrence: { freq: "weekly", interval: 1, weekdays: [1], until: null, count: null },
+    });
+    renderCalendar(repository);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: /루틴 미팅/ }))[1]);
+    const modal = await screen.findByRole("dialog", { name: "일정 수정" });
+    fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "루틴 미팅(변경)" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+
+    const scope = await screen.findByRole("dialog", { name: "반복 일정 수정" });
+    fireEvent.click(within(scope).getByRole("button", { name: /이 일정만/ }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "반복 일정 수정" })).not.toBeInTheDocument());
+    const snapshot = await repository.getSnapshot({ from: "2026-08-01", to: "2026-08-31" });
+    const changed = snapshot.events.filter((event) => event.title.startsWith("루틴 미팅"));
+    expect(changed.filter((event) => event.title === "루틴 미팅(변경)")).toHaveLength(1);
+    expect(changed.filter((event) => event.title === "루틴 미팅").length).toBeGreaterThanOrEqual(3);
+  });
+
   it("빈 상태에서 생성 진입을 제공한다", async () => {
     const base = createMockCalendarRepository();
     const repository: CalendarRepository = {

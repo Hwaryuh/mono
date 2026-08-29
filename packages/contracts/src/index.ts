@@ -250,6 +250,20 @@ export const calendarCategoryWriteInputSchema = z.object({
 
 export const calendarCategoryOrderSchema = z.array(z.string().min(1)).min(1);
 
+export const recurrenceFreqSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
+
+// 반복 규칙. weekdays는 weekly에서만 의미 있고 [] 이면 시작일의 요일을 쓴다.
+// 종료: until(이 날짜까지 포함) 또는 count(횟수) 중 하나, 둘 다 null 이면 무한.
+export const calendarRecurrenceSchema = z.object({
+  freq: recurrenceFreqSchema,
+  interval: z.number().int().min(1).max(999),
+  weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+  until: z.string().nullable(),
+  count: z.number().int().min(1).max(999).nullable(),
+});
+
+export const calendarEditScopeSchema = z.enum(["this", "future", "all"]);
+
 export const calendarEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -260,6 +274,11 @@ export const calendarEventSchema = z.object({
   location: z.string(),
   categoryId: z.string(),
   note: z.string(),
+  // 반복 시리즈의 규칙(마스터·전개된 occurrence 모두에 실림). 단발 일정은 null.
+  recurrence: calendarRecurrenceSchema.nullable().default(null),
+  // 전개된 occurrence면 마스터 이벤트 id와 그 occurrence의 원래 슬롯 날짜. 단발 일정은 null.
+  seriesId: z.string().nullable().default(null),
+  occurrenceDate: z.string().nullable().default(null),
 });
 
 export const calendarSnapshotSchema = z.object({
@@ -268,12 +287,18 @@ export const calendarSnapshotSchema = z.object({
   events: z.array(calendarEventSchema),
 });
 
-export const calendarWriteInputSchema = calendarEventSchema.omit({ id: true }).extend({
-  title: z.string().trim().min(1).max(500),
-  location: z.string().max(500),
-  note: z.string().max(4_000),
-});
+export const calendarWriteInputSchema = calendarEventSchema
+  .omit({ id: true, seriesId: true, occurrenceDate: true, recurrence: true })
+  .extend({
+    title: z.string().trim().min(1).max(500),
+    location: z.string().max(500),
+    note: z.string().max(4_000),
+    recurrence: calendarRecurrenceSchema.nullable().optional(),
+  });
 
+export type RecurrenceFreq = z.infer<typeof recurrenceFreqSchema>;
+export type CalendarRecurrence = z.infer<typeof calendarRecurrenceSchema>;
+export type CalendarEditScope = z.infer<typeof calendarEditScopeSchema>;
 export type CalendarCategory = z.infer<typeof calendarCategorySchema>;
 export type CalendarCategoryWriteInput = z.infer<typeof calendarCategoryWriteInputSchema>;
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;

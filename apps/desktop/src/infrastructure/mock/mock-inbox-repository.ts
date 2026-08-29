@@ -67,6 +67,9 @@ function approveItem(state: MockPlatformState, itemId: string) {
       location: fieldValue(item, "장소"),
       categoryId: category.id,
       note: fieldValue(item, "메모"),
+      recurrence: null,
+      seriesId: null,
+      occurrenceDate: null,
     }, ...state.calendar.events];
   }
 

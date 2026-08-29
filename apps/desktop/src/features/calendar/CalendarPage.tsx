@@ -1,9 +1,10 @@
-import { calendarCategoryWriteInputSchema, type CalendarCategory, type CalendarCategoryWriteInput, type CalendarEvent, type CalendarSnapshot, type CalendarWriteInput } from "@mono/contracts";
+import { calendarCategoryWriteInputSchema, type CalendarCategory, type CalendarCategoryWriteInput, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import type { CalendarRepository } from "./calendar-repository";
+import { addDays, weekdayOf } from "./recurrence";
 
 export const calendarQueryKey = ["calendar"] as const;
 const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
@@ -13,7 +14,9 @@ const maxSpanLanes = 3;
 
 type CalendarView = "month" | "agenda";
 type EditorItem = CalendarEvent | "new" | null;
-type Draft = Omit<CalendarWriteInput, "startTime" | "endTime"> & { startTime: string; endTime: string };
+type Draft = Omit<CalendarWriteInput, "startTime" | "endTime" | "recurrence"> & { startTime: string; endTime: string; recurrence: CalendarRecurrence | null };
+type RecurrencePreset = "none" | "daily" | "weekly" | "weekdays" | "biweekly" | "monthly" | "yearly" | "custom";
+type RecurrenceEnd = "never" | "until" | "count";
 type CategoryCommand =
   | { type: "create"; input: CalendarCategoryWriteInput }
   | { type: "update"; categoryId: string; input: CalendarCategoryWriteInput }
@@ -68,11 +71,66 @@ function blankDraft(snapshot: CalendarSnapshot, selectedDate = snapshot.today): 
     location: "",
     categoryId: snapshot.categories[0]?.id ?? "",
     note: "",
+    recurrence: null,
   };
 }
 
 function draftOf(event: CalendarEvent): Draft {
-  return { ...event, startTime: event.startTime ?? "", endTime: event.endTime ?? "" };
+  return {
+    title: event.title,
+    startDate: event.startDate,
+    startTime: event.startTime ?? "",
+    endDate: event.endDate,
+    endTime: event.endTime ?? "",
+    location: event.location,
+    categoryId: event.categoryId,
+    note: event.note,
+    recurrence: event.recurrence,
+  };
+}
+
+const monFri = [1, 2, 3, 4, 5];
+const sameWeekdays = (left: number[], right: number[]) =>
+  left.length === right.length && [...left].sort().join() === [...right].sort().join();
+
+function recurrenceToPreset(rule: CalendarRecurrence | null, startDate: string): RecurrencePreset {
+  if (!rule) return "none";
+  const naturalWeekday = [weekdayOf(startDate)];
+  const isNatural = rule.weekdays.length === 0 || sameWeekdays(rule.weekdays, naturalWeekday);
+  if (rule.freq === "daily" && rule.interval === 1) return "daily";
+  if (rule.freq === "weekly" && rule.interval === 1 && isNatural) return "weekly";
+  if (rule.freq === "weekly" && rule.interval === 1 && sameWeekdays(rule.weekdays, monFri)) return "weekdays";
+  if (rule.freq === "weekly" && rule.interval === 2 && isNatural) return "biweekly";
+  if (rule.freq === "monthly" && rule.interval === 1) return "monthly";
+  if (rule.freq === "yearly" && rule.interval === 1) return "yearly";
+  return "custom";
+}
+
+function presetToRecurrence(preset: RecurrencePreset, startDate: string, prev: CalendarRecurrence | null): CalendarRecurrence | null {
+  const end = { until: prev?.until ?? null, count: prev?.count ?? null };
+  switch (preset) {
+    case "none": return null;
+    case "daily": return { freq: "daily", interval: 1, weekdays: [], ...end };
+    case "weekly": return { freq: "weekly", interval: 1, weekdays: [weekdayOf(startDate)], ...end };
+    case "weekdays": return { freq: "weekly", interval: 1, weekdays: monFri, ...end };
+    case "biweekly": return { freq: "weekly", interval: 2, weekdays: [weekdayOf(startDate)], ...end };
+    case "monthly": return { freq: "monthly", interval: 1, weekdays: [], ...end };
+    case "yearly": return { freq: "yearly", interval: 1, weekdays: [], ...end };
+    case "custom": return prev ?? { freq: "weekly", interval: 1, weekdays: [weekdayOf(startDate)], until: null, count: null };
+  }
+}
+
+function recurrenceSummary(rule: CalendarRecurrence, startDate: string): string {
+  const every = rule.interval > 1 ? `${rule.interval}` : "";
+  const unit = { daily: "일", weekly: "주", monthly: "개월", yearly: "년" }[rule.freq];
+  let base = every ? `${every}${unit}마다` : { daily: "매일", weekly: "매주", monthly: "매월", yearly: "매년" }[rule.freq];
+  if (rule.freq === "weekly") {
+    const days = (rule.weekdays.length ? rule.weekdays : [weekdayOf(startDate)]).slice().sort((a, b) => a - b).map((d) => dayNames[d]);
+    base = `${base} ${days.join("·")}`;
+  }
+  if (rule.until) return `${base}, ${formatDay(rule.until)}까지`;
+  if (rule.count) return `${base}, ${rule.count}회`;
+  return base;
 }
 
 function categoryOf(snapshot: CalendarSnapshot, event: CalendarEvent) {
@@ -159,13 +217,24 @@ function computeMonthSpans(cells: Array<{ date: string }>, snapshot: CalendarSna
   return { segments, laneByDate };
 }
 
+function gridRange(visibleMonth: string): { from: string; to: string } {
+  const [year, month] = visibleMonth.split("-").map(Number);
+  const first = dateOf(year, month - 1, 1);
+  const gridStart = dateOf(year, month - 1, 1 - first.getUTCDay());
+  const start = isoDate(gridStart);
+  // 6주 그리드 42일 + 앞뒤 1주 여유.
+  return { from: addDays(start, -7), to: addDays(start, 48) };
+}
+
 export function CalendarPage({ repository }: { repository: CalendarRepository }) {
   const [view, setView] = useState<CalendarView>("month");
-  const [visibleMonth, setVisibleMonth] = useState("");
+  const [visibleMonth, setVisibleMonth] = useState(() => isoDate(new Date()).slice(0, 7));
   const [dayDialogDate, setDayDialogDate] = useState<string | null>(null);
   const [editorItem, setEditorItem] = useState<EditorItem>(null);
-  const [draft, setDraft] = useState<Draft>({ title: "", startDate: "", startTime: "", endDate: "", endTime: "", location: "", categoryId: "", note: "" });
+  const [draft, setDraft] = useState<Draft>({ title: "", startDate: "", startTime: "", endDate: "", endTime: "", location: "", categoryId: "", note: "", recurrence: null });
   const [formError, setFormError] = useState<string | null>(null);
+  // 반복 시리즈의 occurrence를 저장/삭제할 때 범위를 고르는 다이얼로그.
+  const [scopePrompt, setScopePrompt] = useState<{ mode: "save" | "delete"; event: CalendarEvent; input?: CalendarWriteInput } | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryDraft, setCategoryDraft] = useState<CalendarCategoryWriteInput>(blankCategoryDraft);
@@ -176,7 +245,11 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const handledParamRef = useRef("");
   const viewRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const queryClient = useQueryClient();
-  const snapshotQuery = useQuery({ queryKey: calendarQueryKey, queryFn: () => repository.getSnapshot() });
+  const range = gridRange(visibleMonth);
+  const snapshotQuery = useQuery({
+    queryKey: [...calendarQueryKey, range.from, range.to],
+    queryFn: () => repository.getSnapshot(range),
+  });
 
   const invalidateSnapshots = async () => {
     await Promise.all([
@@ -191,9 +264,15 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     onError: (error) => setFormError(errorMessage(error)),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ eventId, input }: { eventId: string; input: CalendarWriteInput }) => repository.update(eventId, input),
+    mutationFn: ({ eventId, input, scope }: { eventId: string; input: CalendarWriteInput; scope?: CalendarEditScope }) => repository.update(eventId, input, scope),
     onMutate: () => setFormError(null),
-    onSuccess: async () => { await invalidateSnapshots(); closeEditor(true); },
+    onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); closeEditor(true); },
+    onError: (error) => setFormError(errorMessage(error)),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: ({ eventId, scope }: { eventId: string; scope?: CalendarEditScope }) => repository.remove(eventId, scope),
+    onMutate: () => setFormError(null),
+    onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); closeEditor(true); },
     onError: (error) => setFormError(errorMessage(error)),
   });
   const categoryMutation = useMutation({
@@ -222,10 +301,6 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   });
 
   useEffect(() => {
-    if (!visibleMonth && snapshotQuery.data) setVisibleMonth(snapshotQuery.data.today.slice(0, 7));
-  }, [snapshotQuery.data, visibleMonth]);
-
-  useEffect(() => {
     const snapshot = snapshotQuery.data;
     const modal = searchParams.get("modal");
     const id = searchParams.get("id") ?? "";
@@ -243,12 +318,13 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     }
   }, [searchParams, snapshotQuery.data]);
 
-  if (snapshotQuery.isPending || !visibleMonth) return <CalendarLoading />;
+  if (snapshotQuery.isPending) return <CalendarLoading />;
   if (snapshotQuery.isError) return <div className="calendar-state" role="alert"><Icon name="alert" size={18} />일정을 불러오지 못했습니다.</div>;
 
   const snapshot = snapshotQuery.data;
   const monthEvents = sortEvents(snapshot.events.filter((event) => event.startDate.startsWith(visibleMonth)));
-  const editorBusy = createMutation.isPending || updateMutation.isPending;
+  const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const editingEvent = editorItem && editorItem !== "new" ? editorItem : null;
   const cells = monthCells(visibleMonth, snapshot.today, snapshot.events);
   const monthSpans = computeMonthSpans(cells, snapshot);
   const dayEvents = dayDialogDate ? sortEvents(snapshot.events.filter((event) => coversDate(event, dayDialogDate))) : [];
@@ -336,25 +412,55 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
+  function draftToInput(): CalendarWriteInput | null {
     const input: CalendarWriteInput = {
-      ...draft,
       title: draft.title.trim(),
-      location: draft.location.trim(),
-      note: draft.note.trim(),
+      startDate: draft.startDate,
       startTime: draft.startTime || null,
+      endDate: draft.endDate,
       endTime: draft.endTime || null,
+      location: draft.location.trim(),
+      categoryId: draft.categoryId,
+      note: draft.note.trim(),
+      recurrence: draft.recurrence,
     };
-    if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
-    if (!input.startDate || !input.endDate) { setFormError("시작일과 종료일을 입력해야 합니다."); return; }
-    if (!input.categoryId) { setFormError("라벨을 선택해야 합니다."); return; }
-    if (Boolean(input.startTime) !== Boolean(input.endTime)) { setFormError("시작과 종료 시간을 모두 입력하거나 모두 비워야 합니다."); return; }
+    if (!input.title) { setFormError("제목을 입력해야 합니다."); return null; }
+    if (!input.startDate || !input.endDate) { setFormError("시작일과 종료일을 입력해야 합니다."); return null; }
+    if (!input.categoryId) { setFormError("라벨을 선택해야 합니다."); return null; }
+    if (Boolean(input.startTime) !== Boolean(input.endTime)) { setFormError("시작과 종료 시간을 모두 입력하거나 모두 비워야 합니다."); return null; }
     const start = `${input.startDate}T${input.startTime ?? "00:00"}`;
     const end = `${input.endDate}T${input.endTime ?? "23:59"}`;
-    if (end < start) { setFormError("종료 일시는 시작 일시보다 빠를 수 없습니다."); return; }
-    if (editorItem === "new") createMutation.mutate(input);
-    else if (editorItem) updateMutation.mutate({ eventId: editorItem.id, input });
+    if (end < start) { setFormError("종료 일시는 시작 일시보다 빠를 수 없습니다."); return null; }
+    if (input.recurrence?.until && input.recurrence.until < input.startDate) {
+      setFormError("반복 종료 날짜는 시작일 이후여야 합니다."); return null;
+    }
+    return input;
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const input = draftToInput();
+    if (!input) return;
+    if (editorItem === "new") { createMutation.mutate(input); return; }
+    if (!editingEvent) return;
+    // 반복 시리즈의 한 회차를 고치는 중이면 범위를 먼저 묻는다.
+    if (editingEvent.seriesId) { setScopePrompt({ mode: "save", event: editingEvent, input }); return; }
+    updateMutation.mutate({ eventId: editingEvent.id, input });
+  }
+
+  function requestDelete() {
+    if (!editingEvent) return;
+    if (editingEvent.seriesId) { setScopePrompt({ mode: "delete", event: editingEvent }); return; }
+    deleteMutation.mutate({ eventId: editingEvent.id });
+  }
+
+  function runScope(scope: CalendarEditScope) {
+    if (!scopePrompt) return;
+    if (scopePrompt.mode === "save" && scopePrompt.input) {
+      updateMutation.mutate({ eventId: scopePrompt.event.id, input: scopePrompt.input, scope });
+    } else if (scopePrompt.mode === "delete") {
+      deleteMutation.mutate({ eventId: scopePrompt.event.id, scope });
+    }
   }
 
   function onViewKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -427,6 +533,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
                     {segment.continuesLeft && <Icon name="arrowLeft" size={10} />}
                     {!segment.continuesLeft && segment.event.startTime && <time>{segment.event.startTime}</time>}
                     <span>{segment.event.title}</span>
+                    {segment.event.seriesId && <Icon name="routine" size={9} strokeWidth={1.8} />}
                     {segment.continuesRight && <Icon name="chevronRight" size={10} />}
                   </button>
                 ))}
@@ -448,7 +555,11 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
 
       <Modal
         className="calendar-event-modal"
-        footer={<><Button disabled={editorBusy} onClick={() => closeEditor()}>취소</Button><Button form="calendar-event-form" loading={editorBusy} type="submit" variant="primary">{editorItem === "new" ? "생성" : "저장"}</Button></>}
+        footer={<>
+          {editingEvent && <Button className="calendar-event-modal__delete" disabled={editorBusy} onClick={requestDelete} variant="ghost">삭제</Button>}
+          <Button disabled={editorBusy} onClick={() => closeEditor()}>취소</Button>
+          <Button form="calendar-event-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? "생성" : "저장"}</Button>
+        </>}
         icon="calendar"
         onClose={closeEditor}
         open={editorItem !== null}
@@ -458,6 +569,12 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
           <label className="calendar-event-form__title"><span>제목</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
           <DateTimeFields draft={draft} label="시작" onChange={setDraftField} prefix="start" />
           <DateTimeFields draft={draft} label="종료" onChange={setDraftField} prefix="end" />
+          <RecurrenceField
+            disabled={editorBusy}
+            onChange={(recurrence) => setDraftField("recurrence", recurrence)}
+            startDate={draft.startDate}
+            value={draft.recurrence}
+          />
           <label className="calendar-event-form__location-field"><span>장소</span><div className="calendar-event-form__location"><Icon name="location" size={12} /><Input maxLength={500} onChange={(event) => setDraftField("location", event.target.value)} value={draft.location} /></div></label>
           <fieldset aria-labelledby="calendar-event-category-label" className="calendar-event-form__category">
             <div className="calendar-event-form__category-header">
@@ -469,6 +586,31 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
           <label className="calendar-event-form__note"><span>메모</span><TextArea maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
+      </Modal>
+
+      <Modal
+        className="calendar-scope-modal"
+        footer={<Button disabled={editorBusy} onClick={() => setScopePrompt(null)}>취소</Button>}
+        icon={scopePrompt?.mode === "delete" ? "trash" : "calendar"}
+        onClose={() => { if (!editorBusy) setScopePrompt(null); }}
+        open={scopePrompt !== null}
+        title={scopePrompt?.mode === "delete" ? "반복 일정 삭제" : "반복 일정 수정"}
+      >
+        <div className="calendar-scope">
+          <p><strong>{scopePrompt?.event.title}</strong>은(는) 반복 일정입니다. 어디까지 {scopePrompt?.mode === "delete" ? "삭제" : "적용"}할까요?</p>
+          <div className="calendar-scope__choices">
+            <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("this")} type="button">
+              <strong>이 일정만</strong><span>{scopePrompt?.event.occurrenceDate ? formatDay(scopePrompt.event.occurrenceDate) : ""} 하루만</span>
+            </button>
+            <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("future")} type="button">
+              <strong>이후 일정 모두</strong><span>이 회차부터 마지막까지</span>
+            </button>
+            <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("all")} type="button">
+              <strong>모든 일정</strong><span>시리즈 전체</span>
+            </button>
+          </div>
+          {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+        </div>
       </Modal>
 
       <Modal className="calendar-category-modal" icon="calendar" onClose={closeCategoryManager} open={categoryManagerOpen} title="라벨 관리">
@@ -553,17 +695,130 @@ function dayLabel(date: string, today: string) {
 
 function CalendarEventButton({ event, category, onClick }: { event: CalendarEvent; category?: CalendarCategory; onClick: () => void }) {
   const color = category?.color ?? "oklch(0.645 0.009 106.643)";
-  return <button className="calendar-event" onClick={onClick} style={{ "--event-color": color } as React.CSSProperties} title={`${event.title} · ${formatRange(event)}`} type="button"><time>{eventTime(event)}</time><span>{event.title}</span></button>;
+  return <button className="calendar-event" onClick={onClick} style={{ "--event-color": color } as React.CSSProperties} title={`${event.title} · ${formatRange(event)}`} type="button"><time>{eventTime(event)}</time><span>{event.title}</span>{event.seriesId && <Icon name="routine" size={9} strokeWidth={1.8} />}</button>;
 }
 
 function AgendaEventButton({ event, category, onClick }: { event: CalendarEvent; category?: CalendarCategory; onClick: () => void }) {
-  return <button className="calendar-agenda-event" onClick={onClick} type="button"><i style={{ backgroundColor: category?.color ?? "oklch(0.645 0.009 106.643)" }} /><time>{formatRange(event)}</time><strong title={event.title}>{event.title}</strong><span title={event.location}>{event.location}</span></button>;
+  return <button className="calendar-agenda-event" onClick={onClick} type="button"><i style={{ backgroundColor: category?.color ?? "oklch(0.645 0.009 106.643)" }} /><time>{formatRange(event)}</time><strong title={event.title}>{event.title}{event.seriesId && <Icon name="routine" size={10} strokeWidth={1.8} />}</strong><span title={event.location}>{event.location}</span></button>;
 }
 
 function DateTimeFields({ draft, label, prefix, onChange }: { draft: Draft; label: string; prefix: "start" | "end"; onChange: <Key extends keyof Draft>(key: Key, value: Draft[Key]) => void }) {
   const dateKey = `${prefix}Date` as "startDate" | "endDate";
   const timeKey = `${prefix}Time` as "startTime" | "endTime";
   return <fieldset className="calendar-event-form__date-time"><legend>{label}</legend><div><DatePicker align={prefix === "end" ? "end" : "start"} label={`${label} 날짜`} onChange={(value) => onChange(dateKey, value)} value={draft[dateKey]} /><TimePicker align={prefix === "end" ? "end" : "start"} label={`${label} 시간`} onChange={(value) => onChange(timeKey, value)} value={draft[timeKey]} /></div></fieldset>;
+}
+
+const recurrencePresetOptions: { value: RecurrencePreset; label: string }[] = [
+  { value: "none", label: "안 함" },
+  { value: "daily", label: "매일" },
+  { value: "weekly", label: "매주" },
+  { value: "weekdays", label: "평일 (월–금)" },
+  { value: "biweekly", label: "2주마다" },
+  { value: "monthly", label: "매월" },
+  { value: "yearly", label: "매년" },
+  { value: "custom", label: "사용자 설정" },
+];
+const recurrenceFreqOptions: { value: RecurrenceFreq; label: string }[] = [
+  { value: "daily", label: "일" },
+  { value: "weekly", label: "주" },
+  { value: "monthly", label: "개월" },
+  { value: "yearly", label: "년" },
+];
+
+function clamp(raw: string, min: number, max: number, fallback: number): number {
+  const parsed = Number(raw.replace(/[^\d]/g, ""));
+  if (!Number.isFinite(parsed) || parsed < min) return raw === "" ? min : fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function RecurrenceField({ value, startDate, disabled, onChange }: {
+  value: CalendarRecurrence | null;
+  startDate: string;
+  disabled: boolean;
+  onChange: (recurrence: CalendarRecurrence | null) => void;
+}) {
+  const preset = recurrenceToPreset(value, startDate);
+  const end: RecurrenceEnd = value?.until ? "until" : value?.count ? "count" : "never";
+  const patch = (partial: Partial<CalendarRecurrence>) => { if (value) onChange({ ...value, ...partial }); };
+  const toggleWeekday = (weekday: number) => {
+    if (!value) return;
+    const next = value.weekdays.includes(weekday)
+      ? value.weekdays.filter((day) => day !== weekday)
+      : [...value.weekdays, weekday].sort((a, b) => a - b);
+    onChange({ ...value, weekdays: next.length ? next : [weekdayOf(startDate)] });
+  };
+  const setEnd = (next: RecurrenceEnd) => {
+    if (!value) return;
+    if (next === "never") onChange({ ...value, until: null, count: null });
+    else if (next === "until") onChange({ ...value, until: value.until ?? addDays(startDate, 90), count: null });
+    else onChange({ ...value, until: null, count: value.count ?? 10 });
+  };
+
+  return (
+    <fieldset className="calendar-event-form__recurrence">
+      <legend>반복</legend>
+      <Select
+        align="end"
+        disabled={disabled}
+        label="반복"
+        onChange={(next) => onChange(presetToRecurrence(next as RecurrencePreset, startDate, value))}
+        options={recurrencePresetOptions}
+        value={preset}
+      />
+      {value && (
+        <div className="calendar-recurrence">
+          {preset === "custom" && (
+            <>
+              <label className="calendar-recurrence__interval">
+                <span>간격</span>
+                <div>
+                  <Input aria-label="반복 간격" disabled={disabled} inputMode="numeric" onChange={(event) => patch({ interval: clamp(event.target.value, 1, 999, value.interval) })} value={String(value.interval)} />
+                  <Select
+                    align="end"
+                    disabled={disabled}
+                    label="반복 주기"
+                    onChange={(next) => patch({ freq: next as RecurrenceFreq, weekdays: next === "weekly" ? (value.weekdays.length ? value.weekdays : [weekdayOf(startDate)]) : [] })}
+                    options={recurrenceFreqOptions}
+                    value={value.freq}
+                  />
+                </div>
+              </label>
+              {value.freq === "weekly" && (
+                <div aria-label="반복 요일" className="calendar-recurrence__weekdays" role="group">
+                  {dayNames.map((name, index) => (
+                    <button
+                      aria-pressed={value.weekdays.includes(index)}
+                      className="calendar-recurrence__weekday"
+                      disabled={disabled}
+                      key={name}
+                      onClick={() => toggleWeekday(index)}
+                      type="button"
+                    >{name}</button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          <label className="calendar-recurrence__end">
+            <span>반복 끝</span>
+            <div>
+              <Select
+                align="end"
+                disabled={disabled}
+                label="반복 끝"
+                onChange={(next) => setEnd(next as RecurrenceEnd)}
+                options={[{ value: "never", label: "안 함" }, { value: "until", label: "날짜" }, { value: "count", label: "횟수" }]}
+                value={end}
+              />
+              {end === "until" && <DatePicker align="end" disabled={disabled} label="반복 종료 날짜" min={startDate} onChange={(next) => patch({ until: next })} value={value.until ?? ""} />}
+              {end === "count" && <Input aria-label="반복 횟수" disabled={disabled} inputMode="numeric" onChange={(event) => patch({ count: clamp(event.target.value, 1, 999, value.count ?? 10) })} value={String(value.count ?? "")} />}
+            </div>
+          </label>
+          <p className="calendar-recurrence__summary"><Icon name="routine" size={11} strokeWidth={1.8} />{recurrenceSummary(value, startDate)}</p>
+        </div>
+      )}
+    </fieldset>
+  );
 }
 
 function CalendarEmpty({ onCreate }: { onCreate: () => void }) {

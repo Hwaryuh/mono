@@ -15,6 +15,7 @@ import {
   type ScrapSnapshot,
   type TodoSnapshot,
 } from "@mono/contracts";
+import type { CalendarException } from "../../features/calendar/recurrence";
 
 /** 저장된 상태의 정규화 버전. 스키마 기본값·색상 정규화 규칙이 바뀌면 올린다. */
 export const STATE_VERSION = 1;
@@ -25,7 +26,7 @@ export type MockPlatformState = {
   inbox: InboxSnapshot;
   ledger: LedgerSnapshot;
   todo: TodoSnapshot;
-  calendar: CalendarSnapshot;
+  calendar: CalendarSnapshot & { exceptions: CalendarException[] };
   scrap: ScrapSnapshot;
   routine: {
     items: RoutineDefinition[];
@@ -159,7 +160,7 @@ export function createMockPlatformState(): MockPlatformState {
         { id: "task-5", title: "렌즈 주문", labelId: "home", dueDate: "2026-08-11", dueTime: null, note: "", done: false, completedAt: null },
       ],
     }),
-    calendar: calendarSnapshotSchema.parse({
+    calendar: { ...calendarSnapshotSchema.parse({
       today: "2026-08-05",
       categories: [
         { id: "work", name: "업무", color: "oklch(0.604 0.149 260.322)" },
@@ -180,7 +181,7 @@ export function createMockPlatformState(): MockPlatformState {
         { id: "event-8", title: "제주 워크샵", startDate: "2026-08-12", startTime: "09:00", endDate: "2026-08-14", endTime: "18:00", location: "제주", categoryId: "personal", note: "" },
         { id: "event-9", title: "가족 여행", startDate: "2026-08-28", startTime: null, endDate: "2026-09-01", endTime: null, location: "", categoryId: "appointment", note: "" },
       ],
-    }),
+    }), exceptions: [] },
     scrap: scrapSnapshotSchema.parse({
       tags: ["요리", "레퍼런스", "음악", "전시", "수집", "기타"],
       items: [

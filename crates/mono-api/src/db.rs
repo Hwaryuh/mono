@@ -77,6 +77,33 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   category_id TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT ''
 );
+-- 반복 규칙. calendar_events의 마스터 행이 여기 항목을 가지면 반복 시리즈다.
+CREATE TABLE IF NOT EXISTS calendar_recurrences (
+  event_id TEXT PRIMARY KEY,
+  freq TEXT NOT NULL,
+  interval_n INTEGER NOT NULL DEFAULT 1,
+  weekdays_json TEXT NOT NULL DEFAULT '[]',
+  until_date TEXT,
+  count_n INTEGER
+);
+-- 시리즈의 단일 occurrence 예외. kind='cancelled'면 그 날짜를 건너뛰고,
+-- kind='modified'면 아래 override 컬럼 값으로 대체한다. occurrence_date는 원래 슬롯 날짜.
+CREATE TABLE IF NOT EXISTS calendar_event_exceptions (
+  id TEXT PRIMARY KEY,
+  master_id TEXT NOT NULL,
+  occurrence_date TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT,
+  start_date TEXT,
+  start_time TEXT,
+  end_date TEXT,
+  end_time TEXT,
+  location TEXT,
+  category_id TEXT,
+  note TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_event_exceptions_key
+  ON calendar_event_exceptions (master_id, occurrence_date);
 CREATE TABLE IF NOT EXISTS scrap_tags (
   tag TEXT PRIMARY KEY
 );

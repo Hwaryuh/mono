@@ -1906,6 +1906,8 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 [data-theme="dark"] .calendar-event:hover { filter: brightness(1.08); }
 .calendar-event time { flex: none; color: var(--color-text-faint); font-size: 9px; font-variant-numeric: tabular-nums; }
 .calendar-event span { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-event > svg { flex: none; margin-left: -1px; color: var(--color-text-faint); }
+.calendar-agenda-event strong > svg { margin-left: 4px; color: var(--color-text-faint); vertical-align: -1px; }
 .calendar-cell__more { align-self: flex-start; padding: 1px 3px; color: var(--color-text-faint); font-size: 9.5px; }
 
 /* 여러 날 이어지는 일정: 셀 위에 겹쳐 그리는 막대. 셀은 --span-reserve 만큼 위를 비워 둔다. */
@@ -2007,7 +2009,59 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event-form__location-field,
 .calendar-event-form__category,
 .calendar-event-form__note,
+.calendar-event-form__recurrence,
 .calendar-mutation-error { grid-column: 1 / -1; }
+
+.calendar-event-form__recurrence > .ui-select { width: 100%; }
+.calendar-recurrence { margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--color-border); }
+.calendar-recurrence__interval > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; }
+.calendar-recurrence__interval .ui-input { font-variant-numeric: tabular-nums; text-align: center; }
+.calendar-recurrence__end > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px; }
+.calendar-recurrence__end .ui-input { font-variant-numeric: tabular-nums; }
+.calendar-recurrence__weekdays { display: flex; gap: 4px; }
+.calendar-recurrence__weekday {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+}
+.calendar-recurrence__weekday:hover:not(:disabled) { border-color: var(--color-border-strong); }
+.calendar-recurrence__weekday[aria-pressed="true"] { border-color: transparent; background: var(--color-accent); color: var(--color-accent-foreground); font-weight: 700; }
+.calendar-recurrence__weekday:disabled { opacity: 0.5; cursor: default; }
+.calendar-recurrence__summary { margin: 0; display: flex; align-items: center; gap: 5px; color: var(--color-text-muted); font-size: 10.5px; }
+.calendar-recurrence__summary > svg { flex: none; color: var(--color-accent); }
+
+.calendar-scope-modal { width: min(400px, 100%); }
+.calendar-scope { display: flex; flex-direction: column; gap: 12px; }
+.calendar-scope > p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.calendar-scope > p strong { color: var(--color-text); }
+.calendar-scope__choices { display: flex; flex-direction: column; gap: 6px; }
+.calendar-scope__choice {
+  width: 100%;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+.calendar-scope__choice:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.calendar-scope__choice:disabled { opacity: 0.5; cursor: default; }
+.calendar-scope__choice > strong { color: var(--color-text); font-size: 12.5px; }
+.calendar-scope__choice > span { color: var(--color-text-faint); font-size: 10.5px; }
+.calendar-event-modal__delete { margin-right: auto; color: var(--color-danger); }
 .calendar-event-form__date-time > div { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 78px; gap: 6px; }
 .calendar-event-form .ui-input { height: 32px; }
 .calendar-event-form__title .ui-input { font-size: 12.5px; }

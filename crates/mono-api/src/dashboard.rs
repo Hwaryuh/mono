@@ -217,20 +217,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         .prepare("SELECT id, color FROM calendar_categories")?
         .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
         .collect::<rusqlite::Result<HashMap<_, _>>>()?;
-    let mut event_rows = conn
-        .prepare(
-            "SELECT id, title, start_time, category_id FROM calendar_events \
-             WHERE start_date = ?1 ORDER BY seq DESC",
-        )?
-        .query_map([&today], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, String>(3)?,
-            ))
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut event_rows = super::calendar::events_starting_on(conn, &today)?;
     event_rows.sort_by(|a, b| {
         a.2.clone().unwrap_or_default().cmp(&b.2.clone().unwrap_or_default())
     });
