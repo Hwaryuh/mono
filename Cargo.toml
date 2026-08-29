@@ -5,7 +5,9 @@ resolver = "2"
 # 워크스페이스는 루트 매니페스트에서만 profile을 인식한다 — 멤버의 [profile.*]는 무시됨.
 [profile.release]
 panic = "abort"
-codegen-units = 1
-lto = true
+# 데스크톱 릴리즈는 최고 수준의 링크 최적화보다 빌드 회전 속도를 우선한다.
+# Thin LTO는 크기·성능 이점을 대부분 유지하면서 플랫폼별 번들 시간을 줄인다.
+codegen-units = 8
+lto = "thin"
 opt-level = "s"
 strip = true
