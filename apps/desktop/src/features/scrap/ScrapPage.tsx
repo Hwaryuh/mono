@@ -482,9 +482,36 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<ScrapWriteInput>({ title: item.title, memo: item.memo, url: item.url ?? "", tag: item.tag });
   const [editError, setEditError] = useState<string | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoPreviewUrlRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
+  const mediaStore = useMediaStore();
+  const { data: existingPhotoSrc } = useMedia(item.mediaId);
+
+  useEffect(() => () => {
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+  }, []);
+
   const editMutation = useMutation({
-    mutationFn: (input: ScrapWriteInput) => repository.update(item.id, input),
+    mutationFn: async (input: ScrapWriteInput) => {
+      let mediaId: string | null = item.mediaId;
+      let stagedMediaId: string | null = null;
+      if (pendingPhoto) {
+        stagedMediaId = crypto.randomUUID();
+        await mediaStore.save(stagedMediaId, pendingPhoto.file);
+        mediaId = stagedMediaId;
+      } else if (photoRemoved) {
+        mediaId = null;
+      }
+      try {
+        await repository.update(item.id, { ...input, mediaId });
+      } catch (error) {
+        if (stagedMediaId) { try { await mediaStore.delete(stagedMediaId); } catch { /* 고아 미디어 GC가 후속 정리한다. */ } }
+        throw error;
+      }
+    },
     onMutate: () => setEditError(null),
     onSuccess: async () => {
       await Promise.all([
@@ -492,14 +519,50 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
       ]);
       setEditing(false);
+      resetPhotoDraft();
     },
     onError: (error) => setEditError(errorMessage(error)),
   });
 
+  function resetPhotoDraft() {
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+    photoPreviewUrlRef.current = null;
+    setPendingPhoto(null);
+    setPhotoRemoved(false);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function choosePhoto(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setEditError("사진 파일만 추가할 수 있습니다."); return; }
+    if (file.size > maxPhotoBytes) { setEditError("사진은 10MB를 넘을 수 없습니다."); return; }
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+    photoPreviewUrlRef.current = URL.createObjectURL(file);
+    setPendingPhoto({ file, previewUrl: photoPreviewUrlRef.current });
+    setPhotoRemoved(false);
+    setEditError(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function removePhoto() {
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+    photoPreviewUrlRef.current = null;
+    setPendingPhoto(null);
+    setPhotoRemoved(true);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
   function startEditing() {
     setEditDraft({ title: item.title, memo: item.memo, url: item.url ?? "", tag: item.tag });
     setEditError(null);
+    resetPhotoDraft();
     setEditing(true);
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setEditError(null);
+    resetPhotoDraft();
   }
 
   function submitEdit(event: FormEvent) {
@@ -522,8 +585,32 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
       <label><span>메모</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
       <label><span>링크 (선택)</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
       <label><span>라벨</span><Select disabled={editMutation.isPending} label="라벨" onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
+      <fieldset className="scrap-detail__editor-photo">
+        <legend>사진 (선택)</legend>
+        <input accept="image/*" aria-label="사진 파일 선택" className="capture-file-input" disabled={editMutation.isPending} onChange={(event) => choosePhoto(event.currentTarget.files?.[0])} ref={photoInputRef} tabIndex={-1} type="file" />
+        {pendingPhoto ? (
+          <div className="scrap-photo-preview">
+            <img alt={`${pendingPhoto.file.name} 미리보기`} src={pendingPhoto.previewUrl} />
+            <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
+            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
+            <IconButton aria-label="사진 제거" disabled={editMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+          </div>
+        ) : item.mediaId && !photoRemoved ? (
+          <div className="scrap-photo-preview">
+            {existingPhotoSrc && <img alt="현재 사진" src={existingPhotoSrc} />}
+            <span><strong>현재 사진</strong></span>
+            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
+            <IconButton aria-label="사진 제거" disabled={editMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+          </div>
+        ) : (
+          <button className="scrap-photo-picker" disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} type="button">
+            <Icon name="image" size={17} strokeWidth={1.5} />
+            <span><strong>사진 선택</strong><small>JPG, PNG 등 · 최대 10MB</small></span>
+          </button>
+        )}
+      </fieldset>
       <div className="scrap-detail__editor-actions">
-        <Button disabled={editMutation.isPending} onClick={() => { setEditing(false); setEditError(null); }} size="small" type="button" variant="ghost">취소</Button>
+        <Button disabled={editMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">취소</Button>
         <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">저장</Button>
       </div>
       {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}

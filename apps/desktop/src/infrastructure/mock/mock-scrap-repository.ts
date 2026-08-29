@@ -39,7 +39,8 @@ class MockScrapRepository implements ScrapRepository {
     scrap.memo = parsed.memo;
     scrap.tag = parsed.tag;
     scrap.url = parsed.url || null;
-    scrap.kind = scrap.mediaId ? "image" : parsed.url ? "url" : "text";
+    scrap.mediaId = parsed.mediaId ?? null;
+    scrap.kind = parsed.mediaId ? "image" : parsed.url ? "url" : "text";
   }
 
   async delete(scrapId: string) {

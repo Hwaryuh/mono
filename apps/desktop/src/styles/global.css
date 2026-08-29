@@ -2154,7 +2154,11 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .scrap-detail__copy > p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .scrap-detail__editor { display: flex; flex-direction: column; gap: 9px; }
 .scrap-detail__editor > label { display: flex; flex-direction: column; gap: 4px; }
-.scrap-detail__editor > label > span { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-detail__editor > label > span,
+.scrap-detail__editor legend { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-detail__editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.scrap-detail__editor legend { margin-bottom: 5px; }
+.scrap-detail__editor .ui-textarea { height: auto; min-height: 66px; resize: none; }
 .scrap-detail__editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .scrap-detail__copy > div { padding-top: 3px; display: flex; align-items: center; gap: 7px; min-width: 0; }
 .scrap-detail__url { min-width: 0; overflow: hidden; color: var(--color-accent); font-size: 10.5px; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-accent) 38%, transparent); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; }

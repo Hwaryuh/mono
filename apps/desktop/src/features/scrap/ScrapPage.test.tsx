@@ -381,6 +381,51 @@ describe("ScrapPage", () => {
     expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("보존");
   });
 
+  it("스크랩 상세에서 사진을 교체하면 새 미디어를 올리고 저장한다", async () => {
+    const snapshot: ScrapSnapshot = {
+      tags: ["수집", "기타"],
+      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", comments: [] }],
+    };
+    const repository = repositoryOf(snapshot, {
+      update: vi.fn(async (id, input) => {
+        const item = snapshot.items.find((candidate) => candidate.id === id)!;
+        item.title = input.title;
+        item.mediaId = input.mediaId ?? null;
+        item.kind = input.mediaId ? "image" : "text";
+      }),
+    });
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:existing"), delete: vi.fn(async () => {}) };
+    vi.spyOn(crypto, "randomUUID").mockReturnValue("22222222-2222-4222-8222-222222222222");
+    renderPage(repository, "/scrap?detail=img", undefined, mediaStore);
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
+    const photo = new File(["p"], "새포스터.png", { type: "image/png" });
+    fireEvent.change(within(drawer).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+    fireEvent.click(within(within(drawer).getByRole("textbox", { name: "제목" }).closest("form")!).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith("22222222-2222-4222-8222-222222222222", photo));
+    expect(repository.update).toHaveBeenCalledWith("img", expect.objectContaining({ mediaId: "22222222-2222-4222-8222-222222222222" }));
+  });
+
+  it("스크랩 상세에서 사진을 제거하면 mediaId 없이 저장한다", async () => {
+    const snapshot: ScrapSnapshot = {
+      tags: ["수집", "기타"],
+      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", comments: [] }],
+    };
+    const repository = repositoryOf(snapshot, { update: vi.fn(async () => {}) });
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:existing"), delete: vi.fn(async () => {}) };
+    renderPage(repository, "/scrap?detail=img", undefined, mediaStore);
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "사진 제거" }));
+    fireEvent.click(within(within(drawer).getByRole("textbox", { name: "제목" }).closest("form")!).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(repository.update).toHaveBeenCalledWith("img", expect.objectContaining({ mediaId: null })));
+    expect(mediaStore.save).not.toHaveBeenCalled();
+  });
+
   it("라벨 관리 Modal에서 기존 라벨 이름을 바꾸면 목록과 필터에 반영된다", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository, "/scrap?modal=new");

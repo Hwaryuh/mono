@@ -251,15 +251,16 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     Ok(())
 }
 
+// media_id는 클라이언트가 보낸 값을 그대로 적용한다(없거나 null이면 사진 제거).
+// 데스크톱 수정 폼은 항상 현재 상태를 전부 실어 보낸다.
 fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiResult<()> {
     require_scrap(conn, id)?;
     let title = validated_title(&input.title)?;
     let memo = validated_memo(&input.memo)?;
     let url = validated_url(&input.url)?;
     let tag = validated_tag(&input.tag)?;
-    let has_media: bool = conn
-        .query_row("SELECT media_id IS NOT NULL FROM scrap_items WHERE id = ?1", [id], |row| row.get(0))?;
-    let kind = if has_media {
+    let media_id = validated_media_id(input.media_id.as_deref())?;
+    let kind = if media_id.is_some() {
         "image"
     } else if url.is_empty() {
         "text"
@@ -270,8 +271,17 @@ fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiR
     let tx = conn.transaction()?;
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
     tx.execute(
-        "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5 WHERE id = ?6",
-        params![kind, title, memo, tag, if url.is_empty() { None } else { Some(url) }, id],
+        "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5, media_id = ?6 \
+         WHERE id = ?7",
+        params![
+            kind,
+            title,
+            memo,
+            tag,
+            if url.is_empty() { None } else { Some(url) },
+            media_id,
+            id,
+        ],
     )?;
     tx.commit()?;
     Ok(())
@@ -567,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn update_scrap_keeps_image_kind_when_media_present() {
+    fn update_scrap_swaps_and_clears_media() {
         let db = db::open_memory();
         let mut conn = db.lock().unwrap();
         let mut input = write_input("사진 스크랩", "", "사진");
@@ -575,11 +585,19 @@ mod tests {
         create_scrap(&mut conn, input).unwrap();
         let id = first_scrap_id(&conn);
 
-        update_scrap(&mut conn, &id, write_input("사진 제목 수정", "", "사진")).unwrap();
-
+        // 다른 사진으로 교체
+        let mut swap = write_input("사진 교체", "", "사진");
+        swap.media_id = Some("00000000-0000-4000-8000-000000000002".into());
+        update_scrap(&mut conn, &id, swap).unwrap();
         let item = &get_snapshot(&conn).unwrap().items[0];
-        assert_eq!(item.title, "사진 제목 수정");
         assert_eq!(item.kind, "image");
+        assert_eq!(item.media_id.as_deref(), Some("00000000-0000-4000-8000-000000000002"));
+
+        // media_id 없이 수정하면 사진 제거 → text
+        update_scrap(&mut conn, &id, write_input("사진 제거", "", "사진")).unwrap();
+        let item = &get_snapshot(&conn).unwrap().items[0];
+        assert_eq!(item.kind, "text");
+        assert_eq!(item.media_id, None);
     }
 
     #[test]
