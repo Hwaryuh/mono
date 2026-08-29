@@ -2191,6 +2191,44 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .scrap-create-form .ui-textarea { height: auto; min-height: 72px; resize: none; }
 .scrap-create-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .scrap-create-form legend { margin-bottom: 6px; }
+.scrap-photo-picker {
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-faint);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.scrap-photo-picker:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); }
+.scrap-photo-picker:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.scrap-photo-picker:disabled { cursor: default; opacity: 0.5; }
+.scrap-photo-picker > svg { flex: none; }
+.scrap-photo-picker > span,
+.scrap-photo-preview > span { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px; }
+.scrap-photo-picker strong,
+.scrap-photo-preview strong { overflow: hidden; color: var(--color-text); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.scrap-photo-picker small,
+.scrap-photo-preview small { color: var(--color-text-faint); font-size: 10px; }
+.scrap-photo-preview {
+  min-height: 58px;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+}
+.scrap-photo-preview > img { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 5px; object-fit: cover; }
+.scrap-photo-preview > .ui-button { min-height: 28px; flex: none; }
+.scrap-photo-preview > .ui-icon-button { width: 28px; height: 28px; flex: none; color: var(--color-text-faint); }
 .scrap-create-form__label-legend { width: 100%; display: flex; align-items: center; }
 .scrap-create-form__label-legend > button {
   margin-left: auto;

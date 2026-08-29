@@ -4,6 +4,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExternalUrlOpener } from "../../infrastructure/external-url-opener";
+import type { MediaStore } from "../../infrastructure/media/media-store";
+import { MediaStoreProvider } from "../../infrastructure/media/media-store-context";
 import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import { ScrapPage } from "./ScrapPage";
 import type { ScrapRepository } from "./scrap-repository";
@@ -18,9 +20,10 @@ beforeEach(() => {
   httpClient.httpGetBlob.mockReset().mockResolvedValue(new Blob(["img"], { type: "image/png" }));
 });
 
-function renderPage(repository: ScrapRepository = createMockScrapRepository(), initialEntry = "/scrap", urlOpener?: ExternalUrlOpener) {
+function renderPage(repository: ScrapRepository = createMockScrapRepository(), initialEntry = "/scrap", urlOpener?: ExternalUrlOpener, mediaStore?: MediaStore) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[initialEntry]}><Routes><Route path="/scrap" element={<ScrapPage repository={repository} urlOpener={urlOpener} />} /></Routes></MemoryRouter></QueryClientProvider>);
+  const page = <MemoryRouter initialEntries={[initialEntry]}><Routes><Route path="/scrap" element={<ScrapPage repository={repository} urlOpener={urlOpener} />} /></Routes></MemoryRouter>;
+  return render(<QueryClientProvider client={queryClient}>{mediaStore ? <MediaStoreProvider value={mediaStore}>{page}</MediaStoreProvider> : page}</QueryClientProvider>);
 }
 
 function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepository> = {}): ScrapRepository {
@@ -304,6 +307,61 @@ describe("ScrapPage", () => {
     expect(managerTrigger).toHaveFocus();
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
     expect(await screen.findByRole("button", { name: /새 링크 자료/ })).toBeInTheDocument();
+  });
+
+  it("수동으로 고른 사진을 업로드하고 이미지 스크랩으로 저장한다", async () => {
+    const repository = createMockScrapRepository();
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => null), delete: vi.fn(async () => {}) };
+    const mediaId = "00000000-0000-4000-8000-000000000001";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(mediaId);
+    renderPage(repository, "/scrap?modal=new", undefined, mediaStore);
+
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    const photo = new File(["photo"], "여름 바다.png", { type: "image/png" });
+    fireEvent.change(within(modal).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+
+    expect(within(modal).getByRole("img", { name: "여름 바다.png 미리보기" })).toHaveAttribute("src", "blob:mock");
+    expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("여름 바다");
+    await waitFor(() => expect(within(modal).getByRole("button", { name: "교체" })).toHaveFocus());
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith(mediaId, photo));
+    expect(await screen.findByRole("button", { name: /여름 바다/ })).toBeInTheDocument();
+    expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "image", mediaId, title: "여름 바다" });
+  });
+
+  it("사진 제거 후 보이는 사진 선택 버튼으로 focus를 복귀한다", async () => {
+    renderPage(createMockScrapRepository(), "/scrap?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    const input = within(modal).getByLabelText("사진 파일 선택");
+    expect(input).toHaveAttribute("tabindex", "-1");
+    fireEvent.change(input, { target: { files: [new File(["photo"], "제거.png", { type: "image/png" })] } });
+
+    const removeButton = within(modal).getByRole("button", { name: "제거.png 사진 제거" });
+    fireEvent.click(removeButton);
+
+    const picker = within(modal).getByRole("button", { name: /사진 선택/ });
+    await waitFor(() => expect(picker).toHaveFocus());
+    expect(within(modal).queryByRole("img", { name: "제거.png 미리보기" })).not.toBeInTheDocument();
+  });
+
+  it("사진이 연결된 스크랩 저장 실패 시 업로드한 사진을 정리하고 입력을 보존한다", async () => {
+    const base = await createMockScrapRepository().getSnapshot();
+    const repository = repositoryOf(base, { create: vi.fn(async () => { throw new Error("스크랩 저장 실패"); }) });
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => null), delete: vi.fn(async () => {}) };
+    const mediaId = "00000000-0000-4000-8000-000000000002";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(mediaId);
+    renderPage(repository, "/scrap?modal=new", undefined, mediaStore);
+
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    const photo = new File(["photo"], "보존.png", { type: "image/png" });
+    fireEvent.change(within(modal).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+
+    expect(await within(modal).findByRole("alert")).toHaveTextContent("스크랩 저장 실패");
+    expect(mediaStore.delete).toHaveBeenCalledWith(mediaId);
+    expect(within(modal).getByRole("img", { name: "보존.png 미리보기" })).toBeInTheDocument();
+    expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("보존");
   });
 
   it("라벨 관리 Modal에서 기존 라벨 이름을 바꾸면 목록과 필터에 반영된다", async () => {

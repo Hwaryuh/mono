@@ -12,6 +12,15 @@ describe("MockScrapRepository", () => {
     expect(snapshot.items[0]).toMatchObject({ title: "새 참고 자료", kind: "url", tag: "새 태그" });
   });
 
+  it("미디어 id가 있으면 이미지 스크랩으로 저장한다", async () => {
+    const repository = createMockScrapRepository();
+    const mediaId = "00000000-0000-4000-8000-000000000001";
+
+    await repository.create({ title: "사진", memo: "", url: "", tag: "사진", mediaId });
+
+    expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "image", mediaId });
+  });
+
   it("댓글을 대상 스크랩에만 추가한다", async () => {
     const repository = createMockScrapRepository();
 

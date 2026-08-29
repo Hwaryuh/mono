@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type M
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
 import { httpGetBlob } from "../../infrastructure/http/http-client";
-import { useMedia } from "../../infrastructure/media/media-store-context";
+import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
 import type { ScrapRepository } from "./scrap-repository";
 
 export const scrapQueryKey = ["scrap"] as const;
@@ -19,12 +19,25 @@ const kindMeta: Record<ScrapKind, { icon: IconName; label: string }> = {
 };
 
 type Draft = ScrapWriteInput;
+type PendingPhoto = { file: File; previewUrl: string };
 
 const blankDraft: Draft = { title: "", memo: "", url: "", tag: "수집" };
+const maxPhotoBytes = 10 * 1024 * 1024;
+const photoPickerDomId = "scrap-photo-picker";
+const photoReplaceDomId = "scrap-photo-replace";
 const externalUrlOpener = PlatformExternalUrlOpener.of();
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+}
+
+function photoTitle(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "").trim() || "사진";
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repository: ScrapRepository; urlOpener?: ExternalUrlOpener }) {
@@ -34,6 +47,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const [commentBusyId, setCommentBusyId] = useState<string | null>(null);
   const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Draft>(blankDraft);
+  const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -48,8 +62,11 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const [tagDeleteError, setTagDeleteError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const handledModalRef = useRef(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoPreviewUrlRef = useRef<string | null>(null);
   const tagRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const queryClient = useQueryClient();
+  const mediaStore = useMediaStore();
   const snapshotQuery = useQuery({ queryKey: scrapQueryKey, queryFn: () => repository.getSnapshot() });
 
   const invalidateSnapshots = async () => {
@@ -60,7 +77,17 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   };
 
   const createMutation = useMutation({
-    mutationFn: (input: ScrapWriteInput) => repository.create(input),
+    mutationFn: async ({ input, photo }: { input: ScrapWriteInput; photo: File | null }) => {
+      if (!photo) return repository.create(input);
+      const mediaId = crypto.randomUUID();
+      await mediaStore.save(mediaId, photo);
+      try {
+        await repository.create({ ...input, mediaId });
+      } catch (error) {
+        try { await mediaStore.delete(mediaId); } catch { /* 고아 미디어 GC가 후속 정리한다. */ }
+        throw error;
+      }
+    },
     onMutate: () => setFormError(null),
     onSuccess: async () => {
       await invalidateSnapshots();
@@ -86,11 +113,16 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     const shouldOpen = searchParams.get("modal") === "new";
     if (shouldOpen && !handledModalRef.current && snapshotQuery.data) {
       handledModalRef.current = true;
+      replacePhoto();
       setDraft({ ...blankDraft, tag: snapshotQuery.data.tags.includes("수집") ? "수집" : snapshotQuery.data.tags[0] ?? "수집" });
       setFormError(null);
     }
     if (!shouldOpen) handledModalRef.current = false;
   }, [searchParams, snapshotQuery.data]);
+
+  useEffect(() => () => {
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+  }, []);
 
   useEffect(() => {
     const requestedId = searchParams.get("detail");
@@ -106,6 +138,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
   const createOpen = searchParams.get("modal") === "new";
 
   function openCreate() {
+    replacePhoto();
     setDraft({ ...blankDraft, tag: snapshot.tags.includes("수집") ? "수집" : snapshot.tags[0] ?? "수집" });
     setFormError(null);
     setTagManagerOpen(false);
@@ -115,6 +148,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
   function closeCreate(force = false) {
     if (createMutation.isPending && !force) return;
+    replacePhoto();
     setFormError(null);
     setTagManagerOpen(false);
     setTagInput("");
@@ -127,7 +161,35 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     const input = { ...draft, title: draft.title.trim(), memo: draft.memo.trim(), url: draft.url.trim() };
     if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
     if (!input.tag) { setFormError("라벨을 선택해야 합니다."); return; }
-    createMutation.mutate(input);
+    createMutation.mutate({ input, photo: pendingPhoto?.file ?? null });
+  }
+
+  function replacePhoto(next: PendingPhoto | null = null) {
+    if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
+    photoPreviewUrlRef.current = next?.previewUrl ?? null;
+    setPendingPhoto(next);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function choosePhoto(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormError("사진 파일만 추가할 수 있습니다.");
+      return;
+    }
+    if (file.size > maxPhotoBytes) {
+      setFormError("사진은 10MB를 넘을 수 없습니다.");
+      return;
+    }
+    replacePhoto({ file, previewUrl: URL.createObjectURL(file) });
+    setDraft((current) => current.title.trim() ? current : { ...current, title: photoTitle(file.name) });
+    setFormError(null);
+    requestAnimationFrame(() => document.getElementById(photoReplaceDomId)?.focus());
+  }
+
+  function removePhoto() {
+    replacePhoto();
+    requestAnimationFrame(() => document.getElementById(photoPickerDomId)?.focus());
   }
 
   async function submitComment(event: FormEvent) {
@@ -293,6 +355,32 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
           <label><span>제목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 합주실 후보 정리" value={draft.title} /></label>
           <label><span>메모</span><TextArea maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder="메모..." rows={3} value={draft.memo} /></label>
           <label><span>링크 (선택)</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
+          <fieldset className="scrap-create-form__photo-fieldset">
+            <legend>사진 (선택)</legend>
+            <input
+              accept="image/*"
+              aria-label="사진 파일 선택"
+              className="capture-file-input"
+              disabled={createMutation.isPending}
+              onChange={(event) => choosePhoto(event.currentTarget.files?.[0])}
+              ref={photoInputRef}
+              tabIndex={-1}
+              type="file"
+            />
+            {pendingPhoto ? (
+              <div className="scrap-photo-preview">
+                <img alt={`${pendingPhoto.file.name} 미리보기`} src={pendingPhoto.previewUrl} />
+                <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
+                <Button disabled={createMutation.isPending} id={photoReplaceDomId} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
+                <IconButton aria-label={`${pendingPhoto.file.name} 사진 제거`} disabled={createMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+              </div>
+            ) : (
+              <button className="scrap-photo-picker" disabled={createMutation.isPending} id={photoPickerDomId} onClick={() => photoInputRef.current?.click()} type="button">
+                <Icon name="image" size={17} strokeWidth={1.5} />
+                <span><strong>사진 선택</strong><small>JPG, PNG 등 · 최대 10MB</small></span>
+              </button>
+            )}
+          </fieldset>
           <fieldset className="scrap-create-form__label-fieldset">
             <legend className="scrap-create-form__label-legend"><span>라벨</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">관리</button></legend>
             <Select disabled={createMutation.isPending} label="라벨" onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />

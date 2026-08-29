@@ -20,13 +20,13 @@ class MockScrapRepository implements ScrapRepository {
     if (!this.state.scrap.tags.includes(parsed.tag)) this.state.scrap.tags.push(parsed.tag);
     this.state.scrap.items = [{
       id: `scrap-${this.state.nextScrapId++}`,
-      kind: parsed.url ? "url" : "text",
+      kind: parsed.mediaId ? "image" : parsed.url ? "url" : "text",
       title: parsed.title,
       memo: parsed.memo,
       tag: parsed.tag,
       savedAt: "방금",
       url: parsed.url || null,
-      mediaId: null,
+      mediaId: parsed.mediaId ?? null,
       comments: [],
     }, ...this.state.scrap.items];
   }

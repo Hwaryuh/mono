@@ -50,6 +50,9 @@ struct ScrapWriteInput {
     #[serde(default)]
     url: String,
     tag: String,
+    #[serde(default)]
+    #[serde(rename = "mediaId")]
+    media_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -112,6 +115,21 @@ fn validated_tag(raw: &str) -> ApiResult<String> {
         return Err(ApiError::validation("라벨 이름은 100자 이하여야 합니다."));
     }
     Ok(tag.to_string())
+}
+
+fn validated_media_id(raw: Option<&str>) -> ApiResult<Option<String>> {
+    let Some(id) = raw else {
+        return Ok(None);
+    };
+    let valid = id.len() == 36
+        && id.as_bytes().iter().enumerate().all(|(index, &byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
+        });
+    if !valid {
+        return Err(ApiError::validation("올바르지 않은 미디어 id입니다."));
+    }
+    Ok(Some(id.to_string()))
 }
 
 fn validated_comment(raw: &str) -> ApiResult<String> {
@@ -201,7 +219,14 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     let memo = validated_memo(&input.memo)?;
     let url = validated_url(&input.url)?;
     let tag = validated_tag(&input.tag)?;
-    let kind = if url.is_empty() { "text" } else { "url" };
+    let media_id = validated_media_id(input.media_id.as_deref())?;
+    let kind = if media_id.is_some() {
+        "image"
+    } else if url.is_empty() {
+        "text"
+    } else {
+        "url"
+    };
 
     let tx = conn.transaction()?;
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
@@ -209,7 +234,7 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
         tx.query_row("SELECT COALESCE(MAX(seq), 0) FROM scrap_items", [], |row| row.get(0))?;
     tx.execute(
         "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, url, media_id) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -219,6 +244,7 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
             tag,
             now_iso(),
             if url.is_empty() { None } else { Some(url) },
+            media_id,
         ],
     )?;
     tx.commit()?;
@@ -414,6 +440,7 @@ mod tests {
             memo: String::new(),
             url: url.into(),
             tag: tag.into(),
+            media_id: None,
         }
     }
 
@@ -447,6 +474,34 @@ mod tests {
         assert_eq!(
             snapshot.items.iter().map(|i| i.kind.as_str()).collect::<Vec<_>>(),
             ["text", "url"]
+        );
+    }
+
+    #[test]
+    fn create_with_media_id_makes_image_scrap() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let mut input = write_input("사진 스크랩", "", "사진");
+        let media_id = "00000000-0000-4000-8000-000000000001";
+        input.media_id = Some(media_id.into());
+
+        create_scrap(&mut conn, input).unwrap();
+
+        let item = &get_snapshot(&conn).unwrap().items[0];
+        assert_eq!(item.kind, "image");
+        assert_eq!(item.media_id.as_deref(), Some(media_id));
+    }
+
+    #[test]
+    fn create_rejects_invalid_media_id() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let mut input = write_input("사진 스크랩", "", "사진");
+        input.media_id = Some("../not-an-id".into());
+
+        let err = create_scrap(&mut conn, input).unwrap_err();
+        assert!(
+            matches!(err, ApiError::Validation(messages) if messages.iter().any(|message| message.contains("미디어 id")))
         );
     }
 

@@ -310,6 +310,7 @@ export const scrapWriteInputSchema = z.object({
   memo: z.string().max(4_000),
   url: z.string().trim().max(2_000),
   tag: z.string().trim().min(1).max(100),
+  mediaId: z.string().min(1).nullable().optional(),
 });
 
 export const scrapCommentInputSchema = z.object({
