@@ -65,7 +65,7 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
     try {
       return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
     } catch {
-      throw new Error("서버에 연결할 수 없습니다. 주소와 Tailscale 연결을 확인하세요.");
+      throw new Error("서버에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요.");
     } finally {
       clearTimeout(timer);
     }
