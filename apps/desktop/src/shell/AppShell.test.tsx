@@ -289,6 +289,22 @@ describe("AppShell", () => {
     await waitFor(async () => expect((await store.read()).runningEmbedded).toBe(false));
   });
 
+  it("토큰이 걸린 원격 서버를 현재 연결로 정상 표시한다", async () => {
+    const store = new InMemoryServerSettingsStore({ reachable: ["https://mono.example.ts.net"], requiredToken: "sekret" });
+    await store.save({ mode: "remote", remoteUrl: "https://mono.example.ts.net", token: "sekret" });
+    await store.restart();
+    const probe = vi.spyOn(store, "probe");
+    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    fireEvent.click(within(settingsModal).getByRole("button", { name: "서버" }));
+
+    // 현재 연결 프로브가 저장된 토큰을 실어 보내므로 401이 아니라 "연결됨"이다.
+    expect(await within(settingsModal).findByText("연결됨")).toBeInTheDocument();
+    expect(within(settingsModal).queryByText("응답 없음")).not.toBeInTheDocument();
+    expect(probe).toHaveBeenCalledWith("https://mono.example.ts.net", "sekret");
+  });
+
   it("잘못된 원격 주소는 저장을 막고 오류를 알린다", async () => {
     const store = new InMemoryServerSettingsStore();
     renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
