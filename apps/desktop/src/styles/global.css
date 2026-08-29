@@ -61,6 +61,12 @@ li {
   text-wrap: pretty;
 }
 
+/* 텍스트 선택도 사용자 강조색을 따른다 — 기본 브라우저 파랑이 뜨면 조립한 티가 난다. */
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  color: var(--color-text);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
