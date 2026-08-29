@@ -357,7 +357,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
             <>
               <SettingsHeading description="설치된 버전을 확인하고 업데이트합니다." title="정보" />
               <section aria-label="업데이트" className="settings-group">
-                <div className="settings-version"><span>버전</span><strong>0.1.93</strong></div>
+                <div className="settings-version"><span>버전</span><strong>0.1.94</strong></div>
                 <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">지금 업데이트 확인</Button>
               </section>
             </>
