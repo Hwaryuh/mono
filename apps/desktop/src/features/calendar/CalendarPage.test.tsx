@@ -134,6 +134,23 @@ describe("CalendarPage", () => {
     expect(category).toMatchObject({ color: "oklch(0.604 0.149 260.322)" });
   });
 
+  it("단발 일정 삭제는 확인 모달을 거친다", async () => {
+    const repository = createMockCalendarRepository();
+    renderCalendar(repository);
+    fireEvent.click(await screen.findByRole("button", { name: /미용실 방문/ }));
+    const eventModal = screen.getByRole("dialog", { name: "일정 수정" });
+    fireEvent.click(within(eventModal).getByRole("button", { name: "삭제" }));
+
+    const confirm = await screen.findByRole("dialog", { name: "일정 삭제" });
+    expect(within(confirm).getByText(/미용실 방문/)).toBeInTheDocument();
+    // 확인 전에는 그대로.
+    expect((await repository.getSnapshot()).events.some((event) => event.id === "event-2")).toBe(true);
+
+    fireEvent.click(within(confirm).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "일정 수정" })).not.toBeInTheDocument());
+    expect((await repository.getSnapshot()).events.some((event) => event.id === "event-2")).toBe(false);
+  });
+
   it("사용 중인 라벨 삭제 시 열린 일정과 기존 일정을 대체 라벨로 이동한다", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository);

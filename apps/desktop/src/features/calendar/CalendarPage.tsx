@@ -235,6 +235,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const [formError, setFormError] = useState<string | null>(null);
   // 반복 시리즈의 occurrence를 저장/삭제할 때 범위를 고르는 다이얼로그.
   const [scopePrompt, setScopePrompt] = useState<{ mode: "save" | "delete"; event: CalendarEvent; input?: CalendarWriteInput } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryDraft, setCategoryDraft] = useState<CalendarCategoryWriteInput>(blankCategoryDraft);
@@ -272,7 +273,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const deleteMutation = useMutation({
     mutationFn: ({ eventId, scope }: { eventId: string; scope?: CalendarEditScope }) => repository.remove(eventId, scope),
     onMutate: () => setFormError(null),
-    onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); closeEditor(true); },
+    onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); setDeleteConfirm(false); closeEditor(true); },
     onError: (error) => setFormError(errorMessage(error)),
   });
   const categoryMutation = useMutation({
@@ -357,6 +358,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     if (editorBusy && !force) return;
     setEditorItem(null);
     setFormError(null);
+    setDeleteConfirm(false);
     if (searchParams.has("modal")) setSearchParams({}, { replace: true });
   }
 
@@ -450,8 +452,9 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
 
   function requestDelete() {
     if (!editingEvent) return;
+    // 반복 일정은 범위 선택 다이얼로그가 확인 단계를 겸한다. 단발 일정은 확인 모달.
     if (editingEvent.seriesId) { setScopePrompt({ mode: "delete", event: editingEvent }); return; }
-    deleteMutation.mutate({ eventId: editingEvent.id });
+    setDeleteConfirm(true);
   }
 
   function runScope(scope: CalendarEditScope) {
@@ -609,6 +612,20 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
               <strong>모든 일정</strong><span>시리즈 전체</span>
             </button>
           </div>
+          {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+        </div>
+      </Modal>
+
+      <Modal
+        className="calendar-category-delete-modal"
+        footer={<><Button disabled={deleteMutation.isPending} onClick={() => setDeleteConfirm(false)}>취소</Button><Button loading={deleteMutation.isPending} onClick={() => editingEvent && deleteMutation.mutate({ eventId: editingEvent.id })} variant="danger">삭제</Button></>}
+        icon="alert"
+        onClose={() => { if (!deleteMutation.isPending) setDeleteConfirm(false); }}
+        open={deleteConfirm}
+        title="일정 삭제"
+      >
+        <div className="calendar-category-delete">
+          <p><strong>{editingEvent?.title}</strong> 일정을 삭제할까요? 되돌릴 수 없습니다.</p>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </div>
       </Modal>
