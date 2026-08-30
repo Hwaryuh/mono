@@ -97,6 +97,14 @@ li {
   user-select: none;
 }
 
+/* 드래그로 좁히는 동안 내부는 펼친 레이아웃(168px = MIN_SIDEBAR_WIDTH)을 유지하고
+   사이드바 가장자리가 그 위를 덮으며 잘라낸다 — 글자가 찌그러지지 않는다. */
+.app-shell--resizing .sidebar__brand,
+.app-shell--resizing .sidebar__nav,
+.app-shell--resizing .sidebar__footer {
+  min-width: 168px;
+}
+
 .sidebar {
   position: relative;
   min-width: 0;
