@@ -9,7 +9,7 @@ function errorMessage(error: unknown): string {
 
 export function RouteErrorScreen() {
   const error = useRouteError();
-  // ponytail: 로그만 남기고 재시도는 새로고침에 맡긴다. 별도 리포팅 붙일 때 여기 확장.
+  // 로그만 남기고 재시도는 새로고침에 맡긴다. 별도 리포팅 붙일 때 여기 확장.
   console.error(error);
 
   return (
