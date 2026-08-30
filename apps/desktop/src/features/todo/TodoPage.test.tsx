@@ -201,6 +201,27 @@ describe("TodoPage", () => {
     expect(await screen.findByText("아직 할 일이 없습니다")).toBeInTheDocument();
   });
 
+  it("하루 이상 지난 완료 항목은 전체에서 숨기고 완료 탭에만 보인다", async () => {
+    const base = createMockTodoRepository();
+    const snapshot = {
+      today: "2026-08-05",
+      labels: [{ id: "home", name: "집안일", color: "oklch(0.7 0.1 250)" }],
+      items: [
+        { id: "aged", title: "오래된 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), routineId: null, occurrenceDate: null },
+        { id: "fresh", title: "방금 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date().toISOString(), routineId: null, occurrenceDate: null },
+      ],
+    };
+    renderTodo(repositoryOf(base, { getSnapshot: async () => snapshot }));
+
+    await screen.findByText("방금 완료");
+    expect(screen.queryByText("오래된 완료")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /전체 1/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: /완료 2/ }));
+    expect(screen.getByText("오래된 완료")).toBeInTheDocument();
+    expect(screen.getByText("방금 완료")).toBeInTheDocument();
+  });
+
   it("mutation pending과 오류를 해당 항목에만 표시한다", async () => {
     const base = createMockTodoRepository();
     let rejectToggle: ((reason?: unknown) => void) | undefined;

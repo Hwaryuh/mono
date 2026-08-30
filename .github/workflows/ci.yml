@@ -8,14 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 빠른 검증 — 모든 push/PR/태그. 프론트 + 임베드 API 서버 유닛 테스트.
-  # macOS 러너는 청구 10배라 제외 — 유닛 테스트는 플랫폼 무관, 실제 macOS 빌드는 태그의 bundle 잡이 한다.
-  check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest]
-    runs-on: ${{ matrix.os }}
+  # 프론트 + 계약 패키지. Linux 러너 — 유닛 테스트는 플랫폼 무관, 요금 1x.
+  frontend:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -29,26 +24,30 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # API 서버 유닛 테스트 + 워크스페이스 컴파일 검증. 진짜 release 빌드는 태그의 bundle 잡이 함.
+  # frontend와 병렬 — 벽시계는 둘 중 느린 쪽.
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
       - uses: dtolnay/rust-toolchain@stable
-      - run: npm run version:check
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-          # v1: check 프로필 dep 아티팩트를 캐시에 새로 태우려고 한 번 bump.
-          # 이전 캐시는 release 빌드 기준이라 cargo check가 매번 dep를 새로 컴파일했다.
-          prefix-key: v1-rust
+          # dev/test 프로필 target/. bundle 잡(release 프로필)과 키를 분리한다.
+          prefix-key: v2-rust-check
+          # PR에서는 저장하지 않는다 — main·태그만 캐시를 갱신해 10GB 한도 경쟁을 줄인다.
+          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: API server tests
-        run: cargo test --lib -p mono-api
-
-      # 매 push의 컴파일 검증만. 진짜 release 빌드(LTO+codegen-units=1)는 태그 걸린 bundle 잡이 함.
-      - name: Workspace compile check
-        run: cargo check --workspace
+      - run: npm run version:check
+      - run: cargo test --lib -p mono-api
+      - run: cargo check --workspace
 
   # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: check
+    needs: [frontend, rust]
     permissions:
       contents: read
     strategy:
@@ -70,12 +69,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-          # 컴파일 결과는 sccache가 파일 단위로 재사용한다. target 전체를 압축·업로드하면
-          # macOS에서 캐시 저장만 약 2분 걸리므로 레지스트리 캐시만 유지한다.
-          cache-targets: false
-
-      - name: Set up Rust compiler cache
-        uses: Mozilla-Actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+          # release 프로필 target/를 캐시한다. Cargo.lock이 안 바뀌면 dep 재컴파일 없이
+          # 앱 크레이트만 다시 빌드 → 번들 시간이 ~6분에서 ~2분대로 떨어진다.
+          # 저장은 Cargo.lock/rustc가 바뀐 태그에서만 일어난다(세이브 비용은 dep 변경당 1회).
+          prefix-key: v2-bundle
 
       # macos-26은 공식 arm64 label → aarch64 .dmg. Intel Mac 대상은 별도 매트릭스 필요.
       # APPLE_SIGNING_IDENTITY: '-' → ad-hoc 서명. 없으면 arm64 미서명 앱이 "손상됨"으로
@@ -85,8 +82,6 @@ jobs:
       - name: Tauri build
         env:
           APPLE_SIGNING_IDENTITY: "-"
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri --workspace @mono/desktop -- build
@@ -195,9 +190,12 @@ jobs:
             exit 1
           fi
 
+  # bundle과 병렬로 돈다 — 서버 배포는 태그 SHA만 있으면 되고 번들 아티팩트와 무관하다.
+  # 서버가 클라이언트보다 잠깐 앞서는 건 안전한 방향(앱은 서버가 뒤처질 때만 경고).
+  # publish-release가 이 잡 완료를 기다리므로 "서버 배포·검증 후 클라이언트 공개" 순서는 유지된다.
   deploy-release-server:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify-release-assets
+    needs: [frontend, rust]
     runs-on: ubuntu-latest
     timeout-minutes: 50
     permissions:
@@ -249,7 +247,7 @@ jobs:
 
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: deploy-release-server
+    needs: [verify-release-assets, deploy-release-server]
     runs-on: ubuntu-latest
     permissions:
       contents: write

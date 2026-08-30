@@ -34,6 +34,13 @@ function statusOf(item: TodoItem, today: string): TodoStatus {
   return "upcoming";
 }
 
+// 하루 이상 지난 완료 항목은 "전체"에서 숨기고 "완료" 탭에만 남긴다.
+function isAgedDone(item: TodoItem, now: number): boolean {
+  if (!item.done || !item.completedAt) return false;
+  const completed = Date.parse(item.completedAt);
+  return !Number.isNaN(completed) && now - completed >= 86_400_000;
+}
+
 function blankDraft(labels: TodoLabel[]): Draft {
   return { title: "", labelId: labels[0]?.id ?? "", dueDate: "", dueTime: "", note: "" };
 }
@@ -119,12 +126,15 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
   if (snapshotQuery.isError) return <div className="todo-state" role="alert"><Icon name="alert" size={18} />할 일을 불러오지 못했습니다.</div>;
   const snapshot = snapshotQuery.data;
 
+  const now = Date.now();
   const counts = Object.fromEntries(statusOrder.map((statusId) => [
     statusId,
-    statusId === "all" ? snapshot.items.length : snapshot.items.filter((item) => statusOf(item, snapshot.today) === statusId).length,
+    statusId === "all"
+      ? snapshot.items.filter((item) => !isAgedDone(item, now)).length
+      : snapshot.items.filter((item) => statusOf(item, snapshot.today) === statusId).length,
   ])) as Record<TodoStatus, number>;
   const visibleItems = snapshot.items.filter((item) => {
-    const statusMatches = status === "all" || statusOf(item, snapshot.today) === status;
+    const statusMatches = status === "all" ? !isAgedDone(item, now) : statusOf(item, snapshot.today) === status;
     return statusMatches && (labelIds.length === 0 || labelIds.includes(item.labelId));
   });
   const title = labelIds.length > 0 ? "필터링된 할 일" : statusMeta[status].title;
