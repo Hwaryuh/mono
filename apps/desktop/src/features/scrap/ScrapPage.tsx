@@ -9,6 +9,7 @@ import { httpGetBlob } from "../../infrastructure/http/http-client";
 import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
 import { newMediaId } from "../../infrastructure/media/media-store";
 import type { ScrapRepository } from "./scrap-repository";
+import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type SortKey } from "./scrap-sort";
 
 export const scrapQueryKey = ["scrap"] as const;
 
@@ -43,6 +44,7 @@ function formatFileSize(bytes: number) {
 
 export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repository: ScrapRepository; urlOpener?: ExternalUrlOpener }) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>(loadSortKey);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentBusyId, setCommentBusyId] = useState<string | null>(null);
@@ -138,8 +140,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
   const snapshot = snapshotQuery.data;
   const detail = snapshot.items.find((item) => item.id === detailId) ?? null;
-  const visibleItems = activeTag ? snapshot.items.filter((item) => item.tag === activeTag) : snapshot.items;
+  const visibleItems = sortItems(activeTag ? snapshot.items.filter((item) => item.tag === activeTag) : snapshot.items, sortKey);
   const createOpen = searchParams.get("modal") === "new";
+
+  function changeSort(next: string) {
+    setSortKey(next as SortKey);
+    try { localStorage.setItem(sortStorageKey, next); } catch { /* 저장 실패는 무시 — 세션 내에서는 유지된다 */ }
+  }
 
   function openCreate() {
     handledModalRef.current = true;
@@ -311,18 +318,31 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
   return (
     <div className="scrap-page">
-      <div aria-label="스크랩 라벨 필터" className="scrap-tags" role="toolbar">
-        {snapshot.tags.map((tag, index) => (
-          <button
-            aria-pressed={activeTag === tag}
-            className={activeTag === tag ? "scrap-tag scrap-tag--active" : "scrap-tag"}
-            key={tag}
-            onClick={() => setActiveTag((current) => current === tag ? null : tag)}
-            onKeyDown={(event) => onTagKeyDown(event, index)}
-            ref={(element) => { tagRefs.current[index] = element; }}
-            type="button"
-          >{tag}</button>
-        ))}
+      <div className="scrap-toolbar">
+        <div aria-label="스크랩 라벨 필터" className="scrap-tags" role="toolbar">
+          {snapshot.tags.map((tag, index) => (
+            <button
+              aria-pressed={activeTag === tag}
+              className={activeTag === tag ? "scrap-tag scrap-tag--active" : "scrap-tag"}
+              key={tag}
+              onClick={() => setActiveTag((current) => current === tag ? null : tag)}
+              onKeyDown={(event) => onTagKeyDown(event, index)}
+              ref={(element) => { tagRefs.current[index] = element; }}
+              type="button"
+            >{tag}</button>
+          ))}
+        </div>
+        {snapshot.items.length > 0 && (
+          <div className="scrap-sort">
+            <Select
+              align="end"
+              label="스크랩 정렬"
+              onChange={changeSort}
+              options={sortKeys.map((key) => ({ value: key, label: sortLabels[key] }))}
+              value={sortKey}
+            />
+          </div>
+        )}
       </div>
 
       {snapshot.items.length === 0 ? <ScrapEmpty onCreate={openCreate} /> : visibleItems.length === 0 ? <ScrapFilterEmpty onReset={() => setActiveTag(null)} /> : (
