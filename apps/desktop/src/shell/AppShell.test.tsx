@@ -176,6 +176,20 @@ describe("AppShell", () => {
     await waitFor(() => expect(localStorage.getItem("mono:sidebar-width")).toBe("216"));
   });
 
+  it("최소 폭에서 더 줄이면 사이드바가 접힌다", () => {
+    localStorage.clear();
+    const { container } = renderShell();
+    const shell = container.querySelector(".app-shell")!;
+    const handle = screen.getByRole("separator", { name: "사이드바 폭 조절" });
+
+    for (let step = 0; step < 7; step += 1) fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(shell).not.toHaveClass("app-shell--collapsed");
+
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(shell).toHaveClass("app-shell--collapsed");
+    expect(screen.getByRole("button", { name: "사이드바 확장" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("좌측 설정 아이콘을 닫기 아이콘으로 morph하고 설정 패널을 제어한다", async () => {
     const { container } = renderShell();
     const settingsButton = screen.getByRole("button", { name: "설정 열기" });

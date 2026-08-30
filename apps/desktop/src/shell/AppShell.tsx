@@ -38,6 +38,8 @@ type NavigationItem = {
 const MIN_SIDEBAR_WIDTH = 168;
 const MAX_SIDEBAR_WIDTH = 224;
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
+// 최소 폭에서 이만큼 더 끌어당기면 완전히 접힌다.
+const SIDEBAR_COLLAPSE_AT = MIN_SIDEBAR_WIDTH - 44;
 
 function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
@@ -230,6 +232,11 @@ export function AppShell({
     return () => clearTimeout(timeout);
   }, [sidebarWidth]);
 
+  function collapseSidebar() {
+    setSettingsOpen(false);
+    setCollapsed(true);
+  }
+
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
     if (collapsed) return;
     event.preventDefault();
@@ -237,15 +244,24 @@ export function AppShell({
     const originLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
     handle.setPointerCapture(event.pointerId);
     setResizingSidebar(true);
-    const onMove = (move: PointerEvent) => setSidebarWidth(clampSidebarWidth(move.clientX - originLeft));
-    const onUp = (up: PointerEvent) => {
-      handle.releasePointerCapture(up.pointerId);
+    const endDrag = () => {
       handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointerup", endDrag);
+      try { handle.releasePointerCapture(event.pointerId); } catch { /* 이미 해제됨 */ }
       setResizingSidebar(false);
     };
+    const onMove = (move: PointerEvent) => {
+      const width = move.clientX - originLeft;
+      if (width < SIDEBAR_COLLAPSE_AT) {
+        endDrag();
+        setSidebarWidth(MIN_SIDEBAR_WIDTH);
+        collapseSidebar();
+        return;
+      }
+      setSidebarWidth(clampSidebarWidth(width));
+    };
     handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointerup", endDrag);
   }
 
   return (
@@ -325,7 +341,8 @@ export function AppShell({
             className="sidebar__resize"
             onDoubleClick={() => setSidebarWidth(MAX_SIDEBAR_WIDTH)}
             onKeyDown={(event) => {
-              if (event.key === "ArrowLeft") setSidebarWidth((width) => clampSidebarWidth(width - 8));
+              if (event.key === "ArrowLeft" && sidebarWidth <= MIN_SIDEBAR_WIDTH) collapseSidebar();
+              else if (event.key === "ArrowLeft") setSidebarWidth((width) => clampSidebarWidth(width - 8));
               else if (event.key === "ArrowRight") setSidebarWidth((width) => clampSidebarWidth(width + 8));
               else return;
               event.preventDefault();

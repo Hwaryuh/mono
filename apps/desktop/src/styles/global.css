@@ -382,6 +382,7 @@ li {
 
 @media (prefers-reduced-motion: reduce) {
   .settings-server__remote { animation: none; }
+  .app-shell { transition: none; }
 }
 
 .workspace {
