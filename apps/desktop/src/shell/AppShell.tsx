@@ -48,9 +48,10 @@ function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
 }
 
-// 드래그 중 라벨 불투명도 — 좁아질수록 페이드 아웃되어 아이콘만 남는다.
-function sidebarLabelOpacity(width: number): number {
-  return Math.max(0, Math.min(1, (width - SIDEBAR_LABEL_GONE_AT) / (MIN_SIDEBAR_WIDTH - SIDEBAR_LABEL_GONE_AT)));
+// 펼침(0) ↔ 접힘(1) 진행도. 드래그 폭이 좁을수록 1에 가까워지고, CSS가 이 값 하나로
+// 라벨 투명도·너비·아이콘 위치를 보간한다.
+function sidebarCollapseProgress(width: number): number {
+  return Math.max(0, Math.min(1, (MIN_SIDEBAR_WIDTH - width) / (MIN_SIDEBAR_WIDTH - SIDEBAR_LABEL_GONE_AT)));
 }
 
 function readSidebarWidth(): number {
@@ -282,36 +283,33 @@ export function AppShell({
       className={`app-shell ${showCollapsed ? "app-shell--collapsed" : ""} ${draggingSidebar ? "app-shell--resizing" : ""}`}
       style={{
         "--sidebar-width": `${dragWidth ?? sidebarWidth}px`,
-        "--sidebar-fade": dragWidth === null ? 1 : sidebarLabelOpacity(dragWidth),
+        "--sidebar-collapse": dragWidth === null ? (collapsed ? 1 : 0) : sidebarCollapseProgress(dragWidth),
       } as CSSProperties}
     >
       <aside className="sidebar" ref={sidebarRef}>
         <div className="sidebar__brand">
-          {!showCollapsed && (
-            <div className="sidebar__brand-copy">
-              <strong>mono</strong>
-              <span>{formatDate(today, "short")}</span>
-            </div>
-          )}
+          <div className="sidebar__brand-copy">
+            <strong>mono</strong>
+            <span>{formatDate(today, "short")}</span>
+          </div>
         </div>
 
         <nav className="sidebar__nav" aria-label={t("app.navigation.primary")}>
           {navigationGroups.map((group, groupIndex) => (
             <div className="sidebar__group" key={group.label ?? groupIndex}>
-              {group.label && !showCollapsed && (
+              {group.label && (
                 <div className="sidebar__group-title"><span>{group.label}</span><span>{group.items.length}</span></div>
               )}
               {group.items.map((item) => (
                 <NavLink
-                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""}`}
+                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""} ${item.nested ? "sidebar__link--nested" : ""}`}
                   key={item.to}
                   title={showCollapsed ? item.label : undefined}
                   to={item.to}
-                  style={{ paddingLeft: !showCollapsed && item.nested ? 26 : undefined }}
                 >
                   <Icon name={item.icon} size={15} strokeWidth={1.5} />
-                  {!showCollapsed && <span className="sidebar__link-label">{item.label}</span>}
-                  {!showCollapsed && item.badge && item.badge !== "0" && <span className={`sidebar__badge ${item.to === "/inbox" ? "sidebar__badge--hot" : ""}`}>{item.badge}</span>}
+                  <span className="sidebar__link-label">{item.label}</span>
+                  {item.badge && item.badge !== "0" && <span className={`sidebar__badge ${item.to === "/inbox" ? "sidebar__badge--hot" : ""}`}>{item.badge}</span>}
                 </NavLink>
               ))}
             </div>
@@ -319,19 +317,19 @@ export function AppShell({
         </nav>
 
         <div className="sidebar__footer">
-          {!showCollapsed && (
-            <button
-              aria-expanded={settingsOpen}
-              aria-label={settingsOpen ? t("settings.close") : t("settings.open")}
-              className="sidebar__settings-trigger"
-              id="sidebar-settings-trigger"
-              onClick={() => setSettingsOpen((value) => !value)}
-              title={`${settingsOpen ? t("settings.close") : t("settings.title")} (${shortcutModifier},)`}
-              type="button"
-            >
-              <MorphingIcon name={settingsOpen ? "close" : "settings"} size={15} />
-            </button>
-          )}
+          <button
+            aria-expanded={settingsOpen}
+            aria-hidden={showCollapsed || undefined}
+            aria-label={settingsOpen ? t("settings.close") : t("settings.open")}
+            className="sidebar__settings-trigger"
+            id="sidebar-settings-trigger"
+            onClick={() => setSettingsOpen((value) => !value)}
+            tabIndex={showCollapsed ? -1 : undefined}
+            title={`${settingsOpen ? t("settings.close") : t("settings.title")} (${shortcutModifier},)`}
+            type="button"
+          >
+            <MorphingIcon name={settingsOpen ? "close" : "settings"} size={15} />
+          </button>
           <button
             aria-label={showCollapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
             aria-pressed={showCollapsed}

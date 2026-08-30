@@ -97,21 +97,14 @@ li {
   user-select: none;
 }
 
-/* 드래그로 좁히는 동안 내부는 펼친 레이아웃(168px = MIN_SIDEBAR_WIDTH)을 유지하고
-   사이드바 가장자리가 그 위를 덮으며 잘라낸다 — 글자가 찌그러지지 않는다. */
-.app-shell--resizing .sidebar__brand,
-.app-shell--resizing .sidebar__nav,
-.app-shell--resizing .sidebar__footer {
-  min-width: 168px;
-}
-
-/* 좁아질수록 라벨·배지·그룹 제목이 페이드 아웃되어 "사이드바 접기"처럼 아이콘만 남는다. */
+/* 드래그 중에는 접힘 보간이 포인터를 프레임 단위로 따라가야 하므로 트랜지션을 끈다.
+   버튼으로 접거나 펼칠 때만 위 160ms 트랜지션이 살아난다. */
 .app-shell--resizing .sidebar__brand-copy,
 .app-shell--resizing .sidebar__group-title,
 .app-shell--resizing .sidebar__link-label,
 .app-shell--resizing .sidebar__badge,
 .app-shell--resizing .sidebar__settings-trigger {
-  opacity: var(--sidebar-fade, 1);
+  transition: none;
 }
 
 .sidebar {
@@ -156,15 +149,20 @@ li {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow: hidden;
+  opacity: calc(1 - var(--sidebar-collapse, 0));
+  transition: opacity 160ms ease;
 }
 
 .sidebar__brand-copy strong {
   font-size: 12.5px;
+  white-space: nowrap;
 }
 
 .sidebar__brand-copy span {
   color: var(--color-text-faint);
   font-size: 10px;
+  white-space: nowrap;
 }
 
 .sidebar__nav {
@@ -184,14 +182,19 @@ li {
 }
 
 .sidebar__group-title {
-  padding: 9px 9px 4px;
+  max-height: calc((1 - var(--sidebar-collapse, 0)) * 28px);
+  padding: calc(9px * (1 - var(--sidebar-collapse, 0))) 9px calc(4px * (1 - var(--sidebar-collapse, 0)));
   display: flex;
   justify-content: space-between;
+  overflow: hidden;
   color: var(--color-text-faint);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  white-space: nowrap;
+  opacity: calc(1 - var(--sidebar-collapse, 0));
+  transition: opacity 160ms ease, max-height 160ms ease;
 }
 
 .sidebar__link {
@@ -201,7 +204,7 @@ li {
   padding: 0 9px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: calc(9px * (1 - var(--sidebar-collapse, 0)));
   border-radius: var(--radius-control);
   color: var(--color-text-muted);
   font-size: 12px;
@@ -218,20 +221,24 @@ li {
   font-weight: 700;
 }
 
-.app-shell--collapsed .sidebar__link {
-  justify-content: center;
-  padding: 0;
+/* 아이콘 왼쪽 들여쓰기: 펼침 26px → 접힘 9px(다른 아이콘과 정렬). */
+.sidebar__link--nested {
+  padding-left: calc(9px + 17px * (1 - var(--sidebar-collapse, 0)));
 }
 
 .sidebar__link-label {
   min-width: 0;
+  max-width: calc((1 - var(--sidebar-collapse, 0)) * 220px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: calc(1 - var(--sidebar-collapse, 0));
+  transition: opacity 160ms ease, max-width 160ms ease;
 }
 
 .sidebar__badge {
-  min-width: 17px;
+  min-width: calc((1 - var(--sidebar-collapse, 0)) * 17px);
+  max-width: calc((1 - var(--sidebar-collapse, 0)) * 60px);
   margin-left: auto;
   padding: 1px 5px;
   border: 1px solid var(--color-border);
@@ -240,6 +247,9 @@ li {
   color: var(--color-text-muted);
   font-size: 9.5px;
   text-align: center;
+  overflow: hidden;
+  opacity: calc(1 - var(--sidebar-collapse, 0));
+  transition: opacity 160ms ease, max-width 160ms ease, min-width 160ms ease;
 }
 
 .sidebar__badge--hot {
@@ -269,7 +279,7 @@ li {
   background: transparent;
   color: var(--color-text-faint);
   cursor: pointer;
-  transition-property: scale, background-color, color;
+  transition-property: scale, background-color, color, opacity, max-width;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
@@ -282,9 +292,15 @@ li {
 
 .sidebar__settings-trigger:active,
 .sidebar__collapse:active { scale: 0.96; }
+
+/* 좁아질수록 설정 아이콘이 폭·투명도를 반납하고, 접기 버튼은 margin-left:auto 로
+   footer 가 줄어드는 만큼 자연히 가운데(접힌 위치)로 미끄러진다. */
+.sidebar__settings-trigger {
+  max-width: calc((1 - var(--sidebar-collapse, 0)) * 40px);
+  overflow: hidden;
+  opacity: calc(1 - var(--sidebar-collapse, 0));
+}
 .sidebar__collapse { margin-left: auto; }
-.app-shell--collapsed .sidebar__footer { justify-content: center; }
-.app-shell--collapsed .sidebar__collapse { margin-left: 0; }
 
 .settings-modal {
   width: clamp(680px, 60vw, 1200px);
@@ -399,7 +415,12 @@ li {
 
 @media (prefers-reduced-motion: reduce) {
   .settings-server__remote { animation: none; }
-  .app-shell { transition: none; }
+  .app-shell,
+  .app-shell .sidebar__brand-copy,
+  .app-shell .sidebar__group-title,
+  .app-shell .sidebar__link-label,
+  .app-shell .sidebar__badge,
+  .app-shell .sidebar__settings-trigger { transition: none; }
 }
 
 .workspace {
