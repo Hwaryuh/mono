@@ -12,7 +12,6 @@ release/
 .idea/
 .vscode/
 
-# 내부 작업 문서·디자인 소스·AI 툴링 — 레포에 넣지 않는다.
 /.refs/
 /.designs/
 /.cursor/
@@ -20,12 +19,9 @@ release/
 /AGENTS.md
 /CLAUDE.md
 apps/desktop/src-tauri/gen/
-# 모바일 아이콘은 iOS/Android 착수 시 `tauri icon`으로 재생성. 지금은 데스크톱만.
 apps/desktop/src-tauri/icons/android/
 apps/desktop/src-tauri/icons/ios/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-
-# 비밀 정보 복호화 마스터 키(architecture-decisions.md §5). 절대 커밋하지 않는다.
 *.secret.key
