@@ -308,15 +308,15 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
       >
         <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
           <label><span>제목 <b>필수</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
-          <fieldset>
-            <legend className="todo-editor__label-legend"><span>라벨</span><button onClick={openLabelManager} type="button">관리</button></legend>
+          <div className="todo-editor__field">
+            <div className="todo-editor__label-legend"><span>라벨</span><button onClick={openLabelManager} type="button">관리</button></div>
             <Select
               label="라벨"
               onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))}
               options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))}
               value={draft.labelId}
             />
-          </fieldset>
+          </div>
           <div className="todo-editor__due">
             <fieldset><legend>마감일</legend><DatePicker label="마감일" onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
             <label><span>시간</span><TimePicker disabled={!draft.dueDate} label="마감 시간" onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>

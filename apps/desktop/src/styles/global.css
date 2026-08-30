@@ -1679,7 +1679,15 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 .todo-editor label > span b { color: var(--color-accent); font-size: 9px; }
 .todo-editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .todo-editor legend { margin-bottom: 6px; }
-.todo-editor__label-legend { width: 100%; display: flex; align-items: center; }
+.todo-editor__field { min-width: 0; }
+.todo-editor__label-legend {
+  width: 100%;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-faint);
+  font-size: 10.5px;
+}
 .todo-editor__label-legend > button {
   appearance: none;
   min-height: 24px;
@@ -1697,7 +1705,7 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 }
 .todo-editor__label-legend > button:hover { background: var(--color-hover); color: var(--color-text-muted); }
 .todo-editor__label-legend > button:active { scale: 0.96; }
-.todo-editor fieldset > .ui-select { width: 100%; }
+.todo-editor__field > .ui-select { width: 100%; }
 .todo-editor__due { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }
 .todo-editor__delete { margin-right: auto; color: var(--color-danger); }
 .todo-mutation-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }

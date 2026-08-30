@@ -48,6 +48,7 @@ describe("TodoPage", () => {
   it("공통 Modal에서 새 할 일을 생성하고 기존 할 일을 수정한다", async () => {
     renderTodo(createMockTodoRepository(), "/todo?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 할 일" });
+    expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
     fireEvent.change(within(modal).getByRole("textbox", { name: /제목/ }), { target: { value: "분기 보고서 제출" } });
     fireEvent.click(within(modal).getByRole("combobox", { name: "라벨" }));
     fireEvent.click(screen.getByRole("option", { name: "업무" }));
