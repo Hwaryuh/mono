@@ -1,12 +1,13 @@
 {
   "name": "mono-platform",
   "private": true,
-  "version": "0.1.99",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
+    "version:set": "node scripts/version.mjs set",
+    "version:check": "node scripts/version.mjs check",
     "branding:sync": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-windows-branding.ps1",
     "build": "npm run build --workspace @mono/desktop",
     "test": "npm run test --workspaces --if-present",

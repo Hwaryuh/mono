@@ -1,12 +1,17 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import pkg from "./package.json";
+
+const workspaceManifest = readFileSync(new URL("../../Cargo.toml", import.meta.url), "utf8");
+const workspacePackage = /\[workspace\.package\]([\s\S]*?)(?=\n\[|$)/.exec(workspaceManifest)?.[1];
+const appVersion = /^\s*version\s*=\s*"([^"]+)"/m.exec(workspacePackage ?? "")?.[1];
+if (!appVersion) throw new Error("Cargo.toml [workspace.package].version을 찾지 못했습니다.");
 
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  // 앱 버전을 한 곳(package.json)에서 주입한다. 서버 /version과 비교해 드리프트를 경고한다.
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  // 앱·서버가 공유하는 Cargo workspace 버전을 주입해 원격 서버 드리프트를 경고한다.
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   server: {
     port: 4173,
     strictPort: true,

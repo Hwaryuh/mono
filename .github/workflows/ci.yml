@@ -30,6 +30,7 @@ jobs:
       - run: npm run build
 
       - uses: dtolnay/rust-toolchain@stable
+      - run: npm run version:check
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
@@ -47,6 +48,7 @@ jobs:
   # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: check
     permissions:
       contents: read
     strategy:
@@ -192,3 +194,52 @@ jobs:
             echo "Windows setup exe·macOS DMG·macOS .app.tar.gz·latest.json 각 1개를 기대했다." >&2
             exit 1
           fi
+
+  deploy-release-server:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify-release-assets
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-server.yml
+    secrets: inherit
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: deploy-release-server
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  prune-old-releases:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Keep latest five published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t stale_tags < <(
+            gh release list \
+              --repo "$GITHUB_REPOSITORY" \
+              --limit 100 \
+              --exclude-drafts \
+              --exclude-pre-releases \
+              --json tagName,publishedAt \
+              --jq 'sort_by(.publishedAt) | reverse | .[5:] | .[].tagName'
+          )
+
+          for tag in "${stale_tags[@]}"; do
+            [[ -n "$tag" ]] || continue
+            echo "Deleting old release $tag; Git tag remains."
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
+          done

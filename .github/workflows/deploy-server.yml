@@ -3,6 +3,7 @@ name: Deploy server
 run-name: Deploy server ${{ github.sha }}
 
 on:
+  workflow_call:
   workflow_dispatch:
 
 permissions: {}
@@ -19,15 +20,16 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Require main
-        if: github.ref != 'refs/heads/main'
+      - name: Require eligible deployment ref
+        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') || (github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')) }}
         run: |
-          echo "Only main can be deployed. Selected ref: $GITHUB_REF" >&2
+          echo "Manual deploys require main; release deploys require a v* tag. Selected ref: $GITHUB_REF" >&2
           exit 1
 
       - uses: actions/checkout@v5
 
       - name: Require successful CI for this commit
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -60,6 +62,10 @@ jobs:
           install -m 0644 deploy/systemd/mono-api-backup.service dist/systemd/mono-api-backup.service
           install -m 0644 deploy/systemd/mono-api-backup.timer dist/systemd/mono-api-backup.timer
           sha256sum dist/mono-api > dist/mono-api.sha256
+          cargo metadata --locked --no-deps --format-version 1 \
+            | jq -er '.packages[] | select(.name == "mono-api") | .version' \
+            > dist/VERSION
+          test -s dist/VERSION
 
       - name: Retain deployment artifact
         uses: actions/upload-artifact@v4
@@ -144,3 +150,15 @@ jobs:
           scp dist/systemd/mono-api-backup.service mono-server-deploy:"$remote_dir/systemd/mono-api-backup.service"
           scp dist/systemd/mono-api-backup.timer mono-server-deploy:"$remote_dir/systemd/mono-api-backup.timer"
           ssh mono-server-deploy sudo /usr/local/sbin/deploy-mono-api "$release_id" "$binary_sha"
+
+          expected_version="$(<dist/VERSION)"
+          deployed_version="$(
+            ssh mono-server-deploy \
+              'curl --silent --show-error --fail --max-time 5 "http://$(tailscale ip -4):4174/version"' \
+              | jq -er '.version'
+          )"
+          if [[ "$deployed_version" != "$expected_version" ]]; then
+            echo "Server version mismatch after deploy: expected $expected_version, got $deployed_version" >&2
+            exit 1
+          fi
+          echo "Server $deployed_version deployed and verified."
