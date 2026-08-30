@@ -1,10 +1,14 @@
 name: Deploy server
 
-run-name: Deploy server ${{ github.sha }}
+run-name: Deploy server ${{ inputs.release_sha || github.sha }}
 
 on:
-  workflow_call:
   workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 릴리즈 태그가 가리키는 main 커밋 SHA
+        required: false
+        type: string
 
 permissions: {}
 
@@ -20,16 +24,25 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Require eligible deployment ref
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') || (github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')) }}
+      - name: Require main
+        if: github.ref != 'refs/heads/main'
         run: |
-          echo "Manual deploys require main; release deploys require a v* tag. Selected ref: $GITHUB_REF" >&2
+          echo "Server deploys require main. Selected ref: $GITHUB_REF" >&2
           exit 1
+
+      - name: Require requested release SHA
+        if: inputs.release_sha != ''
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          if [[ "$GITHUB_SHA" != "$RELEASE_SHA" ]]; then
+            echo "main moved: release requires $RELEASE_SHA, deployment resolved to $GITHUB_SHA." >&2
+            exit 1
+          fi
 
       - uses: actions/checkout@v5
 
       - name: Require successful CI for this commit
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

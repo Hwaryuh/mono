@@ -198,12 +198,54 @@ jobs:
   deploy-release-server:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: verify-release-assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
     permissions:
-      actions: read
+      actions: write
       contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-server.yml
-    secrets: inherit
+    steps:
+      # Tailscale OIDC는 main ref만 신뢰한다. 태그가 가리키는 SHA와 main이 같을 때만
+      # main 배포를 요청하고, 그 실행이 성공해야 릴리즈 공개를 허용한다.
+      - name: Deploy same SHA from trusted main ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_sha="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
+            echo "Release tag $GITHUB_REF_NAME points to $GITHUB_SHA, but main is $main_sha." >&2
+            exit 1
+          fi
+
+          requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          run_name="Deploy server $GITHUB_SHA"
+          gh workflow run deploy-server.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f release_sha="$GITHUB_SHA"
+
+          run_id=""
+          for attempt in {1..60}; do
+            run_id="$(
+              gh run list \
+                --repo "$GITHUB_REPOSITORY" \
+                --workflow deploy-server.yml \
+                --event workflow_dispatch \
+                --branch main \
+                --limit 20 \
+                --json databaseId,headSha,displayTitle,createdAt \
+                --jq ".[] | select(.headSha == \"$GITHUB_SHA\" and .displayTitle == \"$run_name\" and .createdAt >= \"$requested_at\") | .databaseId" \
+                | head -n 1
+            )"
+            [[ -n "$run_id" ]] && break
+            sleep 2
+          done
+          if [[ -z "$run_id" ]]; then
+            echo "Dispatched server deployment run was not found." >&2
+            exit 1
+          fi
+
+          echo "Waiting for server deployment run $run_id."
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status --interval 10
 
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
