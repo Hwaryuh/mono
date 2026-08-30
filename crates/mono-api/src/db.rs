@@ -1,11 +1,23 @@
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use rusqlite::Connection;
 
 // 단일 사용자 로컬 앱: 커넥션 하나를 Mutex로 감싼다.
 // ponytail: 풀 대신 전역 락. 처리량이 문제되면 r2d2_sqlite로 승격.
 pub type Db = Arc<Mutex<Connection>>;
+
+pub trait DbExt {
+    /// 커넥션 가드. poison된 락도 복구한다 — 한 핸들러의 panic이 이후 모든 요청을
+    /// 벽돌로 만들지 않도록(`.lock().unwrap()`이면 poison 후 전부 panic).
+    fn conn(&self) -> MutexGuard<'_, Connection>;
+}
+
+impl DbExt for Db {
+    fn conn(&self) -> MutexGuard<'_, Connection> {
+        self.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
 
 // apps/api/src/db/client.ts 의 DDL 을 그대로 옮긴다(idempotent — 매 실행 안전).
 const DDL: &str = r#"

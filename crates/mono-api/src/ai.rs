@@ -6,6 +6,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::db::DbExt;
 use super::error::{ApiError, ApiResult};
 use super::secret::{self, SecretState};
 
@@ -421,7 +422,7 @@ async fn test_handler(
     Path(provider): Path<String>,
 ) -> ApiResult<Json<Value>> {
     let key = {
-        let conn = state.db.lock().unwrap();
+        let conn = state.db.conn();
         // 알 수 없는 provider면 여기서 BadRequest.
         secret::get_api_key(&conn, &state.crypto, &provider)?
     };

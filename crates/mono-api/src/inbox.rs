@@ -3,11 +3,12 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::db::Db;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::ledger::{self, LedgerWriteInput};
+use super::common::*;
 
 // ---------- DTO (packages/contracts/src/index.ts inbox* 스키마) ----------
 
@@ -151,14 +152,6 @@ fn all_times(s: &str) -> Vec<String> {
 }
 
 // ---------- 저장소 로직 (apps/api/src/repositories/inbox-repository.ts 1:1) ----------
-
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
-}
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
 
 struct InboxRow {
     source: String,
@@ -462,16 +455,12 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
 async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<InboxSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap())?))
+    Ok(Json(get_snapshot(&db.conn())?))
 }
 
 async fn approve_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    approve_item(&db.lock().unwrap(), &id)?;
+    approve_item(&db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -479,7 +468,7 @@ async fn approve_high_confidence_handler(
     State(db): State<Db>,
     Json(input): Json<ApproveHighConfidenceInput>,
 ) -> ApiResult<Json<Value>> {
-    approve_high_confidence(&db.lock().unwrap(), input.minimum)?;
+    approve_high_confidence(&db.conn(), input.minimum)?;
     Ok(ok())
 }
 
@@ -488,12 +477,12 @@ async fn update_handler(
     Path(id): Path<String>,
     Json(input): Json<InboxUpdateInput>,
 ) -> ApiResult<Json<Value>> {
-    update(&db.lock().unwrap(), &id, input)?;
+    update(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
 async fn discard_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    discard(&db.lock().unwrap(), &id)?;
+    discard(&db.conn(), &id)?;
     Ok(ok())
 }
 

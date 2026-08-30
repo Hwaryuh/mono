@@ -1,13 +1,13 @@
 use axum::extract::{Path, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use chrono::SecondsFormat;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::db::Db;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::common::*;
 
 // apps/api/src/db/schema.ts SCRAP_OTHER_TAG
 const OTHER_TAG: &str = "기타";
@@ -144,10 +144,6 @@ fn validated_comment(raw: &str) -> ApiResult<String> {
 }
 
 // ---------- 저장소 로직 (apps/api/src/repositories/scrap-repository.ts 1:1) ----------
-
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
-}
 
 fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
     let tags: Vec<String> = conn
@@ -389,23 +385,15 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<ScrapSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap())?))
+    Ok(Json(get_snapshot(&db.conn())?))
 }
 
 async fn create_scrap_handler(
     State(db): State<Db>,
     Json(input): Json<ScrapWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_scrap(&mut db.lock().unwrap(), input)?;
+    create_scrap(&mut db.conn(), input)?;
     Ok(created())
 }
 
@@ -414,12 +402,12 @@ async fn update_scrap_handler(
     Path(id): Path<String>,
     Json(input): Json<ScrapWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_scrap(&mut db.lock().unwrap(), &id, input)?;
+    update_scrap(&mut db.conn(), &id, input)?;
     Ok(ok())
 }
 
 async fn delete_scrap_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    delete_scrap(&mut db.lock().unwrap(), &id)?;
+    delete_scrap(&mut db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -427,7 +415,7 @@ async fn add_tag_handler(
     State(db): State<Db>,
     Json(input): Json<AddTagInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    add_tag(&db.lock().unwrap(), &input.tag)?;
+    add_tag(&db.conn(), &input.tag)?;
     Ok(created())
 }
 
@@ -436,7 +424,7 @@ async fn rename_tag_handler(
     Path(tag): Path<String>,
     Json(input): Json<RenameTagInput>,
 ) -> ApiResult<Json<Value>> {
-    rename_tag(&mut db.lock().unwrap(), &tag, &input.next_tag)?;
+    rename_tag(&mut db.conn(), &tag, &input.next_tag)?;
     Ok(ok())
 }
 
@@ -445,7 +433,7 @@ async fn delete_tag_handler(
     Path(tag): Path<String>,
     Json(input): Json<DeleteTagInput>,
 ) -> ApiResult<Json<Value>> {
-    delete_tag(&mut db.lock().unwrap(), &tag, &input.replacement_tag)?;
+    delete_tag(&mut db.conn(), &tag, &input.replacement_tag)?;
     Ok(ok())
 }
 
@@ -454,7 +442,7 @@ async fn add_comment_handler(
     Path(id): Path<String>,
     Json(input): Json<CommentInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    add_comment(&db.lock().unwrap(), &id, &input.text)?;
+    add_comment(&db.conn(), &id, &input.text)?;
     Ok(created())
 }
 
@@ -463,7 +451,7 @@ async fn update_comment_handler(
     Path((id, comment_id)): Path<(String, String)>,
     Json(input): Json<CommentInput>,
 ) -> ApiResult<Json<Value>> {
-    update_comment(&db.lock().unwrap(), &id, &comment_id, &input.text)?;
+    update_comment(&db.conn(), &id, &comment_id, &input.text)?;
     Ok(ok())
 }
 
@@ -471,7 +459,7 @@ async fn delete_comment_handler(
     State(db): State<Db>,
     Path((id, comment_id)): Path<(String, String)>,
 ) -> ApiResult<Json<Value>> {
-    delete_comment(&db.lock().unwrap(), &id, &comment_id)?;
+    delete_comment(&db.conn(), &id, &comment_id)?;
     Ok(ok())
 }
 

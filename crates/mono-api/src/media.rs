@@ -10,6 +10,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use super::db::DbExt;
 use super::error::{ApiError, ApiResult};
 use super::secret::{get_r2_config, R2Config, SecretState};
 
@@ -395,7 +396,7 @@ pub(super) fn routes(state: SecretState) -> Router {
 
 fn client_from(state: &SecretState) -> ApiResult<R2Client> {
     let config = {
-        let conn = state.db.lock().unwrap();
+        let conn = state.db.conn();
         get_r2_config(&conn, &state.crypto)?
     };
     config
@@ -467,7 +468,7 @@ async fn delete_handler(
 
 async fn orphan_stats_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> {
     let referenced = {
-        let conn = state.db.lock().unwrap();
+        let conn = state.db.conn();
         referenced_media_ids(&conn)?
     };
     let objects = client_from(&state)?.list_all().await?;
@@ -485,7 +486,7 @@ async fn credentials_test_handler(State(state): State<SecretState>) -> ApiResult
 
 async fn gc_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> {
     let referenced = {
-        let conn = state.db.lock().unwrap();
+        let conn = state.db.conn();
         referenced_media_ids(&conn)?
     };
     let client = client_from(&state)?;

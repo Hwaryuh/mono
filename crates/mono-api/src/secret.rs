@@ -10,8 +10,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use super::db::Db;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::common::*;
 
 // apps/api/src/security/secret-crypto.ts + repositories/secret-store.ts 이식.
 // 비밀은 DB엔 암호문만, 마스터 키는 별도 파일(mono.secret.key)로 분리한다(§5).
@@ -54,7 +55,7 @@ impl SecretCrypto {
         }
         let mut key = [0u8; 32];
         getrandom::getrandom(&mut key)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "난수 생성 실패"))?;
+            .map_err(|_| std::io::Error::other("난수 생성 실패"))?;
         std::fs::write(path, encode_hex(&key))?;
         #[cfg(unix)]
         {
@@ -297,19 +298,11 @@ pub(super) fn routes(state: SecretState) -> Router {
         .with_state(state)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn ai_key_get(
     State(st): State<SecretState>,
     AxumPath(provider): AxumPath<String>,
 ) -> ApiResult<Json<Value>> {
-    let has = has_api_key(&st.db.lock().unwrap(), &provider)?;
+    let has = has_api_key(&st.db.conn(), &provider)?;
     Ok(Json(json!({ "hasKey": has })))
 }
 
@@ -318,7 +311,7 @@ async fn ai_key_set(
     AxumPath(provider): AxumPath<String>,
     Json(input): Json<ApiKeyInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    set_api_key(&st.db.lock().unwrap(), &st.crypto, &provider, &input.api_key)?;
+    set_api_key(&st.db.conn(), &st.crypto, &provider, &input.api_key)?;
     Ok(created())
 }
 
@@ -326,12 +319,12 @@ async fn ai_key_delete(
     State(st): State<SecretState>,
     AxumPath(provider): AxumPath<String>,
 ) -> ApiResult<Json<Value>> {
-    delete_api_key(&st.db.lock().unwrap(), &provider)?;
+    delete_api_key(&st.db.conn(), &provider)?;
     Ok(ok())
 }
 
 async fn provider_get(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
-    let provider = get_active_provider(&st.db.lock().unwrap())?;
+    let provider = get_active_provider(&st.db.conn())?;
     Ok(Json(json!({ "provider": provider })))
 }
 
@@ -339,12 +332,12 @@ async fn provider_set(
     State(st): State<SecretState>,
     Json(input): Json<ProviderInput>,
 ) -> ApiResult<Json<Value>> {
-    set_active_provider(&st.db.lock().unwrap(), &input.provider)?;
+    set_active_provider(&st.db.conn(), &input.provider)?;
     Ok(ok())
 }
 
 async fn r2_get(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
-    let has = has_r2(&st.db.lock().unwrap())?;
+    let has = has_r2(&st.db.conn())?;
     Ok(Json(json!({ "hasCredentials": has })))
 }
 
@@ -352,12 +345,12 @@ async fn r2_set(
     State(st): State<SecretState>,
     Json(creds): Json<R2Credentials>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    set_r2(&st.db.lock().unwrap(), &st.crypto, &creds)?;
+    set_r2(&st.db.conn(), &st.crypto, &creds)?;
     Ok(created())
 }
 
 async fn r2_delete(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
-    delete_r2(&st.db.lock().unwrap())?;
+    delete_r2(&st.db.conn())?;
     Ok(ok())
 }
 

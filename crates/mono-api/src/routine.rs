@@ -1,13 +1,14 @@
 use axum::extract::{Path, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use chrono::{Datelike, SecondsFormat};
+use chrono::Datelike;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::db::Db;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::common::*;
 
 // ---------- DTO (packages/contracts/src/index.ts routine* 스키마) ----------
 
@@ -88,14 +89,6 @@ fn validated_days(raw: &[i64]) -> ApiResult<Vec<i64>> {
 
 // ---------- 저장소 로직 (apps/api/src/repositories/routine-repository.ts 1:1) ----------
 
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
-
 fn occurrence_id(routine_id: &str, date: &str) -> String {
     format!("routine-occurrence:{routine_id}:{date}")
 }
@@ -147,7 +140,7 @@ fn require_routine(conn: &Connection, id: &str) -> ApiResult<RoutineRow> {
     conn.query_row(
         &format!("SELECT {ROUTINE_COLUMNS} FROM routine_items WHERE id = ?1"),
         [id],
-        |row| row_to_routine(row),
+        row_to_routine,
     )
     .map_err(|_| ApiError::NotFound(format!("루틴을 찾을 수 없습니다: {id}")))
 }
@@ -367,23 +360,15 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<RoutineSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap())?))
+    Ok(Json(get_snapshot(&db.conn())?))
 }
 
 async fn create_handler(
     State(db): State<Db>,
     Json(input): Json<RoutineWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create(&db.lock().unwrap(), input)?;
+    create(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -392,7 +377,7 @@ async fn update_handler(
     Path(id): Path<String>,
     Json(input): Json<RoutineWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update(&db.lock().unwrap(), &id, input)?;
+    update(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
@@ -400,7 +385,7 @@ async fn toggle_today_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    toggle_today(&db.lock().unwrap(), &id)?;
+    toggle_today(&db.conn(), &id)?;
     Ok(ok())
 }
 

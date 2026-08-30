@@ -34,11 +34,14 @@ struct PreviewImage {
     body: Vec<u8>,
 }
 
+// (요청 URL, 캐시된 시각, 이미지 or None=이미지 없음) — LRU는 Vec 순서로 굴린다.
+type CacheEntry = (String, Instant, Option<PreviewImage>);
+
 // ---------- 캐시 (Node의 30분 TTL · 32개 LRU) ----------
 
 #[derive(Clone)]
 pub(super) struct LinkPreviewState {
-    cache: Arc<Mutex<Vec<(String, Instant, Option<PreviewImage>)>>>,
+    cache: Arc<Mutex<Vec<CacheEntry>>>,
 }
 
 pub(super) fn state() -> LinkPreviewState {

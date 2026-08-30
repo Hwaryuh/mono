@@ -1,17 +1,23 @@
 use axum::extract::{Path, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use chrono::SecondsFormat;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::color::normalize_color_to_oklch;
-use super::db::Db;
+use super::category::{self, Categories};
+use super::common::*;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 
-// apps/api/src/db/schema.ts TODO_OTHER_LABEL_ID
-const OTHER_LABEL_ID: &str = "other";
+// todo 라벨은 routine 과 같은 풀을 공유한다. 공통 CRUD 설정.
+const CATS: Categories = Categories {
+    table: "todo_labels",
+    not_found: "라벨을 찾을 수 없습니다",
+    clash: "같은 이름의 라벨이 이미 있습니다.",
+    reorder_invalid: "라벨 순서 목록이 올바르지 않습니다.",
+    reorder_mismatch: "라벨 순서에 현재 라벨이 정확히 한 번씩 포함되어야 합니다.",
+};
 
 // ---------- DTO (packages/contracts/src/index.ts todo* 스키마) ----------
 
@@ -94,32 +100,7 @@ fn validated_note(raw: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-fn validated_label_name(raw: &str) -> ApiResult<String> {
-    let name = raw.trim();
-    if name.is_empty() {
-        return Err(ApiError::validation("라벨 이름을 입력해야 합니다."));
-    }
-    if name.chars().count() > 100 {
-        return Err(ApiError::validation("라벨 이름은 100자 이하여야 합니다."));
-    }
-    Ok(name.to_string())
-}
-
-fn validated_color(raw: &str) -> ApiResult<String> {
-    normalize_color_to_oklch(raw)
-        .ok_or_else(|| ApiError::validation("색상은 OKLCH 또는 6자리 HEX 값이어야 합니다."))
-}
-
 // ---------- 저장소 로직 (apps/api/src/repositories/todo-repository.ts 1:1) ----------
-
-fn now_iso() -> String {
-    // JS new Date().toISOString() 과 동일 형식: 2026-08-27T00:38:50.792Z
-    chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
 
 fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     let labels = conn
@@ -172,18 +153,6 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     Ok(TodoSnapshot { today: today_iso(), labels, items })
 }
 
-fn label_exists(conn: &Connection, id: &str) -> ApiResult<bool> {
-    Ok(conn.query_row("SELECT 1 FROM todo_labels WHERE id = ?1", [id], |_| Ok(())).is_ok())
-}
-
-fn require_label(conn: &Connection, id: &str) -> ApiResult<()> {
-    if label_exists(conn, id)? {
-        Ok(())
-    } else {
-        Err(ApiError::NotFound(format!("라벨을 찾을 수 없습니다: {id}")))
-    }
-}
-
 fn require_item(conn: &Connection, id: &str) -> ApiResult<bool> {
     conn.query_row("SELECT done FROM todo_items WHERE id = ?1", [id], |row| {
         Ok(row.get::<_, i64>(0)? != 0)
@@ -191,83 +160,24 @@ fn require_item(conn: &Connection, id: &str) -> ApiResult<bool> {
     .map_err(|_| ApiError::NotFound(format!("할 일을 찾을 수 없습니다: {id}")))
 }
 
-fn assert_unique_label_name(conn: &Connection, name: &str, except_id: Option<&str>) -> ApiResult<()> {
-    let target = name.to_lowercase();
-    let clash = conn
-        .prepare("SELECT id, name FROM todo_labels")?
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
-        .collect::<rusqlite::Result<Vec<_>>>()?
-        .into_iter()
-        .any(|(id, existing)| Some(id.as_str()) != except_id && existing.to_lowercase() == target);
-    if clash {
-        return Err(ApiError::BadRequest("같은 이름의 라벨이 이미 있습니다.".into()));
-    }
-    Ok(())
-}
-
 fn create_label(conn: &Connection, input: TodoLabelWriteInput) -> ApiResult<()> {
-    let name = validated_label_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_label_name(conn, &name, None)?;
-    // "기타"는 항상 마지막에 남도록 order_index를 그보다 작게.
-    let next_order: i64 = conn.query_row(
-        "SELECT COALESCE(MAX(order_index), -1) FROM todo_labels WHERE id != ?1",
-        [OTHER_LABEL_ID],
-        |row| row.get(0),
-    )?;
-    conn.execute(
-        "INSERT INTO todo_labels (id, name, color, order_index) VALUES (?1, ?2, ?3, ?4)",
-        params![uuid::Uuid::new_v4().to_string(), name, color, next_order + 1],
-    )?;
-    Ok(())
+    CATS.insert(conn, &input.name, &input.color)
 }
 
 fn update_label(conn: &Connection, id: &str, input: TodoLabelWriteInput) -> ApiResult<()> {
-    require_label(conn, id)?;
-    let name = validated_label_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_label_name(conn, &name, Some(id))?;
-    conn.execute(
-        "UPDATE todo_labels SET name = ?1, color = ?2 WHERE id = ?3",
-        params![name, color, id],
-    )?;
-    Ok(())
+    CATS.update(conn, id, &input.name, &input.color)
 }
 
 fn reorder_labels(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
-    if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
-        return Err(ApiError::validation("라벨 순서 목록이 올바르지 않습니다."));
-    }
-    let current: Vec<String> = conn
-        .prepare("SELECT id FROM todo_labels")?
-        .query_map([], |row| row.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
-    let unique: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
-    if ids.len() != current.len()
-        || unique.len() != current.len()
-        || current.iter().any(|id| !unique.contains(id.as_str()))
-    {
-        return Err(ApiError::BadRequest(
-            "라벨 순서에 현재 라벨이 정확히 한 번씩 포함되어야 합니다.".into(),
-        ));
-    }
-    let tx = conn.transaction()?;
-    for (index, id) in ids.iter().enumerate() {
-        tx.execute(
-            "UPDATE todo_labels SET order_index = ?1 WHERE id = ?2",
-            params![index as i64, id],
-        )?;
-    }
-    tx.commit()?;
-    Ok(())
+    CATS.reorder(conn, ids)
 }
 
 fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult<()> {
-    require_label(conn, id)?;
-    if id == OTHER_LABEL_ID {
+    CATS.require(conn, id)?;
+    if id == category::RESERVED_ID {
         return Err(ApiError::BadRequest("기타 라벨은 삭제할 수 없습니다.".into()));
     }
-    require_label(conn, replacement)?;
+    CATS.require(conn, replacement)?;
     if id == replacement {
         return Err(ApiError::BadRequest("삭제할 라벨과 이동할 라벨은 달라야 합니다.".into()));
     }
@@ -365,16 +275,8 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<TodoSnapshot>> {
-    let conn = db.lock().unwrap();
+    let conn = db.conn();
     Ok(Json(get_snapshot(&conn)?))
 }
 
@@ -382,7 +284,7 @@ async fn create_item_handler(
     State(db): State<Db>,
     Json(input): Json<TodoWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_item(&db.lock().unwrap(), input)?;
+    create_item(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -391,17 +293,17 @@ async fn update_item_handler(
     Path(id): Path<String>,
     Json(input): Json<TodoWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_item(&db.lock().unwrap(), &id, input)?;
+    update_item(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
 async fn toggle_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    toggle_complete(&db.lock().unwrap(), &id)?;
+    toggle_complete(&db.conn(), &id)?;
     Ok(ok())
 }
 
 async fn delete_item_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    delete_item(&db.lock().unwrap(), &id)?;
+    delete_item(&db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -409,7 +311,7 @@ async fn create_label_handler(
     State(db): State<Db>,
     Json(input): Json<TodoLabelWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_label(&db.lock().unwrap(), input)?;
+    create_label(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -418,7 +320,7 @@ async fn update_label_handler(
     Path(id): Path<String>,
     Json(input): Json<TodoLabelWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_label(&db.lock().unwrap(), &id, input)?;
+    update_label(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
@@ -426,7 +328,7 @@ async fn reorder_handler(
     State(db): State<Db>,
     Json(input): Json<LabelOrderInput>,
 ) -> ApiResult<Json<Value>> {
-    reorder_labels(&mut db.lock().unwrap(), input.label_ids)?;
+    reorder_labels(&mut db.conn(), input.label_ids)?;
     Ok(ok())
 }
 
@@ -435,7 +337,7 @@ async fn delete_label_handler(
     Path(id): Path<String>,
     Json(input): Json<DeleteLabelInput>,
 ) -> ApiResult<Json<Value>> {
-    delete_label(&mut db.lock().unwrap(), &id, &input.replacement_label_id)?;
+    delete_label(&mut db.conn(), &id, &input.replacement_label_id)?;
     Ok(ok())
 }
 

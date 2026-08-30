@@ -9,10 +9,12 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::db::DbExt;
 use super::ai::{self, AnalysisContext, CaptureImage, CaptureVideo};
 use super::error::{ApiError, ApiResult};
 use super::secret::{self, SecretState};
 use super::{routine, todo};
+use super::common::*;
 
 // getSnapshot·toggleTask·capture 모두 네이티브. capture의 AI 분석은 ai.rs가 처리하고
 // 실패 시 Node와 동일하게 status:"failed" 수집함 항목을 만든다(201은 그대로 반환).
@@ -92,14 +94,6 @@ struct DashboardSnapshot {
 }
 
 // ---------- 로직 (apps/api/src/repositories/dashboard-repository.ts getSnapshot 1:1) ----------
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
-
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
-}
 
 // domain koreanDateLabel(iso, "long")
 fn korean_date_label(iso: &str) -> String {
@@ -392,7 +386,7 @@ async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
         })
     } else {
         let (provider, key, context) = {
-            let conn = state.db.lock().unwrap();
+            let conn = state.db.conn();
             let provider = secret::get_active_provider(&conn)?;
             let key = secret::get_api_key(&conn, &state.crypto, &provider)?;
             let context = build_context(&conn)?;
@@ -453,7 +447,7 @@ async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
         ),
     };
 
-    let conn = state.db.lock().unwrap();
+    let conn = state.db.conn();
     if let Ok(a) = &analysis {
         let next: i64 = conn
             .query_row("SELECT COALESCE(MAX(seq), 0) FROM dashboard_captures", [], |r| r.get(0))?;
@@ -497,7 +491,7 @@ pub fn routes(state: SecretState) -> Router {
 }
 
 async fn snapshot_handler(State(state): State<SecretState>) -> ApiResult<Json<DashboardSnapshot>> {
-    Ok(Json(get_snapshot(&state.db.lock().unwrap())?))
+    Ok(Json(get_snapshot(&state.db.conn())?))
 }
 
 async fn capture_handler(
@@ -512,7 +506,7 @@ async fn toggle_handler(
     State(state): State<SecretState>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    todo::toggle_complete(&state.db.lock().unwrap(), &id)?;
+    todo::toggle_complete(&state.db.conn(), &id)?;
     Ok(Json(json!({ "ok": true })))
 }
 

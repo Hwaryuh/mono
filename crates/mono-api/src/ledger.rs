@@ -3,14 +3,21 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::color::normalize_color_to_oklch;
-use super::db::Db;
+use super::category::{self, Categories};
+use super::common::*;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 
-// apps/api/src/db/schema.ts LEDGER_OTHER_CATEGORY_ID
-const OTHER_CATEGORY_ID: &str = "other";
+// (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
+const CATS: Categories = Categories {
+    table: "ledger_categories",
+    not_found: "가계부 라벨을 찾을 수 없습니다",
+    clash: "같은 이름의 분류가 이미 있습니다.",
+    reorder_invalid: "분류 순서 목록이 올바르지 않습니다.",
+    reorder_mismatch: "분류 순서에 현재 분류가 모두 포함되어야 합니다.",
+};
 
 // ---------- DTO (packages/contracts/src/index.ts ledger* 스키마) ----------
 
@@ -89,22 +96,6 @@ fn validated_note(raw: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-fn validated_category_name(raw: &str) -> ApiResult<String> {
-    let name = raw.trim();
-    if name.is_empty() {
-        return Err(ApiError::validation("라벨 이름을 입력해야 합니다."));
-    }
-    if name.chars().count() > 100 {
-        return Err(ApiError::validation("라벨 이름은 100자 이하여야 합니다."));
-    }
-    Ok(name.to_string())
-}
-
-fn validated_color(raw: &str) -> ApiResult<String> {
-    normalize_color_to_oklch(raw)
-        .ok_or_else(|| ApiError::validation("색상은 OKLCH 또는 6자리 HEX 값이어야 합니다."))
-}
-
 // packages/contracts/src/index.ts wonAmountSchema: 숫자면 그대로, 문자열이면 ₩·원·쉼표·공백 제거 후
 // 숫자만이면 파싱. 이후 양의 정수여야 하고 안전 정수 범위(<= 2^53-1).
 fn validated_amount(value: &Value) -> ApiResult<i64> {
@@ -153,10 +144,6 @@ fn validated_date(raw: &str) -> ApiResult<String> {
 }
 
 // ---------- 저장소 로직 (apps/api/src/repositories/ledger-repository.ts 1:1) ----------
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
 
 fn previous_month(month: &str) -> String {
     // "2026-08" -> "2026-07", "2026-01" -> "2025-12"
@@ -233,34 +220,6 @@ fn get_snapshot(conn: &Connection) -> ApiResult<LedgerSnapshot> {
     })
 }
 
-fn category_exists(conn: &Connection, id: &str) -> ApiResult<bool> {
-    Ok(conn
-        .query_row("SELECT 1 FROM ledger_categories WHERE id = ?1", [id], |_| Ok(()))
-        .is_ok())
-}
-
-fn require_category(conn: &Connection, id: &str) -> ApiResult<()> {
-    if category_exists(conn, id)? {
-        Ok(())
-    } else {
-        Err(ApiError::NotFound(format!("가계부 라벨을 찾을 수 없습니다: {id}")))
-    }
-}
-
-fn assert_unique_name(conn: &Connection, name: &str, except_id: Option<&str>) -> ApiResult<()> {
-    let target = name.to_lowercase();
-    let clash = conn
-        .prepare("SELECT id, name FROM ledger_categories")?
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
-        .collect::<rusqlite::Result<Vec<_>>>()?
-        .into_iter()
-        .any(|(id, existing)| Some(id.as_str()) != except_id && existing.to_lowercase() == target);
-    if clash {
-        return Err(ApiError::BadRequest("같은 이름의 분류가 이미 있습니다.".into()));
-    }
-    Ok(())
-}
-
 pub(super) fn create_expense(conn: &Connection, input: LedgerWriteInput) -> ApiResult<()> {
     let title = validated_title(&input.title)?;
     let amount = validated_amount(&input.amount_won)?;
@@ -316,73 +275,30 @@ fn delete_expense(conn: &Connection, id: &str) -> ApiResult<()> {
 }
 
 fn create_category(conn: &Connection, input: CategoryWriteInput) -> ApiResult<()> {
-    let name = validated_category_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_name(conn, &name, None)?;
-    let next_order: i64 = conn.query_row(
-        "SELECT COALESCE(MAX(order_index), -1) FROM ledger_categories WHERE id != ?1",
-        [OTHER_CATEGORY_ID],
-        |row| row.get(0),
-    )?;
-    conn.execute(
-        "INSERT INTO ledger_categories (id, name, color, order_index) VALUES (?1, ?2, ?3, ?4)",
-        params![uuid::Uuid::new_v4().to_string(), name, color, next_order + 1],
-    )?;
-    Ok(())
+    CATS.insert(conn, &input.name, &input.color)
 }
 
 fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput) -> ApiResult<()> {
-    require_category(conn, id)?;
-    let name = validated_category_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_name(conn, &name, Some(id))?;
-    conn.execute(
-        "UPDATE ledger_categories SET name = ?1, color = ?2 WHERE id = ?3",
-        params![name, color, id],
-    )?;
-    Ok(())
+    CATS.update(conn, id, &input.name, &input.color)
 }
 
 fn reorder_categories(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
-    if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
-        return Err(ApiError::validation("분류 순서 목록이 올바르지 않습니다."));
-    }
-    let current: Vec<String> = conn
-        .prepare("SELECT id FROM ledger_categories")?
-        .query_map([], |row| row.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
-    let unique: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
-    if ids.len() != current.len()
-        || unique.len() != current.len()
-        || current.iter().any(|id| !unique.contains(id.as_str()))
-    {
-        return Err(ApiError::BadRequest(
-            "분류 순서에 현재 분류가 모두 포함되어야 합니다.".into(),
-        ));
-    }
-    let tx = conn.transaction()?;
-    for (index, id) in ids.iter().enumerate() {
-        tx.execute(
-            "UPDATE ledger_categories SET order_index = ?1 WHERE id = ?2",
-            params![index as i64, id],
-        )?;
-    }
-    tx.commit()?;
-    Ok(())
+    CATS.reorder(conn, ids)
 }
 
+// 가계부만 대체 라벨을 받지 않는다 — 항상 "기타"로 지출을 옮긴다.
 fn delete_category(conn: &mut Connection, id: &str) -> ApiResult<()> {
-    require_category(conn, id)?;
-    if id == OTHER_CATEGORY_ID {
+    CATS.require(conn, id)?;
+    if id == category::RESERVED_ID {
         return Err(ApiError::BadRequest("기타 분류는 삭제할 수 없습니다.".into()));
     }
-    if !category_exists(conn, OTHER_CATEGORY_ID)? {
+    if !CATS.exists(conn, category::RESERVED_ID)? {
         return Err(ApiError::NotFound("기타 분류를 찾을 수 없습니다.".into()));
     }
     let tx = conn.transaction()?;
     tx.execute(
         "UPDATE ledger_expenses SET category_id = ?1 WHERE category_id = ?2",
-        params![OTHER_CATEGORY_ID, id],
+        params![category::RESERVED_ID, id],
     )?;
     tx.execute("DELETE FROM ledger_categories WHERE id = ?1", [id])?;
     tx.commit()?;
@@ -408,23 +324,15 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn snapshot_handler(State(db): State<Db>) -> ApiResult<Json<LedgerSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap())?))
+    Ok(Json(get_snapshot(&db.conn())?))
 }
 
 async fn create_expense_handler(
     State(db): State<Db>,
     Json(input): Json<LedgerWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_expense(&db.lock().unwrap(), input)?;
+    create_expense(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -433,12 +341,12 @@ async fn update_expense_handler(
     Path(id): Path<String>,
     Json(input): Json<LedgerWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_expense(&db.lock().unwrap(), &id, input)?;
+    update_expense(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
 async fn delete_expense_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
-    delete_expense(&db.lock().unwrap(), &id)?;
+    delete_expense(&db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -446,7 +354,7 @@ async fn create_category_handler(
     State(db): State<Db>,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_category(&db.lock().unwrap(), input)?;
+    create_category(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -455,7 +363,7 @@ async fn update_category_handler(
     Path(id): Path<String>,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_category(&db.lock().unwrap(), &id, input)?;
+    update_category(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
@@ -463,7 +371,7 @@ async fn reorder_handler(
     State(db): State<Db>,
     Json(input): Json<CategoryOrderInput>,
 ) -> ApiResult<Json<Value>> {
-    reorder_categories(&mut db.lock().unwrap(), input.category_ids)?;
+    reorder_categories(&mut db.conn(), input.category_ids)?;
     Ok(ok())
 }
 
@@ -471,7 +379,7 @@ async fn delete_category_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
-    delete_category(&mut db.lock().unwrap(), &id)?;
+    delete_category(&mut db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -481,6 +389,7 @@ async fn delete_category_handler(
 mod tests {
     use super::*;
     use crate::db;
+    use serde_json::json;
 
     fn category_input(name: &str) -> CategoryWriteInput {
         CategoryWriteInput { name: name.into(), color: "#b03a55".into() }

@@ -4,14 +4,21 @@ use axum::{Json, Router};
 use chrono::{Datelike, Days, Months, NaiveDate};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use super::color::normalize_color_to_oklch;
-use super::db::Db;
+use super::category::{self, Categories};
+use super::common::*;
+use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 
-// apps/api/src/db/schema.ts CALENDAR_OTHER_CATEGORY_ID
-const OTHER_CATEGORY_ID: &str = "other";
+// (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
+const CATS: Categories = Categories {
+    table: "calendar_categories",
+    not_found: "일정 라벨을 찾을 수 없습니다",
+    clash: "같은 이름의 분류가 이미 있습니다.",
+    reorder_invalid: "분류 순서 목록이 올바르지 않습니다.",
+    reorder_mismatch: "분류 순서에 현재 분류가 정확히 한 번씩 포함되어야 합니다.",
+};
 
 // ---------- DTO (packages/contracts/src/index.ts calendar* 스키마) ----------
 
@@ -127,27 +134,7 @@ fn validated_len(raw: &str, max: usize, label: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-fn validated_category_name(raw: &str) -> ApiResult<String> {
-    let name = raw.trim();
-    if name.is_empty() {
-        return Err(ApiError::validation("라벨 이름을 입력해야 합니다."));
-    }
-    if name.chars().count() > 100 {
-        return Err(ApiError::validation("라벨 이름은 100자 이하여야 합니다."));
-    }
-    Ok(name.to_string())
-}
-
-fn validated_color(raw: &str) -> ApiResult<String> {
-    normalize_color_to_oklch(raw)
-        .ok_or_else(|| ApiError::validation("색상은 OKLCH 또는 6자리 HEX 값이어야 합니다."))
-}
-
 // ---------- 저장소 로직 ----------
-
-fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
-}
 
 fn parse_date(raw: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(raw, "%Y-%m-%d").ok()
@@ -501,96 +488,24 @@ pub(super) fn events_starting_on(conn: &Connection, date: &str) -> ApiResult<Vec
         .collect())
 }
 
-fn category_exists(conn: &Connection, id: &str) -> ApiResult<bool> {
-    Ok(conn
-        .query_row("SELECT 1 FROM calendar_categories WHERE id = ?1", [id], |_| Ok(()))
-        .is_ok())
-}
-
-fn require_category(conn: &Connection, id: &str) -> ApiResult<()> {
-    if category_exists(conn, id)? {
-        Ok(())
-    } else {
-        Err(ApiError::NotFound(format!("일정 라벨을 찾을 수 없습니다: {id}")))
-    }
-}
-
-fn assert_unique_name(conn: &Connection, name: &str, except_id: Option<&str>) -> ApiResult<()> {
-    let target = name.to_lowercase();
-    let clash = conn
-        .prepare("SELECT id, name FROM calendar_categories")?
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
-        .collect::<rusqlite::Result<Vec<_>>>()?
-        .into_iter()
-        .any(|(id, existing)| Some(id.as_str()) != except_id && existing.to_lowercase() == target);
-    if clash {
-        return Err(ApiError::BadRequest("같은 이름의 분류가 이미 있습니다.".into()));
-    }
-    Ok(())
-}
-
 fn create_category(conn: &Connection, input: CategoryWriteInput) -> ApiResult<()> {
-    let name = validated_category_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_name(conn, &name, None)?;
-    let next_order: i64 = conn.query_row(
-        "SELECT COALESCE(MAX(order_index), -1) FROM calendar_categories WHERE id != ?1",
-        [OTHER_CATEGORY_ID],
-        |row| row.get(0),
-    )?;
-    conn.execute(
-        "INSERT INTO calendar_categories (id, name, color, order_index) VALUES (?1, ?2, ?3, ?4)",
-        params![uuid::Uuid::new_v4().to_string(), name, color, next_order + 1],
-    )?;
-    Ok(())
+    CATS.insert(conn, &input.name, &input.color)
 }
 
 fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput) -> ApiResult<()> {
-    require_category(conn, id)?;
-    let name = validated_category_name(&input.name)?;
-    let color = validated_color(&input.color)?;
-    assert_unique_name(conn, &name, Some(id))?;
-    conn.execute(
-        "UPDATE calendar_categories SET name = ?1, color = ?2 WHERE id = ?3",
-        params![name, color, id],
-    )?;
-    Ok(())
+    CATS.update(conn, id, &input.name, &input.color)
 }
 
 fn reorder_categories(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
-    if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
-        return Err(ApiError::validation("분류 순서 목록이 올바르지 않습니다."));
-    }
-    let current: Vec<String> = conn
-        .prepare("SELECT id FROM calendar_categories")?
-        .query_map([], |row| row.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
-    let unique: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
-    if ids.len() != current.len()
-        || unique.len() != current.len()
-        || current.iter().any(|id| !unique.contains(id.as_str()))
-    {
-        return Err(ApiError::BadRequest(
-            "분류 순서에 현재 분류가 정확히 한 번씩 포함되어야 합니다.".into(),
-        ));
-    }
-    let tx = conn.transaction()?;
-    for (index, id) in ids.iter().enumerate() {
-        tx.execute(
-            "UPDATE calendar_categories SET order_index = ?1 WHERE id = ?2",
-            params![index as i64, id],
-        )?;
-    }
-    tx.commit()?;
-    Ok(())
+    CATS.reorder(conn, ids)
 }
 
 fn delete_category(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult<()> {
-    require_category(conn, id)?;
-    if id == OTHER_CATEGORY_ID {
+    CATS.require(conn, id)?;
+    if id == category::RESERVED_ID {
         return Err(ApiError::BadRequest("기타 분류는 삭제할 수 없습니다.".into()));
     }
-    require_category(conn, replacement)?;
+    CATS.require(conn, replacement)?;
     if id == replacement {
         return Err(ApiError::BadRequest("삭제할 분류와 이동할 분류는 달라야 합니다.".into()));
     }
@@ -907,26 +822,18 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-fn ok() -> Json<Value> {
-    Json(json!({ "ok": true }))
-}
-
-fn created() -> (axum::http::StatusCode, Json<Value>) {
-    (axum::http::StatusCode::CREATED, Json(json!({ "ok": true })))
-}
-
 async fn snapshot_handler(
     State(db): State<Db>,
     Query(range): Query<SnapshotRange>,
 ) -> ApiResult<Json<CalendarSnapshot>> {
-    Ok(Json(get_snapshot(&db.lock().unwrap(), range.from.as_deref(), range.to.as_deref())?))
+    Ok(Json(get_snapshot(&db.conn(), range.from.as_deref(), range.to.as_deref())?))
 }
 
 async fn create_event_handler(
     State(db): State<Db>,
     Json(input): Json<CalendarWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_event(&db.lock().unwrap(), input)?;
+    create_event(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -935,7 +842,7 @@ async fn update_event_handler(
     Path(id): Path<String>,
     Json(input): Json<CalendarWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_event(&db.lock().unwrap(), &id, input)?;
+    update_event(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
@@ -945,7 +852,7 @@ async fn delete_event_handler(
     input: Option<Json<DeleteEventInput>>,
 ) -> ApiResult<Json<Value>> {
     let scope = input.and_then(|Json(body)| body.scope);
-    delete_event(&db.lock().unwrap(), &id, scope.as_deref())?;
+    delete_event(&db.conn(), &id, scope.as_deref())?;
     Ok(ok())
 }
 
@@ -953,7 +860,7 @@ async fn create_category_handler(
     State(db): State<Db>,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    create_category(&db.lock().unwrap(), input)?;
+    create_category(&db.conn(), input)?;
     Ok(created())
 }
 
@@ -962,7 +869,7 @@ async fn update_category_handler(
     Path(id): Path<String>,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_category(&db.lock().unwrap(), &id, input)?;
+    update_category(&db.conn(), &id, input)?;
     Ok(ok())
 }
 
@@ -970,7 +877,7 @@ async fn reorder_handler(
     State(db): State<Db>,
     Json(input): Json<CategoryOrderInput>,
 ) -> ApiResult<Json<Value>> {
-    reorder_categories(&mut db.lock().unwrap(), input.category_ids)?;
+    reorder_categories(&mut db.conn(), input.category_ids)?;
     Ok(ok())
 }
 
@@ -979,7 +886,7 @@ async fn delete_category_handler(
     Path(id): Path<String>,
     Json(input): Json<DeleteCategoryInput>,
 ) -> ApiResult<Json<Value>> {
-    delete_category(&mut db.lock().unwrap(), &id, &input.replacement_category_id)?;
+    delete_category(&mut db.conn(), &id, &input.replacement_category_id)?;
     Ok(ok())
 }
 
