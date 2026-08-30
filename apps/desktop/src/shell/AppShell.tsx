@@ -103,7 +103,7 @@ export function AppShell({
   aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; mediaMaintenance?: MediaMaintenance;
   r2SettingsStore?: R2SettingsStore; serverSettingsStore?: ServerSettingsStore; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository;
 }) {
-  const { formatDate, formatMonth, locale, setLocale, t } = useI18n();
+  const { formatDate, locale, setLocale, t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [resizingSidebar, setResizingSidebar] = useState(false);
@@ -141,9 +141,7 @@ export function AppShell({
     queryKey: dashboardQueryKey,
     queryFn: () => dashboardRepository.getSnapshot(),
   });
-  const subtitle = pathname === "/dashboard" ? formatDate(today)
-    : pathname === "/ledger" ? formatMonth(today)
-    : "";
+  const subtitle = pathname === "/dashboard" ? formatDate(today) : "";
   const meta = {
     ...baseMeta,
     action: baseMeta.actionKey ? t(baseMeta.actionKey) : undefined,

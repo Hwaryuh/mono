@@ -468,6 +468,7 @@ describe("AppShell", () => {
     renderShell();
     fireEvent.click(screen.getByRole("link", { name: "가계부" }));
     const createButton = await screen.findByRole("button", { name: "지출 추가" });
+    expect(screen.queryByText("2026년 8월")).not.toBeInTheDocument();
     createButton.focus();
     fireEvent.click(createButton);
 
