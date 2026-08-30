@@ -2200,6 +2200,7 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 }
 
 .scrap-list-card {
+  width: 100%;
   min-width: 0;
   padding: 0;
   overflow: hidden;
@@ -2214,7 +2215,11 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 
 .scrap-list-card:hover { border-color: var(--color-border-strong); }
 .scrap-list-card__media {
+  width: 100%;
   height: 118px;
+  min-width: 0;
+  flex: none;
+  align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2227,7 +2232,7 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .scrap-list-card__media span { font-size: 10.5px; }
 .scrap-list-card__media img,
 .scrap-detail__media img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.scrap-list-card__body { min-height: 108px; padding: 11px 12px; display: flex; flex-direction: column; gap: 7px; }
+.scrap-list-card__body { width: 100%; min-width: 0; min-height: 108px; padding: 11px 12px; align-self: stretch; display: flex; flex-direction: column; gap: 7px; }
 .scrap-list-card__body > strong {
   height: 34px;
   overflow: hidden;
@@ -2241,9 +2246,9 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
   overflow-wrap: anywhere;
 }
 .scrap-list-card__body > p { height: 32px; margin: 0; overflow: hidden; color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.scrap-list-card__body > div { margin-top: auto; padding-top: 2px; display: flex; align-items: center; gap: 7px; }
-.scrap-list-card__body > div > span:first-child { padding: 1px 8px; border: 1px solid var(--color-border); border-radius: 20px; color: var(--color-text-faint); font-size: 10px; }
-.scrap-list-card__body > div > span:last-child { margin-left: auto; display: flex; align-items: center; gap: 4px; color: var(--color-text-faint); font-size: 10px; }
+.scrap-list-card__footer { width: 100%; min-width: 0; margin-top: auto; padding-top: 2px; align-self: stretch; display: flex; align-items: center; gap: 7px; }
+.scrap-list-card__footer > span:first-child { flex: none; padding: 1px 8px; border: 1px solid var(--color-border); border-radius: 20px; color: var(--color-text-faint); font-size: 10px; }
+.scrap-list-card__comment-count { margin-left: auto; flex: none; display: flex; align-items: center; gap: 4px; color: var(--color-text-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
 
 .scrap-empty { min-height: 300px; padding: 70px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--color-text-faint); text-align: center; }
 .scrap-empty > svg { color: var(--color-border-strong); }
@@ -2257,7 +2262,7 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .scrap-detail-title { display: flex; align-items: baseline; gap: 8px; }
 .scrap-detail-title small { color: var(--color-text-faint); font-size: 10.5px; font-weight: 400; }
 .scrap-detail { display: flex; flex-direction: column; gap: 12px; }
-.scrap-detail__media { height: 190px; flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-hover); color: var(--color-text-faint); }
+.scrap-detail__media { width: 100%; min-width: 0; height: 190px; flex: none; align-self: stretch; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-hover); color: var(--color-text-faint); }
 .scrap-detail__media span { font-size: 11px; }
 .scrap-detail__copy { display: flex; flex-direction: column; gap: 6px; }
 .scrap-detail__copy-head { display: flex; align-items: flex-start; gap: 8px; }

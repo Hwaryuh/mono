@@ -484,7 +484,7 @@ function ScrapMediaPreview({ item, meta, iconSize }: { item: ScrapItem; meta: { 
 
 function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
   const meta = kindMeta[item.kind];
-  return <button className="scrap-list-card" onClick={onOpen} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div><span>{item.tag}</span><span><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
+  return <button className="scrap-list-card" onClick={onOpen} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div className="scrap-list-card__footer"><span>{item.tag}</span><span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
 }
 
 function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void }) {
