@@ -24,8 +24,9 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # API 서버 유닛 테스트 + 워크스페이스 컴파일 검증. 진짜 release 빌드는 태그의 bundle 잡이 함.
-  # frontend와 병렬 — 벽시계는 둘 중 느린 쪽.
+  # API 서버 유닛 테스트 + 컴파일 검증. frontend와 병렬 — 벽시계는 둘 중 느린 쪽.
+  # src-tauri 크레이트는 Linux GTK/webkit dev 패키지가 있어야 check되므로 여기서 제외한다.
+  # 그 크레이트는 태그의 bundle 잡이 windows·macOS에서 실제로 빌드한다.
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -35,14 +36,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-          # dev/test 프로필 target/. bundle 잡(release 프로필)과 키를 분리한다.
           prefix-key: v2-rust-check
           # PR에서는 저장하지 않는다 — main·태그만 캐시를 갱신해 10GB 한도 경쟁을 줄인다.
           save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
 
       - run: npm run version:check
-      - run: cargo test --lib -p mono-api
-      - run: cargo check --workspace
+      - run: cargo test --locked -p mono-api
 
   # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
   bundle:
