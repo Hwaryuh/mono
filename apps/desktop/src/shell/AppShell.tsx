@@ -41,7 +41,7 @@ const COLLAPSED_SIDEBAR_WIDTH = 56; // .app-shell--collapsed 의 첫 열 폭과 
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
 // 드래그를 놓았을 때 이 폭보다 좁으면 접힘, 넓으면 펼침으로 붙는다.
 const SIDEBAR_SNAP_AT = 120;
-// 이 폭 이하로 좁히면 라벨이 완전히 사라지고 아이콘만 남는다.
+// 이 폭 이하에서는 라벨과 들여쓰기 보간이 끝나고 아이콘-only 상태를 유지한다.
 const SIDEBAR_LABEL_GONE_AT = COLLAPSED_SIDEBAR_WIDTH + 24;
 
 function clampSidebarWidth(width: number): number {
@@ -302,13 +302,15 @@ export function AppShell({
               )}
               {group.items.map((item) => (
                 <NavLink
-                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""} ${item.nested && !collapsed && !draggingSidebar ? "sidebar__link--nested" : ""}`}
+                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""} ${item.nested ? "sidebar__link--nested" : ""}`}
                   key={item.to}
                   title={showCollapsed ? item.label : undefined}
                   to={item.to}
                 >
-                  <Icon name={item.icon} size={15} strokeWidth={1.5} />
-                  <span className="sidebar__link-label">{item.label}</span>
+                  <span className="sidebar__link-content">
+                    <Icon name={item.icon} size={15} strokeWidth={1.5} />
+                    <span className="sidebar__link-label">{item.label}</span>
+                  </span>
                   {item.badge && item.badge !== "0" && <span className={`sidebar__badge ${item.to === "/inbox" ? "sidebar__badge--hot" : ""}`}>{item.badge}</span>}
                 </NavLink>
               ))}

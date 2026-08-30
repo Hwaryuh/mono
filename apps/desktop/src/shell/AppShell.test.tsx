@@ -201,10 +201,14 @@ describe("AppShell", () => {
     const handle = screen.getByRole("separator", { name: "사이드바 폭 조절" });
 
     firePointer(handle, "pointerdown", 224);
-    firePointer(handle, "pointermove", 96);
-    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("96px");
+    firePointer(handle, "pointermove", 124);
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("124px");
+    expect(shell.style.getPropertyValue("--sidebar-collapse")).toBe("0.5");
+    expect(container.querySelector('.sidebar__link[href="/routine"]')).toHaveClass("sidebar__link--nested");
     expect(shell).not.toHaveClass("app-shell--collapsed");
-    firePointer(handle, "pointerup", 96);
+    firePointer(handle, "pointermove", 56);
+    expect(shell.style.getPropertyValue("--sidebar-collapse")).toBe("1");
+    firePointer(handle, "pointerup", 56);
     expect(shell).toHaveClass("app-shell--collapsed");
 
     firePointer(handle, "pointerdown", 56);

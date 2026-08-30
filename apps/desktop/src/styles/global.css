@@ -101,6 +101,7 @@ li {
    버튼으로 접거나 펼칠 때만 위 160ms 트랜지션이 살아난다. */
 .app-shell--resizing .sidebar__brand-copy,
 .app-shell--resizing .sidebar__group-title,
+.app-shell--resizing .sidebar__link-content,
 .app-shell--resizing .sidebar__link-label,
 .app-shell--resizing .sidebar__badge,
 .app-shell--resizing .sidebar__settings-trigger {
@@ -204,10 +205,8 @@ li {
   padding: 0 9px;
   display: flex;
   align-items: center;
-  gap: calc(9px * (1 - var(--sidebar-collapse, 0)));
   border-radius: var(--radius-control);
   color: var(--color-text-muted);
-  transition: padding-left 160ms ease;
   font-size: 12px;
   font-weight: 500;
 }
@@ -222,11 +221,21 @@ li {
   font-weight: 700;
 }
 
-/* 루틴 들여쓰기는 완전히 펼친 상태에서만 유효한 그룹핑 단서다. 접기 시작(드래그·버튼)
-   과 동시에 클래스가 빠지고, 위 transition 이 26px→9px 을 부드럽게 편다. */
-.sidebar__link--nested {
-  padding-left: 26px;
+.sidebar__link-content {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(9px * (1 - var(--sidebar-collapse, 0)));
+  transform: translateX(calc(
+    var(--sidebar-nested-offset, 0px) * (1 - var(--sidebar-collapse, 0))
+    + 1.5px * var(--sidebar-collapse, 0)
+  ));
+  transition: transform 160ms ease;
 }
+
+/* 루틴 들여쓰기도 접힘 진행도에 묶는다. 드래그 중 포인터를 지연 없이 따라가고,
+   버튼으로 접고 펼칠 때는 transform transition 으로 같은 경로를 왕복한다. */
+.sidebar__link--nested { --sidebar-nested-offset: 17px; }
 
 .sidebar__link-label {
   min-width: 0;
