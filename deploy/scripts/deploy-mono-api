@@ -95,6 +95,8 @@ install -o root -g root -m 0755 -- "$source_binary" "$candidate"
 install -o root -g root -m 0755 -- "$TARGET" "$rollback"
 
 echo "Creating pre-deployment backup..."
+# ponytail: 로컬만. 오프사이트 미러링은 daily mono-api-backup.service가 담당한다 —
+# 배포 직전 번들도 다음 daily 실행에 함께 올라간다.
 runuser --user mono -- "$TARGET" backup "$BACKUP_DIR" --keep 14
 
 mv -fT -- "$candidate" "$TARGET"

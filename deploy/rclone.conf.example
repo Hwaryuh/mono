@@ -1,0 +1,27 @@
+# /etc/mono/rclone.conf 로 복사 후 값 채우기. 권한 0600, owner mono:mono.
+#   install -o mono -g mono -m 0600 rclone.conf.example /etc/mono/rclone.conf
+#
+# 그리고 /etc/mono/mono.env 에 원격 경로를 지정한다(버킷/프리픽스 포함):
+#   MONO_BACKUP_REMOTE=r2:my-bucket/mono
+#
+# 유닛은 rclone copy(업로드만) 라서 로컬을 지워도 원격은 안 지워진다.
+# 원격 보존은 버킷 Settings > Object Lifecycle Rules 에서: "Delete objects" after 30 days 정도.
+
+# --- Cloudflare R2 ---
+# provider = Cloudflare 는 rclone >= 1.59 (Debian 12+). 더 오래된 rclone이면 provider = Other.
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = <R2 Access Key ID>
+secret_access_key = <R2 Secret Access Key>
+endpoint = https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+acl = private
+
+# --- Backblaze B2 (S3 호환 엔드포인트) ---
+[b2]
+type = s3
+provider = Other
+access_key_id = <B2 keyID>
+secret_access_key = <B2 applicationKey>
+endpoint = https://s3.<REGION>.backblazeb2.com
+acl = private

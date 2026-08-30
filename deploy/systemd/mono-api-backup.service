@@ -6,8 +6,17 @@ After=mono-api.service
 Type=oneshot
 User=mono
 Group=mono
+Environment=HOME=/tmp
 EnvironmentFile=/etc/mono/mono.env
 ExecStart=/opt/mono/mono-api backup /var/backups/mono --keep 14
+# 오프사이트 복제: MONO_BACKUP_REMOTE(rclone 원격 경로, 예 "r2:my-bucket/mono")가 설정돼
+# 있으면 방금 만든 번들 디렉터리를 원격으로 올린다. 미설정이면 조용히 건너뛴다.
+# 원격 자격증명은 /etc/mono/rclone.conf(0600, owner mono). 예시는 deploy/rclone.conf.example.
+# ponytail: copy(=업로드만, 삭제 없음). 로컬 prune 버그가 원격을 지우지 못한다.
+#           원격 보존은 버킷의 Object Lifecycle Rule로 서버 측에서 처리(예: 30일 후 만료).
+#           push가 실제로 실패하면(자격증명·네트워크) 이 oneshot 유닛이 failed로 뜬다 —
+#           조용한 백업 실패를 막으려면 이게 맞다.
+ExecStartPost=/bin/sh -c 'test -n "$MONO_BACKUP_REMOTE" || exit 0; exec rclone --config /etc/mono/rclone.conf --cache-dir /tmp copy /var/backups/mono "$MONO_BACKUP_REMOTE"'
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
