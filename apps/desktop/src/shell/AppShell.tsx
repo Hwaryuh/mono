@@ -1,6 +1,6 @@
 import { Badge, Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, Select, StatusIndicator, type IconName } from "@mono/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import type { DashboardRepository } from "../features/dashboard/dashboard-repository";
 import { dashboardQueryKey, formatMediaSize, QuickCapture } from "../features/dashboard/QuickCapture";
@@ -34,6 +34,32 @@ type NavigationItem = {
   badge?: string;
   nested?: boolean;
 };
+
+const MIN_SIDEBAR_WIDTH = 168;
+const MAX_SIDEBAR_WIDTH = 224;
+const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
+
+function clampSidebarWidth(width: number): number {
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+}
+
+function readSidebarWidth(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+    if (Number.isFinite(stored) && stored > 0) return clampSidebarWidth(stored);
+  } catch {
+    // 저장소가 차단되면 기본 폭으로 시작한다.
+  }
+  return MAX_SIDEBAR_WIDTH;
+}
+
+function writeSidebarWidth(width: number): void {
+  try {
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(width)));
+  } catch {
+    // 저장소가 차단돼도 현재 세션 폭은 유지한다.
+  }
+}
 
 type Theme = "light" | "dark";
 type SettingsSectionId = "appearance" | "server" | "ai" | "storage" | "about";
@@ -77,6 +103,9 @@ export function AppShell({
 }) {
   const { formatDate, formatMonth, locale, setLocale, t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
+  const [resizingSidebar, setResizingSidebar] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -196,9 +225,35 @@ export function AppShell({
     return () => window.removeEventListener("keydown", openNewItem);
   }, [meta.action, pathname]);
 
+  useEffect(() => {
+    const timeout = setTimeout(() => writeSidebarWidth(sidebarWidth), 200);
+    return () => clearTimeout(timeout);
+  }, [sidebarWidth]);
+
+  function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (collapsed) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const originLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
+    handle.setPointerCapture(event.pointerId);
+    setResizingSidebar(true);
+    const onMove = (move: PointerEvent) => setSidebarWidth(clampSidebarWidth(move.clientX - originLeft));
+    const onUp = (up: PointerEvent) => {
+      handle.releasePointerCapture(up.pointerId);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      setResizingSidebar(false);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+  }
+
   return (
-    <div className={`app-shell ${collapsed ? "app-shell--collapsed" : ""}`}>
-      <aside className="sidebar">
+    <div
+      className={`app-shell ${collapsed ? "app-shell--collapsed" : ""} ${resizingSidebar ? "app-shell--resizing" : ""}`}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+    >
+      <aside className="sidebar" ref={sidebarRef}>
         <div className="sidebar__brand">
           {!collapsed && (
             <div className="sidebar__brand-copy">
@@ -259,6 +314,27 @@ export function AppShell({
             <Icon name={collapsed ? "panelExpand" : "panelCollapse"} size={15} />
           </button>
         </div>
+
+        {!collapsed && (
+          <div
+            aria-label={t("app.sidebar.resize")}
+            aria-orientation="vertical"
+            aria-valuemax={MAX_SIDEBAR_WIDTH}
+            aria-valuemin={MIN_SIDEBAR_WIDTH}
+            aria-valuenow={Math.round(sidebarWidth)}
+            className="sidebar__resize"
+            onDoubleClick={() => setSidebarWidth(MAX_SIDEBAR_WIDTH)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") setSidebarWidth((width) => clampSidebarWidth(width - 8));
+              else if (event.key === "ArrowRight") setSidebarWidth((width) => clampSidebarWidth(width + 8));
+              else return;
+              event.preventDefault();
+            }}
+            onPointerDown={startSidebarResize}
+            role="separator"
+            tabIndex={0}
+          />
+        )}
       </aside>
 
       <main className="workspace">

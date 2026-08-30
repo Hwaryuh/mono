@@ -157,6 +157,25 @@ describe("AppShell", () => {
     expect(screen.queryByRole("button", { name: "설정 열기" })).not.toBeInTheDocument();
   });
 
+  it("사이드바 폭을 키보드로 줄이고 최대값을 넘지 못한다", async () => {
+    localStorage.clear();
+    const { container } = renderShell();
+    const shell = container.querySelector<HTMLElement>(".app-shell")!;
+    const handle = screen.getByRole("separator", { name: "사이드바 폭 조절" });
+
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("224px");
+
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("216px");
+
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("224px");
+
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    await waitFor(() => expect(localStorage.getItem("mono:sidebar-width")).toBe("216"));
+  });
+
   it("좌측 설정 아이콘을 닫기 아이콘으로 morph하고 설정 패널을 제어한다", async () => {
     const { container } = renderShell();
     const settingsButton = screen.getByRole("button", { name: "설정 열기" });

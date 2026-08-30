@@ -18,6 +18,7 @@ export const koMessages = {
   "app.action.closeWarning": "경고 닫기",
   "app.sidebar.expand": "사이드바 확장",
   "app.sidebar.collapse": "사이드바 축소",
+  "app.sidebar.resize": "사이드바 폭 조절",
   "app.quickCapture.title": "빠른 캡처",
   "app.serverBehind": "서버 버전이 앱보다 낮습니다 (서버 {serverVersion} · 앱 {appVersion}). 기능이 조용히 동작하지 않을 수 있으니 서버를 재배포하세요.",
   "settings.title": "설정",
