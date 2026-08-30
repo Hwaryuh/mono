@@ -41,9 +41,16 @@ const COLLAPSED_SIDEBAR_WIDTH = 56; // .app-shell--collapsed 의 첫 열 폭과 
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
 // 드래그를 놓았을 때 이 폭보다 좁으면 접힘, 넓으면 펼침으로 붙는다.
 const SIDEBAR_SNAP_AT = 120;
+// 이 폭 이하로 좁히면 라벨이 완전히 사라지고 아이콘만 남는다.
+const SIDEBAR_LABEL_GONE_AT = COLLAPSED_SIDEBAR_WIDTH + 24;
 
 function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+}
+
+// 드래그 중 라벨 불투명도 — 좁아질수록 페이드 아웃되어 아이콘만 남는다.
+function sidebarLabelOpacity(width: number): number {
+  return Math.max(0, Math.min(1, (width - SIDEBAR_LABEL_GONE_AT) / (MIN_SIDEBAR_WIDTH - SIDEBAR_LABEL_GONE_AT)));
 }
 
 function readSidebarWidth(): number {
@@ -273,7 +280,10 @@ export function AppShell({
   return (
     <div
       className={`app-shell ${showCollapsed ? "app-shell--collapsed" : ""} ${draggingSidebar ? "app-shell--resizing" : ""}`}
-      style={{ "--sidebar-width": `${dragWidth ?? sidebarWidth}px` } as CSSProperties}
+      style={{
+        "--sidebar-width": `${dragWidth ?? sidebarWidth}px`,
+        "--sidebar-fade": dragWidth === null ? 1 : sidebarLabelOpacity(dragWidth),
+      } as CSSProperties}
     >
       <aside className="sidebar" ref={sidebarRef}>
         <div className="sidebar__brand">
