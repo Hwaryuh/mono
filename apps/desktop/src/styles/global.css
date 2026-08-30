@@ -233,6 +233,10 @@ li {
   transition: transform 160ms ease;
 }
 
+/* 아이콘은 접힘 상태에서 유일하게 남는 요소다 — 어떤 형제(라벨·배지)도
+   flex 압축으로 15px 밑으로 줄이지 못하게 고정한다. */
+.sidebar__link-content > svg { flex: none; }
+
 /* 루틴 들여쓰기도 접힘 진행도에 묶는다. 드래그 중 포인터를 지연 없이 따라가고,
    버튼으로 접고 펼칠 때는 transform transition 으로 같은 경로를 왕복한다. */
 .sidebar__link--nested { --sidebar-nested-offset: 17px; }
@@ -248,11 +252,15 @@ li {
 }
 
 .sidebar__badge {
+  flex: none;
   min-width: calc((1 - var(--sidebar-collapse, 0)) * 17px);
   max-width: calc((1 - var(--sidebar-collapse, 0)) * 60px);
   margin-left: auto;
-  padding: 1px 5px;
+  /* 접힘 진행도에 좌우 패딩·테두리도 묶는다. 안 그러면 max-width:0 이어도
+     패딩(10px)+테두리(2px)가 남아 아이콘 자리를 뺏는다. */
+  padding: 1px calc(5px * (1 - var(--sidebar-collapse, 0)));
   border: 1px solid var(--color-border);
+  border-width: calc(1px * (1 - var(--sidebar-collapse, 0)));
   border-radius: 9px;
   background: var(--color-hover);
   color: var(--color-text-muted);
@@ -260,7 +268,7 @@ li {
   text-align: center;
   overflow: hidden;
   opacity: calc(1 - var(--sidebar-collapse, 0));
-  transition: opacity 160ms ease, max-width 160ms ease, min-width 160ms ease;
+  transition: opacity 160ms ease, max-width 160ms ease, min-width 160ms ease, padding 160ms ease, border-width 160ms ease;
 }
 
 .sidebar__badge--hot {
