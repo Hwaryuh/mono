@@ -207,6 +207,7 @@ li {
   gap: calc(9px * (1 - var(--sidebar-collapse, 0)));
   border-radius: var(--radius-control);
   color: var(--color-text-muted);
+  transition: padding-left 160ms ease;
   font-size: 12px;
   font-weight: 500;
 }
@@ -221,9 +222,10 @@ li {
   font-weight: 700;
 }
 
-/* 아이콘 왼쪽 들여쓰기: 펼침 26px → 접힘 9px(다른 아이콘과 정렬). */
+/* 루틴 들여쓰기는 완전히 펼친 상태에서만 유효한 그룹핑 단서다. 접기 시작(드래그·버튼)
+   과 동시에 클래스가 빠지고, 위 transition 이 26px→9px 을 부드럽게 편다. */
 .sidebar__link--nested {
-  padding-left: calc(9px + 17px * (1 - var(--sidebar-collapse, 0)));
+  padding-left: 26px;
 }
 
 .sidebar__link-label {
@@ -416,6 +418,7 @@ li {
 @media (prefers-reduced-motion: reduce) {
   .settings-server__remote { animation: none; }
   .app-shell,
+  .app-shell .sidebar__link,
   .app-shell .sidebar__brand-copy,
   .app-shell .sidebar__group-title,
   .app-shell .sidebar__link-label,

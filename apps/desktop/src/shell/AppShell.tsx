@@ -302,7 +302,7 @@ export function AppShell({
               )}
               {group.items.map((item) => (
                 <NavLink
-                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""} ${item.nested ? "sidebar__link--nested" : ""}`}
+                  className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""} ${item.nested && !collapsed && !draggingSidebar ? "sidebar__link--nested" : ""}`}
                   key={item.to}
                   title={showCollapsed ? item.label : undefined}
                   to={item.to}
