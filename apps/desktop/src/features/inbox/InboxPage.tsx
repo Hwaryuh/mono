@@ -451,7 +451,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
           />
         ))}
         {visible.length === 0 && (
-          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>여기에 남은 항목이 없습니다</strong><span>대시보드의 빠른 캡처로 무엇이든 던져 넣으세요.</span></div>
+          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>여기에 남은 항목이 없습니다</strong><span>빠른 캡처로 무엇이든 던져 넣으세요.</span></div>
         )}
       </div>
     </div>

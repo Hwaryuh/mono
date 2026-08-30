@@ -379,7 +379,6 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
                     options={localeOptions.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
                     value={locale}
                   />
-                  <p>{t("settings.locale.onlyKorean")}</p>
                 </div>
               </section>
             </>

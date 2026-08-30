@@ -41,7 +41,6 @@ export const koMessages = {
   "settings.locale.description": "표시 언어와 날짜·숫자 형식을 선택합니다.",
   "settings.locale.label": "표시 언어",
   "settings.locale.korean": "한국어",
-  "settings.locale.onlyKorean": "현재 한국어만 지원합니다. 다른 언어를 추가할 수 있도록 기반은 준비되어 있습니다.",
   "settings.about.description": "설치된 버전을 확인하고 업데이트합니다.",
   "settings.about.update": "업데이트",
   "settings.about.version": "버전",
