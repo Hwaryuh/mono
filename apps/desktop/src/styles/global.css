@@ -274,6 +274,8 @@ li {
 .app-updater__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .settings-accent-control { min-height: 34px; display: flex; align-items: center; gap: 12px; }
 .settings-accent-control > span { position: relative; top: -1px; color: var(--color-text-muted); font: 11px var(--font-code); font-variant-numeric: tabular-nums; }
+.settings-locale-control { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); align-items: center; gap: 18px; }
+.settings-locale-control > p { margin: 0; color: var(--color-text-faint); font-size: 10.5px; line-height: 1.55; }
 .settings-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .settings-theme-options > button { -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; padding: 7px; display: flex; align-items: stretch; flex-direction: column; gap: 8px; border: 0; border-radius: calc(var(--radius-control) + 4px); background: transparent; color: var(--color-text-muted); cursor: pointer; box-shadow: 0 0 0 1px var(--color-border); transition-property: scale, box-shadow, color; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
 .settings-theme-options > button:hover { box-shadow: 0 0 0 1px var(--color-border-strong), 0 4px 14px oklch(0.222 0.002 106.554 / 7%); color: var(--color-text); }

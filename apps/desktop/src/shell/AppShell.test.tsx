@@ -210,6 +210,19 @@ describe("AppShell", () => {
     await waitFor(() => expect(document.documentElement).toHaveStyle({ "--color-accent": "oklch(0.873 0.14 93.538)" }));
   });
 
+  it("설정에서 지원 언어를 한국어 한 항목으로 제공한다", async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
+    const settingsModal = screen.getByRole("dialog", { name: "설정" });
+    const languageSelect = within(settingsModal).getByRole("combobox", { name: "표시 언어" });
+
+    expect(languageSelect).toHaveTextContent("한국어");
+    fireEvent.click(languageSelect);
+    const listbox = screen.getByRole("listbox", { name: "표시 언어 옵션" });
+    expect(within(listbox).getAllByRole("option")).toHaveLength(1);
+    expect(within(listbox).getByRole("option", { name: "한국어" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("설정에서 Gemini API 키를 저장하고 연결 확인 후 삭제한다", async () => {
     const store = new InMemoryAiSettingsStore();
     renderShell(undefined, undefined, undefined, undefined, undefined, store);

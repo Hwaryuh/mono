@@ -1,4 +1,4 @@
-import { Badge, Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, StatusIndicator, type IconName } from "@mono/ui";
+import { Badge, Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, Select, StatusIndicator, type IconName } from "@mono/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -9,7 +9,7 @@ import type { TodoRepository } from "../features/todo/todo-repository";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
 import { useNavigate } from "react-router";
-import { currentIsoDate, koreanDateLabel, koreanMonthLabel } from "@mono/domain";
+import { currentIsoDate } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
@@ -24,6 +24,8 @@ import {
 import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
 import { checkServerCompatibility, serverBehindOf } from "../infrastructure/server/server-compatibility";
 import { CHECK_UPDATE_EVENT } from "../features/updater/AppUpdater";
+import { localeOptions, useI18n, type Locale } from "../i18n/i18n";
+import type { TranslationKey } from "../i18n/messages.ko";
 
 type NavigationItem = {
   to: string;
@@ -38,16 +40,16 @@ type SettingsSectionId = "appearance" | "server" | "ai" | "storage" | "about";
 
 interface SettingsSectionDefinition {
   id: SettingsSectionId;
-  label: string;
+  labelKey: TranslationKey;
   icon: IconName;
 }
 
 const settingsSections: SettingsSectionDefinition[] = [
-  { id: "appearance", label: "화면", icon: "sun" },
-  { id: "server", label: "서버", icon: "server" },
-  { id: "ai", label: "AI", icon: "sparkles" },
-  { id: "storage", label: "저장공간", icon: "layers" },
-  { id: "about", label: "정보", icon: "note" },
+  { id: "appearance", labelKey: "settings.section.appearance", icon: "sun" },
+  { id: "server", labelKey: "settings.section.server", icon: "server" },
+  { id: "ai", labelKey: "settings.section.ai", icon: "sparkles" },
+  { id: "storage", labelKey: "settings.section.storage", icon: "layers" },
+  { id: "about", labelKey: "settings.section.about", icon: "note" },
 ];
 
 const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(window.localStorage);
@@ -56,14 +58,14 @@ const defaultMediaMaintenance = new InMemoryMediaMaintenance();
 const defaultR2SettingsStore = new InMemoryR2SettingsStore();
 const defaultServerSettingsStore = new TauriServerSettingsStore();
 
-const routeMeta: Record<string, { title: string; subtitle: string; icon: IconName; action?: string }> = {
-  "/dashboard": { title: "대시보드", subtitle: "", icon: "grid" },
-  "/inbox": { title: "수집함", subtitle: "", icon: "inbox" },
-  "/todo": { title: "할 일", subtitle: "", icon: "todo", action: "새 할 일" },
-  "/routine": { title: "루틴", subtitle: "", icon: "routine", action: "새 루틴" },
-  "/calendar": { title: "일정", subtitle: "", icon: "calendar", action: "새 일정" },
-  "/scrap": { title: "스크랩", subtitle: "", icon: "scrap", action: "스크랩 추가" },
-  "/ledger": { title: "가계부", subtitle: "", icon: "wallet", action: "지출 추가" },
+const routeMeta: Record<string, { titleKey: TranslationKey; icon: IconName; actionKey?: TranslationKey }> = {
+  "/dashboard": { titleKey: "app.navigation.dashboard", icon: "grid" },
+  "/inbox": { titleKey: "app.navigation.inbox", icon: "inbox" },
+  "/todo": { titleKey: "app.navigation.todo", icon: "todo", actionKey: "app.action.newTodo" },
+  "/routine": { titleKey: "app.navigation.routine", icon: "routine", actionKey: "app.action.newRoutine" },
+  "/calendar": { titleKey: "app.navigation.calendar", icon: "calendar", actionKey: "app.action.newCalendar" },
+  "/scrap": { titleKey: "app.navigation.scrap", icon: "scrap", actionKey: "app.action.newScrap" },
+  "/ledger": { titleKey: "app.navigation.ledger", icon: "wallet", actionKey: "app.action.newLedger" },
 };
 
 export function AppShell({
@@ -73,6 +75,7 @@ export function AppShell({
   aiSettingsStore?: AiSettingsStore; dashboardRepository: DashboardRepository; inboxRepository: InboxRepository; mediaMaintenance?: MediaMaintenance;
   r2SettingsStore?: R2SettingsStore; serverSettingsStore?: ServerSettingsStore; todoRepository: TodoRepository; routineRepository: RoutineRepository; calendarRepository: CalendarRepository;
 }) {
+  const { formatDate, formatMonth, locale, setLocale, t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
@@ -107,10 +110,15 @@ export function AppShell({
     queryKey: dashboardQueryKey,
     queryFn: () => dashboardRepository.getSnapshot(),
   });
-  const subtitle = pathname === "/dashboard" ? koreanDateLabel(today)
-    : pathname === "/ledger" ? koreanMonthLabel(today)
-    : baseMeta.subtitle;
-  const meta = { ...baseMeta, subtitle };
+  const subtitle = pathname === "/dashboard" ? formatDate(today)
+    : pathname === "/ledger" ? formatMonth(today)
+    : "";
+  const meta = {
+    ...baseMeta,
+    action: baseMeta.actionKey ? t(baseMeta.actionKey) : undefined,
+    subtitle,
+    title: t(baseMeta.titleKey),
+  };
 
   function openNewItemModal() {
     if (!meta.action) return;
@@ -124,20 +132,20 @@ export function AppShell({
       : event.ctrlKey && !event.metaKey;
   }
   const moduleNavigationGroup: { label: string; items: NavigationItem[] } = {
-    label: "모듈",
+    label: t("app.navigation.modules"),
     items: [
-      { to: "/todo", label: "할 일", icon: "todo", badge: String(todoCount) },
-      { to: "/routine", label: "루틴", icon: "routine", badge: String(routineCount), nested: true },
-      { to: "/calendar", label: "일정", icon: "calendar", badge: String(todayEventCount) },
-      { to: "/scrap", label: "스크랩", icon: "scrap" },
-      { to: "/ledger", label: "가계부", icon: "wallet" },
+      { to: "/todo", label: t("app.navigation.todo"), icon: "todo", badge: String(todoCount) },
+      { to: "/routine", label: t("app.navigation.routine"), icon: "routine", badge: String(routineCount), nested: true },
+      { to: "/calendar", label: t("app.navigation.calendar"), icon: "calendar", badge: String(todayEventCount) },
+      { to: "/scrap", label: t("app.navigation.scrap"), icon: "scrap" },
+      { to: "/ledger", label: t("app.navigation.ledger"), icon: "wallet" },
     ],
   };
   const navigationGroups: Array<{ label?: string; items: NavigationItem[] }> = [
     {
       items: [
-        { to: "/dashboard", label: "대시보드", icon: "grid" },
-        { to: "/inbox", label: "수집함", icon: "inbox", badge: String(pendingCount) },
+        { to: "/dashboard", label: t("app.navigation.dashboard"), icon: "grid" },
+        { to: "/inbox", label: t("app.navigation.inbox"), icon: "inbox", badge: String(pendingCount) },
       ],
     },
     moduleNavigationGroup,
@@ -195,12 +203,12 @@ export function AppShell({
           {!collapsed && (
             <div className="sidebar__brand-copy">
               <strong>mono</strong>
-              <span>{koreanDateLabel(today, "short")}</span>
+              <span>{formatDate(today, "short")}</span>
             </div>
           )}
         </div>
 
-        <nav className="sidebar__nav" aria-label="주요 메뉴">
+        <nav className="sidebar__nav" aria-label={t("app.navigation.primary")}>
           {navigationGroups.map((group, groupIndex) => (
             <div className="sidebar__group" key={group.label ?? groupIndex}>
               {group.label && !collapsed && (
@@ -227,25 +235,25 @@ export function AppShell({
           {!collapsed && (
             <button
               aria-expanded={settingsOpen}
-              aria-label={settingsOpen ? "설정 닫기" : "설정 열기"}
+              aria-label={settingsOpen ? t("settings.close") : t("settings.open")}
               className="sidebar__settings-trigger"
               id="sidebar-settings-trigger"
               onClick={() => setSettingsOpen((value) => !value)}
-              title={`${settingsOpen ? "설정 닫기" : "설정"} (${shortcutModifier},)`}
+              title={`${settingsOpen ? t("settings.close") : t("settings.title")} (${shortcutModifier},)`}
               type="button"
             >
               <MorphingIcon name={settingsOpen ? "close" : "settings"} size={15} />
             </button>
           )}
           <button
-            aria-label={collapsed ? "사이드바 확장" : "사이드바 축소"}
+            aria-label={collapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
             aria-pressed={collapsed}
             className="sidebar__collapse"
             onClick={() => {
               if (!collapsed) setSettingsOpen(false);
               setCollapsed((value) => !value);
             }}
-            title={collapsed ? "사이드바 확장" : "사이드바 축소"}
+            title={collapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
             type="button"
           >
             <Icon name={collapsed ? "panelExpand" : "panelCollapse"} size={15} />
@@ -258,10 +266,9 @@ export function AppShell({
           <div className="server-warning" role="status">
             <Icon name="alert" size={14} strokeWidth={1.8} />
             <p>
-              서버 버전이 앱보다 낮습니다 (서버 <strong>{serverBehind.serverVersion}</strong> · 앱 <strong>{serverBehind.appVersion}</strong>).
-              최근 기능이 조용히 동작하지 않을 수 있으니 서버를 재배포하세요.
+              {t("app.serverBehind", { serverVersion: serverBehind.serverVersion, appVersion: serverBehind.appVersion })}
             </p>
-            <IconButton aria-label="경고 닫기" onClick={() => setServerWarningDismissed(true)} size="small" title="닫기" variant="ghost"><Icon name="close" size={13} /></IconButton>
+            <IconButton aria-label={t("app.action.closeWarning")} onClick={() => setServerWarningDismissed(true)} size="small" title={t("app.action.close")} variant="ghost"><Icon name="close" size={13} /></IconButton>
           </div>
         )}
         <header className="topbar">
@@ -271,7 +278,7 @@ export function AppShell({
             {meta.subtitle && <span>{meta.subtitle}</span>}
           </div>
           <div className="topbar__actions">
-            <IconButton aria-label="검색" title="검색"><Icon name="search" size={14} strokeWidth={1.7} /></IconButton>
+            <IconButton aria-label={t("app.action.search")} title={t("app.action.search")}><Icon name="search" size={14} strokeWidth={1.7} /></IconButton>
             {meta.action && <Button onClick={openNewItemModal} title={`${meta.action} (${shortcutModifier}N)`} variant="primary"><Icon name="plus" size={13} strokeWidth={2} />{meta.action}</Button>}
           </div>
         </header>
@@ -284,41 +291,46 @@ export function AppShell({
         mediaMaintenance={mediaMaintenance}
         onClose={() => setSettingsOpen(false)}
         onAccentColorChange={setAccentColor}
+        locale={locale}
+        onLocaleChange={setLocale}
         onThemeChange={setTheme}
         open={settingsOpen}
         r2SettingsStore={r2SettingsStore}
         serverSettingsStore={serverSettingsStore}
         theme={theme}
       />
-      <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title="빠른 캡처">
+      <Modal className="quick-capture-modal" icon="sparkles" onClose={() => setQuickCaptureOpen(false)} open={quickCaptureOpen} title={t("app.quickCapture.title")}>
         <QuickCapture autoFocus repository={dashboardRepository} snapshot={dashboardQuery.data} />
         <div className="quick-capture-shortcut" aria-hidden="true">
-          <kbd>{shortcutModifier}K</kbd><span>빠른 캡처</span><kbd>ESC</kbd><span>닫기</span>
+          <kbd>{shortcutModifier}K</kbd><span>{t("app.quickCapture.title")}</span><kbd>ESC</kbd><span>{t("app.action.close")}</span>
         </div>
       </Modal>
     </div>
   );
 }
 
-function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, aiSettingsStore, mediaMaintenance, r2SettingsStore, serverSettingsStore }: {
+function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAccentColorChange, locale, onLocaleChange, aiSettingsStore, mediaMaintenance, r2SettingsStore, serverSettingsStore }: {
   open: boolean;
   onClose: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   accentColor: string;
   onAccentColorChange: (accentColor: string) => void;
+  locale: Locale;
+  onLocaleChange: (locale: Locale) => void;
   aiSettingsStore: AiSettingsStore;
   mediaMaintenance: MediaMaintenance;
   r2SettingsStore: R2SettingsStore;
   serverSettingsStore: ServerSettingsStore;
 }) {
+  const { t } = useI18n();
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance");
   return (
-    <Modal className="settings-modal" icon="settings" onClose={onClose} open={open} title="설정">
+    <Modal className="settings-modal" icon="settings" onClose={onClose} open={open} title={t("settings.title")}>
       <div className="settings-layout">
         <aside className="settings-navigation">
-          <span>설정</span>
-          <nav aria-label="설정 항목">
+          <span>{t("settings.title")}</span>
+          <nav aria-label={t("settings.navigation")}>
             {settingsSections.map((section) => (
               <button
                 aria-current={activeSection === section.id ? "page" : undefined}
@@ -328,7 +340,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
                 type="button"
               >
                 <Icon name={section.icon} size={14} />
-                <span>{section.label}</span>
+                <span>{t(section.labelKey)}</span>
               </button>
             ))}
           </nav>
@@ -337,25 +349,37 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
         <section className="settings-content">
           {activeSection === "appearance" && (
             <>
-              <SettingsHeading description="앱 전체의 색상과 화면 표현을 변경합니다." title="화면" />
+              <SettingsHeading description={t("settings.appearance.description")} title={t("settings.section.appearance")} />
               <section className="settings-group">
-                <header><strong>테마</strong><span>변경 사항은 모든 화면에 즉시 적용됩니다.</span></header>
-                <div aria-label="화면 테마" className="settings-theme-options" role="radiogroup">
+                <header><strong>{t("settings.theme.title")}</strong><span>{t("settings.theme.description")}</span></header>
+                <div aria-label={t("settings.theme.label")} className="settings-theme-options" role="radiogroup">
                   <button aria-checked={theme === "light"} onClick={() => onThemeChange("light")} role="radio" type="button">
                     <span className="settings-theme-preview settings-theme-preview--light" />
-                    <span><Icon name="sun" size={13} />라이트</span>
+                    <span><Icon name="sun" size={13} />{t("settings.theme.light")}</span>
                   </button>
                   <button aria-checked={theme === "dark"} onClick={() => onThemeChange("dark")} role="radio" type="button">
                     <span className="settings-theme-preview settings-theme-preview--dark" />
-                    <span><Icon name="moon" size={13} />다크</span>
+                    <span><Icon name="moon" size={13} />{t("settings.theme.dark")}</span>
                   </button>
                 </div>
               </section>
               <section className="settings-group">
-                <header><strong>강조색</strong><span>버튼, 선택 상태와 포커스에 앱 전체에서 적용됩니다.</span></header>
+                <header><strong>{t("settings.accent.title")}</strong><span>{t("settings.accent.description")}</span></header>
                 <div className="settings-accent-control">
-                  <ColorPicker icon="edit" label="강조색" onChange={onAccentColorChange} selected value={accentColor} />
+                  <ColorPicker icon="edit" label={t("settings.accent.title")} onChange={onAccentColorChange} selected value={accentColor} />
                   <span>{accentColor.toUpperCase()}</span>
+                </div>
+              </section>
+              <section className="settings-group">
+                <header><strong>{t("settings.locale.title")}</strong><span>{t("settings.locale.description")}</span></header>
+                <div className="settings-locale-control">
+                  <Select
+                    label={t("settings.locale.label")}
+                    onChange={(value) => onLocaleChange(value as Locale)}
+                    options={localeOptions.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+                    value={locale}
+                  />
+                  <p>{t("settings.locale.onlyKorean")}</p>
                 </div>
               </section>
             </>
@@ -374,10 +398,10 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
 
           {activeSection === "about" && (
             <>
-              <SettingsHeading description="설치된 버전을 확인하고 업데이트합니다." title="정보" />
-              <section aria-label="업데이트" className="settings-group">
-                <div className="settings-version"><span>버전</span><strong>{__APP_VERSION__}</strong></div>
-                <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">지금 업데이트 확인</Button>
+              <SettingsHeading description={t("settings.about.description")} title={t("settings.section.about")} />
+              <section aria-label={t("settings.about.update")} className="settings-group">
+                <div className="settings-version"><span>{t("settings.about.version")}</span><strong>{__APP_VERSION__}</strong></div>
+                <Button onClick={() => window.dispatchEvent(new Event(CHECK_UPDATE_EVENT))} type="button">{t("settings.about.checkUpdate")}</Button>
               </section>
             </>
           )}
