@@ -176,7 +176,6 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
 
   return (
     <div className="routine-page">
-      <div className="routine-notice"><Icon name="routine" size={14} /><span>지정한 요일이 오면 루틴은 <b>그날의 할 일</b>로 자동 생성됩니다. 기간이 끝나면 생성도 멈춥니다.</span></div>
       <div className="routine-cards">
         {snapshot.items.map((routine) => <RoutineCard key={routine.id} onEdit={() => openEditor(routine)} repository={repository} routine={routine} snapshot={snapshot} />)}
         {snapshot.items.length === 0 && <div className="routine-empty"><Icon name="routine" size={28} /><strong>아직 루틴이 없습니다</strong><span>반복할 일을 만들면 지정 요일의 할 일에 자동으로 나타납니다.</span><Button onClick={openCreate} variant="primary">새 루틴</Button></div>}
@@ -260,5 +259,5 @@ function RoutineCard({ routine, snapshot, repository, onEdit }: { routine: Routi
 }
 
 function RoutineLoading() {
-  return <div aria-label="루틴 불러오는 중" className="routine-page"><div className="routine-notice" /><div className="routine-cards">{Array.from({ length: 3 }, (_, index) => <div className="routine-card routine-card--skeleton" key={index} />)}</div></div>;
+  return <div aria-label="루틴 불러오는 중" className="routine-page"><div className="routine-cards">{Array.from({ length: 3 }, (_, index) => <div className="routine-card routine-card--skeleton" key={index} />)}</div></div>;
 }
