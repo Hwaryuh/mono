@@ -138,9 +138,11 @@ describe("TodoPage", () => {
 
   it("완료 토글을 항목별로 반영한다", async () => {
     renderTodo();
+    expect(await screen.findByRole("button", { name: /집안일 2/ })).toBeInTheDocument();
     const checkbox = await screen.findByRole("checkbox", { name: "설거지 하기 완료 처리" });
     fireEvent.click(checkbox);
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "설거지 하기 미완료 처리" })).toBeChecked());
+    expect(screen.getByRole("button", { name: /집안일 1/ })).toBeInTheDocument();
   });
 
   it("라벨을 수정·정렬하고 삭제 시 기존 할 일을 선택한 라벨로 이동한다", async () => {

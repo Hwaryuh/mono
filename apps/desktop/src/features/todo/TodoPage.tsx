@@ -261,7 +261,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
                 type="button"
               >
                 <span className="todo-filter__dot" style={{ backgroundColor: label.color }} /><span>{label.name}</span>
-                <small>{snapshot.items.filter((item) => item.labelId === label.id).length}</small>
+                <small>{snapshot.items.filter((item) => item.labelId === label.id && !item.done).length}</small>
               </button>
             );
           })}
