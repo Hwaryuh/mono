@@ -54,7 +54,41 @@ function setVersion(nextVersion) {
   check();
 }
 
+function git(args, inherit = false) {
+  return execFileSync("git", args, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    stdio: inherit ? "inherit" : "pipe",
+  });
+}
+
+// 버전 올림 → 커밋 → main 푸시 → v태그 푸시. 이후는 CI(ci.yml, v* 트리거)가 전부 함.
+// 전제: 코드 변경은 이미 커밋됨, 작업 트리 clean, 브랜치 main.
+function release(nextVersion) {
+  if (!nextVersion || !semverPattern.test(nextVersion)) {
+    throw new Error("사용법: npm run release -- X.Y.Z");
+  }
+  const tag = `v${nextVersion}`;
+  if (git(["status", "--porcelain"]).trim()) {
+    throw new Error("작업 트리가 dirty합니다 — 코드 변경을 먼저 커밋하세요.");
+  }
+  if (git(["branch", "--show-current"]).trim() !== "main") {
+    throw new Error("main 브랜치가 아닙니다.");
+  }
+  if (git(["tag", "--list", tag]).trim()) {
+    throw new Error(`태그 ${tag}가 이미 있습니다.`);
+  }
+
+  setVersion(nextVersion);
+  git(["commit", "-am", `chore(release): bump version to ${nextVersion}`], true);
+  git(["push", "origin", "main"], true);
+  git(["tag", tag], true);
+  git(["push", "origin", tag], true);
+  console.log(`${tag} 푸시 완료. CI가 번들·서버 배포·릴리즈 공개를 진행합니다.`);
+}
+
 const command = process.argv[2];
 if (command === "check") check();
 else if (command === "set") setVersion(process.argv[3]);
-else throw new Error("사용법: node scripts/version.mjs <check|set> [X.Y.Z]");
+else if (command === "release") release(process.argv[3]);
+else throw new Error("사용법: node scripts/version.mjs <check|set|release> [X.Y.Z]");
