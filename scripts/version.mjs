@@ -62,7 +62,8 @@ function git(args, inherit = false) {
   });
 }
 
-// 버전 올림 → 커밋 → main 푸시 → v태그 푸시. 이후는 CI(ci.yml, v* 트리거)가 전부 함.
+// 버전 올림 → 커밋 → main 푸시. 태그 생성·번들·서버 배포·릴리즈 공개는 CI가 한다.
+// CI는 "chore(release): bump version" 커밋이 main에 오르면 릴리즈 파이프라인을 실행한다.
 // 전제: 코드 변경은 이미 커밋됨, 작업 트리 clean, 브랜치 main.
 function release(nextVersion) {
   if (!nextVersion || !semverPattern.test(nextVersion)) {
@@ -75,20 +76,19 @@ function release(nextVersion) {
   if (git(["branch", "--show-current"]).trim() !== "main") {
     throw new Error("main 브랜치가 아닙니다.");
   }
-  if (git(["tag", "--list", tag]).trim()) {
-    throw new Error(`태그 ${tag}가 이미 있습니다.`);
+  if (git(["ls-remote", "--tags", "origin", tag]).trim()) {
+    throw new Error(`태그 ${tag}가 이미 원격에 있습니다.`);
   }
 
   setVersion(nextVersion);
   git(["commit", "-am", `chore(release): bump version to ${nextVersion}`], true);
   git(["push", "origin", "main"], true);
-  git(["tag", tag], true);
-  git(["push", "origin", tag], true);
-  console.log(`${tag} 푸시 완료. CI가 번들·서버 배포·릴리즈 공개를 진행합니다.`);
+  console.log(`main에 ${nextVersion} 푸시 완료. CI가 태그 생성·번들·서버 배포·릴리즈 공개를 진행합니다.`);
 }
 
 const command = process.argv[2];
 if (command === "check") check();
 else if (command === "set") setVersion(process.argv[3]);
 else if (command === "release") release(process.argv[3]);
-else throw new Error("사용법: node scripts/version.mjs <check|set|release> [X.Y.Z]");
+else if (command === "print") process.stdout.write(`${workspaceVersion(readFileSync(cargoManifestPath, "utf8"))}\n`);
+else throw new Error("사용법: node scripts/version.mjs <check|set|release|print> [X.Y.Z]");

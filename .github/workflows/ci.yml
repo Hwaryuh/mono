@@ -3,9 +3,14 @@ name: CI
 on:
   push:
     branches: [main, master]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+# 릴리즈 파이프라인(bundle·tag·publish)은 "chore(release): bump version" 커밋이
+# main에 오르면 실행된다. 태그 push는 트리거가 아니다 — 태그는 tag-release 잡이 만든다.
+# 이유: GitHub Actions 캐시는 ref 스코프다. 태그마다 새 스코프라 태그 트리거는
+# bundle의 release-profile target/ 캐시를 매번 콜드로 만든다. main 트리거면 캐시가
+# 재사용돼 dep 미변경 릴리즈의 번들 시간이 ~7분 → ~2분대로 떨어진다.
 
 jobs:
   # 프론트 + 계약 패키지. Linux 러너 — 유닛 테스트는 플랫폼 무관, 요금 1x.
@@ -26,7 +31,7 @@ jobs:
 
   # API 서버 유닛 테스트 + 컴파일 검증. frontend와 병렬 — 벽시계는 둘 중 느린 쪽.
   # src-tauri 크레이트는 Linux GTK/webkit dev 패키지가 있어야 check되므로 여기서 제외한다.
-  # 그 크레이트는 태그의 bundle 잡이 windows·macOS에서 실제로 빌드한다.
+  # 그 크레이트는 릴리즈의 bundle 잡이 windows·macOS에서 실제로 빌드한다.
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -37,15 +42,16 @@ jobs:
         with:
           workspaces: .
           prefix-key: v2-rust-check
-          # PR에서는 저장하지 않는다 — main·태그만 캐시를 갱신해 10GB 한도 경쟁을 줄인다.
-          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+          # PR에서는 저장하지 않는다 — main만 캐시를 갱신해 10GB 한도 경쟁을 줄인다.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - run: npm run version:check
       - run: cargo test --locked -p mono-api
 
-  # 전체 번들 — v* 태그·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
+  # 전체 번들 — 릴리즈 커밋·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
+  # main 트리거라 rust-cache가 main 스코프에 저장·복원된다(태그 스코프 갇힘 문제 해소).
   bundle:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version')) }}"
     needs: [frontend, rust]
     permissions:
       contents: read
@@ -68,9 +74,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
-          # release 프로필 target/를 캐시한다. Cargo.lock이 안 바뀌면 dep 재컴파일 없이
-          # 앱 크레이트만 다시 빌드 → 번들 시간이 ~6분에서 ~2분대로 떨어진다.
-          # 저장은 Cargo.lock/rustc가 바뀐 태그에서만 일어난다(세이브 비용은 dep 변경당 1회).
+          # release 프로필 target/. Cargo.lock의 dep 그래프가 안 바뀌면 dep 재컴파일 없이
+          # 앱 크레이트(mono-desktop)만 다시 빌드된다.
           prefix-key: v2-bundle
 
       # macos-26은 공식 arm64 label → aarch64 .dmg. Intel Mac 대상은 별도 매트릭스 필요.
@@ -107,9 +112,38 @@ jobs:
           path: staging/
           if-no-files-found: error
 
+  # 릴리즈 커밋(= 이 커밋)에 vX.Y.Z 태그를 만들어 push한다. 태그 push는 CI를 재트리거하지 않는다.
+  tag-release:
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
+    needs: [frontend, rust]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: v
+        run: |
+          version="$(node scripts/version.mjs print)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        run: |
+          tag="${{ steps.v.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "태그 $tag 가 이미 있다 — 버전을 올리지 않은 릴리즈 커밋인가?" >&2
+            exit 1
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+
   publish-draft-release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: bundle
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
+    needs: [bundle, tag-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -127,17 +161,16 @@ jobs:
       # 담는다. URL은 태그에 고정 — "latest" 플래그와 무관하게 항상 이 릴리스를 가리킨다.
       - name: Build latest.json
         env:
-          VERSION: ${{ github.ref_name }}
-          BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}
+          VERSION: ${{ needs.tag-release.outputs.version }}
+          BASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.tag-release.outputs.tag }}
         run: |
-          version="${VERSION#v}"
           mac_archive="$(basename "$(ls release-assets/*.app.tar.gz)")"
           win_installer="$(basename "$(ls release-assets/*-setup.exe)")"
           mac_sig="$(cat release-assets/*.app.tar.gz.sig)"
           win_sig="$(cat release-assets/*-setup.exe.sig)"
           [[ -n "$mac_sig" && -n "$win_sig" ]] || { echo "서명 파일이 비어 있다 — TAURI_SIGNING_PRIVATE_KEY secret 확인." >&2; exit 1; }
           jq -n \
-            --arg version "$version" \
+            --arg version "$VERSION" \
             --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg mac_sig "$mac_sig" --arg mac_url "$BASE_URL/$mac_archive" \
             --arg win_sig "$win_sig" --arg win_url "$BASE_URL/$win_installer" \
@@ -156,6 +189,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           draft: true
+          tag_name: ${{ needs.tag-release.outputs.tag }}
           fail_on_unmatched_files: true
           files: |
             release-assets/*-setup.exe
@@ -164,7 +198,7 @@ jobs:
             release-assets/latest.json
 
   verify-release-assets:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
     needs: publish-draft-release
     runs-on: ubuntu-latest
     permissions: {}
@@ -189,11 +223,11 @@ jobs:
             exit 1
           fi
 
-  # bundle과 병렬로 돈다 — 서버 배포는 태그 SHA만 있으면 되고 번들 아티팩트와 무관하다.
+  # bundle과 병렬로 돈다 — 서버 배포는 커밋 SHA만 있으면 되고 번들 아티팩트와 무관하다.
   # 서버가 클라이언트보다 잠깐 앞서는 건 안전한 방향(앱은 서버가 뒤처질 때만 경고).
   # publish-release가 이 잡 완료를 기다리므로 "서버 배포·검증 후 클라이언트 공개" 순서는 유지된다.
   deploy-release-server:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
     needs: [frontend, rust]
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -201,24 +235,19 @@ jobs:
       actions: write
       contents: read
     steps:
-      # Tailscale OIDC는 main ref만 신뢰한다. 태그가 가리키는 SHA와 main이 같을 때만
-      # main 배포를 요청하고, 그 실행이 성공해야 릴리즈 공개를 허용한다.
-      - name: Deploy same SHA from trusted main ref
+      # 릴리즈 커밋 SHA를 trusted main ref에서 배포하도록 요청한다. deploy-server.yml이
+      # main이 그 SHA에서 이동하지 않았는지, 그리고 이 CI 런의 frontend·rust가 통과했는지 확인한다.
+      - name: Dispatch and wait for server deployment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          main_sha="$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
-            echo "Release tag $GITHUB_REF_NAME points to $GITHUB_SHA, but main is $main_sha." >&2
-            exit 1
-          fi
-
           requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           run_name="Deploy server $GITHUB_SHA"
           gh workflow run deploy-server.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
-            -f release_sha="$GITHUB_SHA"
+            -f release_sha="$GITHUB_SHA" \
+            -f ci_run_id="$GITHUB_RUN_ID"
 
           run_id=""
           for attempt in {1..60}; do
@@ -245,8 +274,8 @@ jobs:
           gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status --interval 10
 
   publish-release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [verify-release-assets, deploy-release-server]
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
+    needs: [verify-release-assets, deploy-release-server, tag-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -254,10 +283,11 @@ jobs:
       - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          TAG: ${{ needs.tag-release.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
 
   prune-old-releases:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: "${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(release): bump version') }}"
     needs: publish-release
     runs-on: ubuntu-latest
     permissions:
