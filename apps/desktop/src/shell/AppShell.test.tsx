@@ -190,6 +190,31 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: "사이드바 확장" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("드래그하는 동안 폭이 포인터를 따라가고 놓는 위치로 접힘·펼침이 결정된다", () => {
+    // jsdom에 PointerEvent가 없어 clientX를 담을 수 있는 MouseEvent로 대체한다.
+    const firePointer = (node: Element, type: string, clientX: number) =>
+      fireEvent(node, new MouseEvent(type, { bubbles: true, clientX }));
+
+    localStorage.clear();
+    const { container } = renderShell();
+    const shell = container.querySelector<HTMLElement>(".app-shell")!;
+    const handle = screen.getByRole("separator", { name: "사이드바 폭 조절" });
+
+    firePointer(handle, "pointerdown", 224);
+    firePointer(handle, "pointermove", 96);
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("96px");
+    expect(shell).not.toHaveClass("app-shell--collapsed");
+    firePointer(handle, "pointerup", 96);
+    expect(shell).toHaveClass("app-shell--collapsed");
+
+    firePointer(handle, "pointerdown", 56);
+    firePointer(handle, "pointermove", 200);
+    expect(shell).not.toHaveClass("app-shell--collapsed");
+    firePointer(handle, "pointerup", 200);
+    expect(shell).not.toHaveClass("app-shell--collapsed");
+    expect(shell.style.getPropertyValue("--sidebar-width")).toBe("200px");
+  });
+
   it("좌측 설정 아이콘을 닫기 아이콘으로 morph하고 설정 패널을 제어한다", async () => {
     const { container } = renderShell();
     const settingsButton = screen.getByRole("button", { name: "설정 열기" });

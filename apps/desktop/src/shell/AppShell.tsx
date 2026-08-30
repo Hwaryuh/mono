@@ -37,9 +37,10 @@ type NavigationItem = {
 
 const MIN_SIDEBAR_WIDTH = 168;
 const MAX_SIDEBAR_WIDTH = 224;
+const COLLAPSED_SIDEBAR_WIDTH = 56; // .app-shell--collapsed 의 첫 열 폭과 같아야 한다
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
-// 최소 폭에서 이만큼 더 끌어당기면 완전히 접힌다.
-const SIDEBAR_COLLAPSE_AT = MIN_SIDEBAR_WIDTH - 44;
+// 드래그를 놓았을 때 이 폭보다 좁으면 접힘, 넓으면 펼침으로 붙는다.
+const SIDEBAR_SNAP_AT = 120;
 
 function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
@@ -106,7 +107,7 @@ export function AppShell({
   const { formatDate, locale, setLocale, t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
-  const [resizingSidebar, setResizingSidebar] = useState(false);
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
@@ -235,41 +236,48 @@ export function AppShell({
     setCollapsed(true);
   }
 
+  // 드래그하는 동안 사이드바 폭이 포인터를 그대로 따라간다(56–224px, transition 없음).
+  // 놓는 순간의 폭만 보고 접힘/펼침 중 가까운 쪽으로 붙는다 — 자동 격발 지점은 없다.
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
-    if (collapsed) return;
     event.preventDefault();
     const handle = event.currentTarget;
     const originLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-    handle.setPointerCapture(event.pointerId);
-    setResizingSidebar(true);
-    const endDrag = () => {
+    const widthAt = (clientX: number) =>
+      Math.min(MAX_SIDEBAR_WIDTH, Math.max(COLLAPSED_SIDEBAR_WIDTH, Math.round(clientX - originLeft)));
+    try { handle.setPointerCapture(event.pointerId); } catch { /* 캡처 미지원 환경 */ }
+    setDragWidth(collapsed ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth);
+
+    const onMove = (move: PointerEvent) => setDragWidth(widthAt(move.clientX));
+    const endDrag = (up: PointerEvent) => {
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", endDrag);
-      try { handle.releasePointerCapture(event.pointerId); } catch { /* 이미 해제됨 */ }
-      setResizingSidebar(false);
-    };
-    const onMove = (move: PointerEvent) => {
-      const width = move.clientX - originLeft;
-      if (width < SIDEBAR_COLLAPSE_AT) {
-        endDrag();
-        setSidebarWidth(MIN_SIDEBAR_WIDTH);
+      handle.removeEventListener("pointercancel", endDrag);
+      try { handle.releasePointerCapture(up.pointerId); } catch { /* 이미 해제됨 */ }
+      const finalWidth = widthAt(up.clientX);
+      setDragWidth(null);
+      if (finalWidth < SIDEBAR_SNAP_AT) {
         collapseSidebar();
-        return;
+      } else {
+        setCollapsed(false);
+        setSidebarWidth(clampSidebarWidth(finalWidth));
       }
-      setSidebarWidth(clampSidebarWidth(width));
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", endDrag);
+    handle.addEventListener("pointercancel", endDrag);
   }
+
+  const draggingSidebar = dragWidth !== null;
+  const showCollapsed = collapsed && !draggingSidebar;
 
   return (
     <div
-      className={`app-shell ${collapsed ? "app-shell--collapsed" : ""} ${resizingSidebar ? "app-shell--resizing" : ""}`}
-      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      className={`app-shell ${showCollapsed ? "app-shell--collapsed" : ""} ${draggingSidebar ? "app-shell--resizing" : ""}`}
+      style={{ "--sidebar-width": `${dragWidth ?? sidebarWidth}px` } as CSSProperties}
     >
       <aside className="sidebar" ref={sidebarRef}>
         <div className="sidebar__brand">
-          {!collapsed && (
+          {!showCollapsed && (
             <div className="sidebar__brand-copy">
               <strong>mono</strong>
               <span>{formatDate(today, "short")}</span>
@@ -280,20 +288,20 @@ export function AppShell({
         <nav className="sidebar__nav" aria-label={t("app.navigation.primary")}>
           {navigationGroups.map((group, groupIndex) => (
             <div className="sidebar__group" key={group.label ?? groupIndex}>
-              {group.label && !collapsed && (
+              {group.label && !showCollapsed && (
                 <div className="sidebar__group-title"><span>{group.label}</span><span>{group.items.length}</span></div>
               )}
               {group.items.map((item) => (
                 <NavLink
                   className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""}`}
                   key={item.to}
-                  title={collapsed ? item.label : undefined}
+                  title={showCollapsed ? item.label : undefined}
                   to={item.to}
-                  style={{ paddingLeft: !collapsed && item.nested ? 26 : undefined }}
+                  style={{ paddingLeft: !showCollapsed && item.nested ? 26 : undefined }}
                 >
                   <Icon name={item.icon} size={15} strokeWidth={1.5} />
-                  {!collapsed && <span className="sidebar__link-label">{item.label}</span>}
-                  {!collapsed && item.badge && item.badge !== "0" && <span className={`sidebar__badge ${item.to === "/inbox" ? "sidebar__badge--hot" : ""}`}>{item.badge}</span>}
+                  {!showCollapsed && <span className="sidebar__link-label">{item.label}</span>}
+                  {!showCollapsed && item.badge && item.badge !== "0" && <span className={`sidebar__badge ${item.to === "/inbox" ? "sidebar__badge--hot" : ""}`}>{item.badge}</span>}
                 </NavLink>
               ))}
             </div>
@@ -301,7 +309,7 @@ export function AppShell({
         </nav>
 
         <div className="sidebar__footer">
-          {!collapsed && (
+          {!showCollapsed && (
             <button
               aria-expanded={settingsOpen}
               aria-label={settingsOpen ? t("settings.close") : t("settings.open")}
@@ -315,41 +323,43 @@ export function AppShell({
             </button>
           )}
           <button
-            aria-label={collapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
-            aria-pressed={collapsed}
+            aria-label={showCollapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
+            aria-pressed={showCollapsed}
             className="sidebar__collapse"
             onClick={() => {
               if (!collapsed) setSettingsOpen(false);
               setCollapsed((value) => !value);
             }}
-            title={collapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
+            title={showCollapsed ? t("app.sidebar.expand") : t("app.sidebar.collapse")}
             type="button"
           >
-            <Icon name={collapsed ? "panelExpand" : "panelCollapse"} size={15} />
+            <Icon name={showCollapsed ? "panelExpand" : "panelCollapse"} size={15} />
           </button>
         </div>
 
-        {!collapsed && (
-          <div
-            aria-label={t("app.sidebar.resize")}
-            aria-orientation="vertical"
-            aria-valuemax={MAX_SIDEBAR_WIDTH}
-            aria-valuemin={MIN_SIDEBAR_WIDTH}
-            aria-valuenow={Math.round(sidebarWidth)}
-            className="sidebar__resize"
-            onDoubleClick={() => setSidebarWidth(MAX_SIDEBAR_WIDTH)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft" && sidebarWidth <= MIN_SIDEBAR_WIDTH) collapseSidebar();
-              else if (event.key === "ArrowLeft") setSidebarWidth((width) => clampSidebarWidth(width - 8));
-              else if (event.key === "ArrowRight") setSidebarWidth((width) => clampSidebarWidth(width + 8));
-              else return;
-              event.preventDefault();
-            }}
-            onPointerDown={startSidebarResize}
-            role="separator"
-            tabIndex={0}
-          />
-        )}
+        <div
+          aria-label={t("app.sidebar.resize")}
+          aria-orientation="vertical"
+          aria-valuemax={MAX_SIDEBAR_WIDTH}
+          aria-valuemin={COLLAPSED_SIDEBAR_WIDTH}
+          aria-valuenow={Math.round(dragWidth ?? (collapsed ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth))}
+          className="sidebar__resize"
+          onDoubleClick={() => { setCollapsed(false); setSidebarWidth(MAX_SIDEBAR_WIDTH); }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              if (collapsed) return;
+              if (sidebarWidth <= MIN_SIDEBAR_WIDTH) collapseSidebar();
+              else setSidebarWidth((width) => clampSidebarWidth(width - 8));
+            } else if (event.key === "ArrowRight") {
+              if (collapsed) setCollapsed(false);
+              else setSidebarWidth((width) => clampSidebarWidth(width + 8));
+            } else return;
+            event.preventDefault();
+          }}
+          onPointerDown={startSidebarResize}
+          role="separator"
+          tabIndex={0}
+        />
       </aside>
 
       <main className="workspace">
