@@ -206,7 +206,61 @@ async fn read_limited(mut response: reqwest::Response, limit: usize) -> Fallible
     Ok(buffer)
 }
 
+fn youtube_video_id(raw_url: &str) -> Option<String> {
+    let url = require_http_url(raw_url).ok()?;
+    let host = url.host_str()?.to_ascii_lowercase();
+    let mut path = url.path_segments()?;
+    let candidate = match host.as_str() {
+        "youtu.be" | "www.youtu.be" => path.next().map(str::to_string),
+        "youtube.com" | "www.youtube.com" | "m.youtube.com" | "music.youtube.com" => {
+            match path.next() {
+                Some("watch") => url
+                    .query_pairs()
+                    .find_map(|(key, value)| (key == "v").then(|| value.into_owned())),
+                Some("shorts" | "embed" | "live") => path.next().map(str::to_string),
+                _ => None,
+            }
+        }
+        "youtube-nocookie.com" | "www.youtube-nocookie.com" => match path.next() {
+            Some("embed") => path.next().map(str::to_string),
+            _ => None,
+        },
+        _ => None,
+    }?;
+    (candidate.len() == 11
+        && candidate
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+    .then_some(candidate)
+}
+
+fn youtube_thumbnail_url(raw_url: &str) -> Option<Url> {
+    let video_id = youtube_video_id(raw_url)?;
+    Url::parse(&format!("https://i.ytimg.com/vi/{video_id}/hqdefault.jpg")).ok()
+}
+
+async fn fetch_preview_image(image_url: &Url) -> Fallible<Option<PreviewImage>> {
+    let (image, _) = fetch_public(
+        image_url.as_str(),
+        "image/avif,image/webp,image/png,image/jpeg,image/gif",
+    )
+    .await?;
+    let image_type = content_type_of(&image);
+    if !SUPPORTED_IMAGE_TYPES.contains(&image_type.as_str()) {
+        return Ok(None);
+    }
+    let body = read_limited(image, IMAGE_LIMIT).await?;
+    Ok(Some(PreviewImage {
+        content_type: image_type,
+        body,
+    }))
+}
+
 async fn fetch_image(page_url: &str) -> Fallible<Option<PreviewImage>> {
+    if let Some(image_url) = youtube_thumbnail_url(page_url) {
+        return fetch_preview_image(&image_url).await;
+    }
+
     let (page, final_url) = fetch_public(page_url, "text/html,application/xhtml+xml").await?;
     let page_type = content_type_of(&page);
     if !page_type.contains("text/html") && !page_type.contains("application/xhtml+xml") {
@@ -218,16 +272,7 @@ async fn fetch_image(page_url: &str) -> Fallible<Option<PreviewImage>> {
         return Ok(None);
     };
     let image_url = final_url.join(&image_ref).map_err(|e| e.to_string())?;
-
-    let (image, _) =
-        fetch_public(image_url.as_str(), "image/avif,image/webp,image/png,image/jpeg,image/gif")
-            .await?;
-    let image_type = content_type_of(&image);
-    if !SUPPORTED_IMAGE_TYPES.contains(&image_type.as_str()) {
-        return Ok(None);
-    }
-    let body = read_limited(image, IMAGE_LIMIT).await?;
-    Ok(Some(PreviewImage { content_type: image_type, body }))
+    fetch_preview_image(&image_url).await
 }
 
 // ---------- HTML 메타 파싱 (previewImageRefOf / attributesOf / decodeHtmlEntities) ----------
@@ -416,6 +461,36 @@ mod tests {
         assert!(require_http_url("ftp://example.com").is_err());
         assert!(require_http_url("http://user:pass@example.com").is_err());
         assert!(require_http_url("https://example.com/x").is_ok());
+    }
+
+    #[test]
+    fn youtube_urls_resolve_to_direct_thumbnail() {
+        for url in [
+            "https://youtu.be/-XJXbxTMkUQ?si=share-token",
+            "https://www.youtube.com/watch?v=-XJXbxTMkUQ&list=WL",
+            "https://m.youtube.com/shorts/-XJXbxTMkUQ",
+            "https://www.youtube.com/embed/-XJXbxTMkUQ",
+            "https://www.youtube-nocookie.com/embed/-XJXbxTMkUQ",
+        ] {
+            assert_eq!(
+                youtube_thumbnail_url(url).as_ref().map(Url::as_str),
+                Some("https://i.ytimg.com/vi/-XJXbxTMkUQ/hqdefault.jpg"),
+                "{url}"
+            );
+        }
+    }
+
+    #[test]
+    fn youtube_thumbnail_rejects_invalid_or_lookalike_urls() {
+        for url in [
+            "https://youtu.be/short",
+            "https://youtu.be/abcdefghijk%2Fprivate",
+            "https://youtube.example/watch?v=-XJXbxTMkUQ",
+            "https://www.youtube.com/watch?v=invalid.id",
+            "javascript:alert(1)",
+        ] {
+            assert_eq!(youtube_thumbnail_url(url), None, "{url}");
+        }
     }
 
     #[tokio::test]
