@@ -1,0 +1,223 @@
+/* QuickCapture 컴포넌트(features/dashboard/QuickCapture.tsx) 스타일.
+   ⌘K 빠른 캡처 모달(shell/AppShell)과 대시보드 캡처 카드에서 공통 사용. */
+.quick-capture {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.quick-capture__drop-feedback {
+  position: absolute;
+  inset: -7px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: var(--radius-card);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 42%, transparent), 0 10px 28px oklch(0.169 0.018 5.951 / 10%);
+  background: color-mix(in srgb, var(--color-accent-soft) 92%, var(--color-surface));
+  color: var(--color-text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px) scale(0.99);
+  transition-property: opacity, transform, background-color, box-shadow;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.quick-capture__drop-feedback strong {
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.quick-capture__drop-feedback span {
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+}
+
+.quick-capture--dragging .quick-capture__drop-feedback {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.quick-capture-modal {
+  width: min(640px, 100%);
+}
+
+.quick-capture-modal .ui-overlay__body {
+  padding: 18px;
+}
+
+.quick-capture-shortcut {
+  min-height: 22px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--color-text-faint);
+  font-size: 10px;
+}
+
+.quick-capture-shortcut kbd {
+  min-width: 30px;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 9.5px;
+  text-align: center;
+}
+
+.capture-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capture-form input {
+  min-width: 0;
+  height: 38px;
+  flex: 1;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  outline: none;
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font-size: 12.5px;
+}
+
+.capture-form input:focus {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.capture-form .ui-button {
+  width: 44px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.capture-file-input { position: fixed; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.capture-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.capture-image {
+  width: min(240px, 100%);
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-subtle);
+  box-shadow: var(--shadow-border);
+}
+
+.capture-image > img {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  outline: 1px solid oklch(0 0 0 / 10%);
+  outline-offset: -1px;
+}
+
+.capture-video-placeholder {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--color-hover);
+  color: var(--color-text-faint);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+html[data-theme="dark"] .capture-image > img { outline-color: oklch(1 0 0 / 10%); }
+.capture-image > span { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.capture-image strong { overflow: hidden; color: var(--color-text); font-size: 10.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.capture-image small { color: var(--color-text-faint); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+.capture-image > button { width: 40px; height: 40px; flex: 0 0 40px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-faint); cursor: pointer; transition-property: scale, background-color, color; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+.capture-image > button:hover { background: var(--color-hover); color: var(--color-text); }
+.capture-image > button:active { scale: 0.96; }
+.capture-image-loading { min-height: 48px; padding: 0 10px; display: inline-flex; align-items: center; color: var(--color-text-faint); font-size: 10.5px; }
+
+.capture-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.capture-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.capture-meta__label {
+  color: var(--color-text-faint);
+  font-size: 10.5px;
+}
+
+.capture-meta__empty {
+  color: var(--color-text-faint);
+  font-size: 10.5px;
+}
+
+.capture-chip,
+.inbox-link {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+}
+
+.capture-chip {
+  max-width: 320px;
+  padding: 3px 10px;
+}
+
+.capture-chip:hover,
+.inbox-link:hover {
+  background: var(--color-hover);
+}
+
+.capture-chip__raw {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-link {
+  margin-left: auto;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
