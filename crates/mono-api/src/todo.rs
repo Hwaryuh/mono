@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
@@ -9,6 +10,7 @@ use super::category::{self, Categories};
 use super::common::*;
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::version::{ensure_versioned_update, expected_version};
 
 // todo 라벨은 routine 과 같은 풀을 공유한다. 공통 CRUD 설정.
 const CATS: Categories = Categories {
@@ -24,6 +26,7 @@ const CATS: Categories = Categories {
 #[derive(Serialize)]
 struct TodoLabel {
     id: String,
+    version: i64,
     name: String,
     color: String,
 }
@@ -32,6 +35,7 @@ struct TodoLabel {
 #[serde(rename_all = "camelCase")]
 struct TodoItem {
     id: String,
+    version: i64,
     title: String,
     label_id: String,
     due_date: Option<String>,
@@ -104,29 +108,30 @@ fn validated_note(raw: &str) -> ApiResult<String> {
 
 fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     let labels = conn
-        .prepare("SELECT id, name, color FROM todo_labels ORDER BY order_index ASC")?
+        .prepare("SELECT id, version, name, color FROM todo_labels ORDER BY order_index ASC")?
         .query_map([], |row| {
-            Ok(TodoLabel { id: row.get(0)?, name: row.get(1)?, color: row.get(2)? })
+            Ok(TodoLabel { id: row.get(0)?, version: row.get(1)?, name: row.get(2)?, color: row.get(3)? })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     let own_items = conn
         .prepare(
-            "SELECT id, title, label_id, due_date, due_time, note, done, completed_at, \
+            "SELECT id, version, title, label_id, due_date, due_time, note, done, completed_at, \
              routine_id, occurrence_date FROM todo_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
             Ok(TodoItem {
                 id: row.get(0)?,
-                title: row.get(1)?,
-                label_id: row.get(2)?,
-                due_date: row.get(3)?,
-                due_time: row.get(4)?,
-                note: row.get(5)?,
-                done: row.get::<_, i64>(6)? != 0,
-                completed_at: row.get(7)?,
-                routine_id: row.get(8)?,
-                occurrence_date: row.get(9)?,
+                version: row.get(1)?,
+                title: row.get(2)?,
+                label_id: row.get(3)?,
+                due_date: row.get(4)?,
+                due_time: row.get(5)?,
+                note: row.get(6)?,
+                done: row.get::<_, i64>(7)? != 0,
+                completed_at: row.get(8)?,
+                routine_id: row.get(9)?,
+                occurrence_date: row.get(10)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -137,6 +142,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
         .into_iter()
         .map(|r| TodoItem {
             id: r.id,
+            version: 1,
             title: r.title,
             label_id: r.label_id,
             due_date: Some(r.occurrence_date.clone()),
@@ -164,8 +170,8 @@ fn create_label(conn: &Connection, input: TodoLabelWriteInput) -> ApiResult<()> 
     CATS.insert(conn, &input.name, &input.color)
 }
 
-fn update_label(conn: &Connection, id: &str, input: TodoLabelWriteInput) -> ApiResult<()> {
-    CATS.update(conn, id, &input.name, &input.color)
+fn update_label(conn: &Connection, id: &str, input: TodoLabelWriteInput, expected: Option<i64>) -> ApiResult<()> {
+    CATS.update(conn, id, &input.name, &input.color, expected)
 }
 
 fn reorder_labels(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
@@ -187,12 +193,12 @@ fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult
     }
     let tx = conn.transaction()?;
     tx.execute(
-        "UPDATE todo_items SET label_id = ?1 WHERE label_id = ?2",
+        "UPDATE todo_items SET label_id = ?1, version = version + 1 WHERE label_id = ?2",
         params![replacement, id],
     )?;
     // 루틴도 같은 라벨 풀을 쓴다 — 죽은 label_id가 남지 않도록 함께 옮긴다 (mock deleteLabel).
     tx.execute(
-        "UPDATE routine_items SET label_id = ?1 WHERE label_id = ?2",
+        "UPDATE routine_items SET label_id = ?1, version = version + 1 WHERE label_id = ?2",
         params![replacement, id],
     )?;
     tx.execute("DELETE FROM todo_labels WHERE id = ?1", [id])?;
@@ -222,15 +228,16 @@ fn create_item(conn: &Connection, input: TodoWriteInput) -> ApiResult<()> {
     Ok(())
 }
 
-fn update_item(conn: &Connection, id: &str, input: TodoWriteInput) -> ApiResult<()> {
+fn update_item(conn: &Connection, id: &str, input: TodoWriteInput, expected: Option<i64>) -> ApiResult<()> {
     require_item(conn, id)?;
     let title = validated_title(&input.title)?;
     let note = validated_note(&input.note)?;
-    conn.execute(
-        "UPDATE todo_items SET title = ?1, label_id = ?2, due_date = ?3, due_time = ?4, note = ?5 WHERE id = ?6",
-        params![title, input.label_id, input.due_date, input.due_time, note, id],
+    let changed = conn.execute(
+        "UPDATE todo_items SET title = ?1, label_id = ?2, due_date = ?3, due_time = ?4, \
+         note = ?5, version = version + 1 WHERE id = ?6 AND (?7 IS NULL OR version = ?7)",
+        params![title, input.label_id, input.due_date, input.due_time, note, id, expected],
     )?;
-    Ok(())
+    ensure_versioned_update(changed, expected)
 }
 
 pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
@@ -291,9 +298,10 @@ async fn create_item_handler(
 async fn update_item_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<TodoWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_item(&db.conn(), &id, input)?;
+    update_item(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -318,9 +326,10 @@ async fn create_label_handler(
 async fn update_label_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<TodoLabelWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_label(&db.conn(), &id, input)?;
+    update_label(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 

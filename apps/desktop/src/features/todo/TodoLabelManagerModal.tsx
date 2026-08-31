@@ -1,12 +1,14 @@
-import { todoLabelWriteInputSchema, type TodoLabel, type TodoLabelWriteInput } from "@mono/contracts";
+import { todoLabelWriteInputSchema, type TodoLabel, type TodoLabelWriteInput, type TodoSnapshot } from "@mono/contracts";
 import { Button, ColorPicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
+import { isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import type { TodoLabelRepository } from "./todo-repository";
 
 type LabelCommand =
   | { type: "create"; input: TodoLabelWriteInput }
-  | { type: "update"; labelId: string; input: TodoLabelWriteInput }
+  | { type: "update"; labelId: string; input: TodoLabelWriteInput; expectedVersion: number }
   | { type: "reorder"; labelIds: string[] }
   | { type: "delete"; labelId: string; replacementLabelId: string };
 
@@ -27,6 +29,7 @@ function errorMessage(error: unknown) {
 
 export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, repository, usageCountOf }: TodoLabelManagerModalProps) {
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editingLabelVersion, setEditingLabelVersion] = useState(1);
   const [labelDraft, setLabelDraft] = useState<TodoLabelWriteInput>(blankLabelDraft);
   const [labelError, setLabelError] = useState<string | null>(null);
   const [labelFocusRequested, setLabelFocusRequested] = useState(false);
@@ -36,7 +39,7 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
   const labelMutation = useMutation({
     mutationFn: async (command: LabelCommand) => {
       if (command.type === "create") await repository.createLabel(command.input);
-      else if (command.type === "update") await repository.updateLabel(command.labelId, command.input);
+      else if (command.type === "update") await repository.updateLabel(command.labelId, command.input, command.expectedVersion);
       else if (command.type === "reorder") await repository.reorderLabels(command.labelIds);
       else await repository.deleteLabel(command.labelId, command.replacementLabelId);
     },
@@ -62,15 +65,30 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
         queryClient.invalidateQueries({ queryKey: ["routine"] }),
       ]);
     },
-    onError: (error) => {
+    onError: async (error) => {
       setLabelError(errorMessage(error));
       setLabelFocusRequested(true);
+      if (isConflictError(error) && editingLabelId) {
+        const version = await resyncConflictVersion<TodoSnapshot>(
+          queryClient, ["todo"],
+          async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ["todo"] }),
+              queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+              queryClient.invalidateQueries({ queryKey: ["routine"] }),
+            ]);
+          },
+          (snapshot) => snapshot.labels.find((candidate) => candidate.id === editingLabelId),
+        );
+        if (version !== null) setEditingLabelVersion(version);
+      }
     },
   });
 
   useEffect(() => {
     if (!open) return;
     setEditingLabelId(null);
+    setEditingLabelVersion(1);
     setLabelDraft(blankLabelDraft);
     setLabelError(null);
     setLabelFocusRequested(false);
@@ -92,6 +110,7 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
 
   function editLabel(label: TodoLabel) {
     setEditingLabelId(label.id);
+    setEditingLabelVersion(label.version ?? 1);
     setLabelDraft({ name: label.name, color: label.color });
     setLabelError(null);
   }
@@ -103,7 +122,7 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
       setLabelError(parsed.error.issues[0]?.message ?? "라벨 입력값을 확인해야 합니다.");
       return;
     }
-    if (editingLabelId) labelMutation.mutate({ type: "update", labelId: editingLabelId, input: parsed.data });
+    if (editingLabelId) labelMutation.mutate({ type: "update", labelId: editingLabelId, input: parsed.data, expectedVersion: editingLabelVersion });
     else labelMutation.mutate({ type: "create", input: parsed.data });
   }
 

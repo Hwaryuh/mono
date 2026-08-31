@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
@@ -8,6 +9,7 @@ use serde_json::Value;
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::common::*;
+use super::version::{ensure_versioned_update, expected_version};
 
 // apps/api/src/db/schema.ts SCRAP_OTHER_TAG
 const OTHER_TAG: &str = "기타";
@@ -18,6 +20,7 @@ const OTHER_TAG: &str = "기타";
 #[serde(rename_all = "camelCase")]
 struct ScrapComment {
     id: String,
+    version: i64,
     created_at: String,
     text: String,
 }
@@ -171,11 +174,11 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     let comments = conn
-        .prepare("SELECT id, scrap_id, created_at, text FROM scrap_comments ORDER BY seq ASC")?
+        .prepare("SELECT id, scrap_id, created_at, text, version FROM scrap_comments ORDER BY seq ASC")?
         .query_map([], |row| {
             Ok((
                 row.get::<_, String>(1)?,
-                ScrapComment { id: row.get(0)?, created_at: row.get(2)?, text: row.get(3)? },
+                ScrapComment { id: row.get(0)?, created_at: row.get(2)?, text: row.get(3)?, version: row.get(4)? },
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -347,12 +350,15 @@ fn add_comment(conn: &Connection, scrap_id: &str, text: &str) -> ApiResult<()> {
     Ok(())
 }
 
-fn update_comment(conn: &Connection, scrap_id: &str, comment_id: &str, text: &str) -> ApiResult<()> {
+fn update_comment(conn: &Connection, scrap_id: &str, comment_id: &str, text: &str, expected: Option<i64>) -> ApiResult<()> {
     require_scrap(conn, scrap_id)?;
     require_comment(conn, scrap_id, comment_id)?;
     let text = validated_comment(text)?;
-    conn.execute("UPDATE scrap_comments SET text = ?1 WHERE id = ?2", params![text, comment_id])?;
-    Ok(())
+    let changed = conn.execute(
+        "UPDATE scrap_comments SET text = ?1, version = version + 1 WHERE id = ?2 AND (?3 IS NULL OR version = ?3)",
+        params![text, comment_id, expected],
+    )?;
+    ensure_versioned_update(changed, expected)
 }
 
 fn delete_comment(conn: &Connection, scrap_id: &str, comment_id: &str) -> ApiResult<()> {
@@ -449,9 +455,10 @@ async fn add_comment_handler(
 async fn update_comment_handler(
     State(db): State<Db>,
     Path((id, comment_id)): Path<(String, String)>,
+    headers: HeaderMap,
     Json(input): Json<CommentInput>,
 ) -> ApiResult<Json<Value>> {
-    update_comment(&db.conn(), &id, &comment_id, &input.text)?;
+    update_comment(&db.conn(), &id, &comment_id, &input.text, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -608,7 +615,7 @@ mod tests {
         add_comment(&conn, &scrap_id, "첫 댓글").unwrap();
         let comment_id = get_snapshot(&conn).unwrap().items[0].comments[0].id.clone();
 
-        update_comment(&conn, &scrap_id, &comment_id, "수정됨").unwrap();
+        update_comment(&conn, &scrap_id, &comment_id, "수정됨", None).unwrap();
         assert_eq!(get_snapshot(&conn).unwrap().items[0].comments[0].text, "수정됨");
 
         delete_comment(&conn, &scrap_id, &comment_id).unwrap();

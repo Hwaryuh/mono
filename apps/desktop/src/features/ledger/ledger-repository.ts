@@ -2,7 +2,7 @@ import type { LedgerCategoryWriteInput, LedgerSnapshot, LedgerWriteInput } from 
 
 export interface LedgerCategoryRepository {
   createCategory(input: LedgerCategoryWriteInput): Promise<void>;
-  updateCategory(categoryId: string, input: LedgerCategoryWriteInput): Promise<void>;
+  updateCategory(categoryId: string, input: LedgerCategoryWriteInput, expectedVersion?: number): Promise<void>;
   reorderCategories(categoryIds: string[]): Promise<void>;
   deleteCategory(categoryId: string): Promise<void>;
 }

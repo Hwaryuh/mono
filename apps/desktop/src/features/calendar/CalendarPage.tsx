@@ -3,6 +3,7 @@ import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
+import { isConflictError } from "../../infrastructure/http/http-client";
 import type { CalendarRepository } from "./calendar-repository";
 import { addDays, weekdayOf } from "./recurrence";
 
@@ -19,7 +20,7 @@ type RecurrencePreset = "none" | "daily" | "weekly" | "weekdays" | "biweekly" | 
 type RecurrenceEnd = "never" | "until" | "count";
 type CategoryCommand =
   | { type: "create"; input: CalendarCategoryWriteInput }
-  | { type: "update"; categoryId: string; input: CalendarCategoryWriteInput }
+  | { type: "update"; categoryId: string; input: CalendarCategoryWriteInput; expectedVersion: number }
   | { type: "reorder"; categoryIds: string[] }
   | { type: "delete"; categoryId: string; replacementCategoryId: string };
 
@@ -240,6 +241,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryVersion, setEditingCategoryVersion] = useState(1);
   const [categoryDraft, setCategoryDraft] = useState<CalendarCategoryWriteInput>(blankCategoryDraft);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
@@ -300,6 +302,15 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
       queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
   };
+  // 스냅샷 쿼리 키에 표시 범위가 붙어 있어 고정 키로 읽을 수 없다 — 무효화 뒤 캐시된 범위들에서 찾는다.
+  const resyncCalendarVersion = async (pick: (snapshot: CalendarSnapshot) => { version?: number } | undefined): Promise<number | null> => {
+    await invalidateSnapshots();
+    for (const [, snapshot] of queryClient.getQueriesData<CalendarSnapshot>({ queryKey: calendarQueryKey })) {
+      const found = snapshot && pick(snapshot);
+      if (found) return found.version ?? null;
+    }
+    return null;
+  };
   const createMutation = useMutation({
     mutationFn: (input: CalendarWriteInput) => repository.create(input),
     onMutate: () => setFormError(null),
@@ -307,10 +318,17 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     onError: (error) => setFormError(errorMessage(error)),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ eventId, input, scope }: { eventId: string; input: CalendarWriteInput; scope?: CalendarEditScope }) => repository.update(eventId, input, scope),
+    mutationFn: ({ eventId, input, scope, expectedVersion }: { eventId: string; input: CalendarWriteInput; scope?: CalendarEditScope; expectedVersion: number }) =>
+      repository.update(eventId, input, scope, expectedVersion),
     onMutate: () => setFormError(null),
     onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); closeEditor(true); },
-    onError: (error) => setFormError(errorMessage(error)),
+    onError: async (error) => {
+      setFormError(errorMessage(error));
+      if (isConflictError(error) && editorItem && editorItem !== "new") {
+        const version = await resyncCalendarVersion((snapshot) => snapshot.events.find((candidate) => candidate.id === editorItem.id));
+        if (version !== null) setEditorItem((current) => (current && current !== "new" ? { ...current, version } : current));
+      }
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: ({ eventId, scope }: { eventId: string; scope?: CalendarEditScope }) => repository.remove(eventId, scope),
@@ -321,7 +339,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const categoryMutation = useMutation({
     mutationFn: async (command: CategoryCommand) => {
       if (command.type === "create") await repository.createCategory(command.input);
-      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input);
+      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input, command.expectedVersion);
       else if (command.type === "reorder") await repository.reorderCategories(command.categoryIds);
       else await repository.deleteCategory(command.categoryId, command.replacementCategoryId);
     },
@@ -340,7 +358,13 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
       await invalidateSnapshots();
       requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#calendar-category-editor input")?.focus());
     },
-    onError: (error) => setCategoryError(errorMessage(error)),
+    onError: async (error) => {
+      setCategoryError(errorMessage(error));
+      if (isConflictError(error) && editingCategoryId) {
+        const version = await resyncCalendarVersion((snapshot) => snapshot.categories.find((candidate) => candidate.id === editingCategoryId));
+        if (version !== null) setEditingCategoryVersion(version);
+      }
+    },
   });
 
   useEffect(() => {
@@ -416,6 +440,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
 
   function editCategory(category: CalendarCategory) {
     setEditingCategoryId(category.id);
+    setEditingCategoryVersion(category.version ?? 1);
     setCategoryDraft({ name: category.name, color: category.color });
     setCategoryError(null);
   }
@@ -427,7 +452,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
       setCategoryError(parsed.error.issues[0]?.message ?? "라벨 입력값을 확인해야 합니다.");
       return;
     }
-    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data });
+    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
     else categoryMutation.mutate({ type: "create", input: parsed.data });
   }
 
@@ -484,7 +509,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     if (!editingEvent) return;
     // 반복 시리즈의 한 회차를 고치는 중이면 범위를 먼저 묻는다.
     if (editingEvent.seriesId) { setScopePrompt({ mode: "save", event: editingEvent, input }); return; }
-    updateMutation.mutate({ eventId: editingEvent.id, input });
+    updateMutation.mutate({ eventId: editingEvent.id, input, expectedVersion: editingEvent.version ?? 1 });
   }
 
   function requestDelete() {
@@ -497,7 +522,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   function runScope(scope: CalendarEditScope) {
     if (!scopePrompt) return;
     if (scopePrompt.mode === "save" && scopePrompt.input) {
-      updateMutation.mutate({ eventId: scopePrompt.event.id, input: scopePrompt.input, scope });
+      updateMutation.mutate({ eventId: scopePrompt.event.id, input: scopePrompt.input, scope, expectedVersion: scopePrompt.event.version ?? 1 });
     } else if (scopePrompt.mode === "delete") {
       deleteMutation.mutate({ eventId: scopePrompt.event.id, scope });
     }
