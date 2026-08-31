@@ -198,10 +198,10 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
             <div className="routine-editor__period" role="radiogroup"><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">종료일 지정</button></div>
             {draft.endless ? <p>끝을 정하지 않습니다. 언제든 루틴 화면에서 기간을 수정할 수 있습니다.</p> : <div className="routine-editor__end"><DatePicker align="end" label="종료일" min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>이 날짜까지만 지정 요일에 할 일이 생성됩니다. 이후에는 비활성 상태가 됩니다.</span></div>}
           </fieldset>
-          <fieldset className="routine-editor__label-fieldset">
-            <legend className="todo-editor__label-legend"><span>라벨</span><button onClick={() => setLabelManagerOpen(true)} type="button">관리</button></legend>
+          <div className="routine-editor__label-field">
+            <div className="todo-editor__label-legend"><span>라벨</span><button onClick={() => setLabelManagerOpen(true)} type="button">관리</button></div>
             <Select label="라벨" onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />
-          </fieldset>
+          </div>
           {formError && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>

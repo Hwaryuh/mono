@@ -32,6 +32,7 @@ describe("RoutinePage", () => {
   it("공통 Modal에서 만들고 수정하며 focus를 복귀한다", async () => {
     renderRoutine(createMockRoutineRepository(), "/routine?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 루틴" });
+    expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
     expect(modal.querySelector(".routine-editor-modal")).toHaveClass("ui-modal");
     expect(modal.querySelector(".routine-editor-modal")).not.toHaveClass("ui-drawer");
     fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "아침 스트레칭" } });

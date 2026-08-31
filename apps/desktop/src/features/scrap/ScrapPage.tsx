@@ -412,10 +412,10 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
               </button>
             )}
           </fieldset>
-          <fieldset className="scrap-create-form__label-fieldset">
-            <legend className="scrap-create-form__label-legend"><span>라벨</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">관리</button></legend>
+          <div className="scrap-create-form__label-field">
+            <div className="scrap-create-form__label-legend"><span>라벨</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">관리</button></div>
             <Select disabled={createMutation.isPending} label="라벨" onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
-          </fieldset>
+          </div>
           {formError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>

@@ -308,6 +308,7 @@ describe("ScrapPage", () => {
   it("라벨 관리 Modal을 중첩해 새 라벨을 만들고 생성에 반영한다", async () => {
     renderPage(createMockScrapRepository(), "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
     fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "새 링크 자료" } });
     fireEvent.change(within(modal).getByRole("textbox", { name: "링크 \(선택\)" }), { target: { value: "https://example.com" } });
     const managerTrigger = within(modal).getByRole("button", { name: "관리" });

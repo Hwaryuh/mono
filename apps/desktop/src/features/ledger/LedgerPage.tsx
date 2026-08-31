@@ -289,8 +289,8 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
             <label><span>금액</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
             <label><span>날짜</span><DatePicker align="end" label="날짜" onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
           </div>
-          <fieldset>
-            <legend className="ledger-expense-form__category-legend"><span>라벨</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button></legend>
+          <div className="ledger-expense-form__field">
+            <div className="ledger-expense-form__category-legend"><span>라벨</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button></div>
             <Select
               align="end"
               disabled={editorBusy}
@@ -299,7 +299,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
               options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))}
               value={draft.categoryId}
             />
-          </fieldset>
+          </div>
           <label><span>메모 <small>(선택)</small></span><Input maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} value={draft.note} /></label>
           {(createMutation.isPending || updateMutation.isPending) && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />지출을 저장하고 있습니다.</div>}
           {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}

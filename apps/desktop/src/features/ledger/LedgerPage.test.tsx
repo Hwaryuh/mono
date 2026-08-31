@@ -91,6 +91,7 @@ describe("LedgerPage", () => {
   it("쉼표 금액으로 지출을 생성하고 Modal을 닫는다", async () => {
     renderLedger(createMockLedgerRepository(), "/ledger?modal=new");
     const modal = await fillRequiredFields();
+    expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
 
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
 
