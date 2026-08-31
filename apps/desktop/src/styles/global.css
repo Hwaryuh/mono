@@ -1503,7 +1503,8 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
   border: 0;
 }
 
-.todo-filter-group legend {
+.todo-filter-group legend,
+.todo-filter-group__title {
   width: 100%;
   padding: 0 6px 4px;
   color: var(--color-text-faint);
@@ -1512,7 +1513,8 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
   letter-spacing: 0.07em;
 }
 
-.todo-filter-group--labels legend {
+/* 관리 버튼이 <legend> 안에 있으면 일부 WebView에서 클릭이 먹지 않아 <div>로 뺀다. */
+.todo-filter-group__title {
   padding-right: 3px;
   display: flex;
   align-items: center;
@@ -1873,21 +1875,21 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 .routine-editor { display: flex; flex-direction: column; gap: 14px; }
 .routine-editor > label { display: flex; flex-direction: column; gap: 5px; }
 .routine-editor > label > span,
-.routine-editor legend { color: var(--color-text-faint); font-size: 10.5px; }
+.routine-editor__group-title { color: var(--color-text-faint); font-size: 10.5px; }
 .routine-editor > label .ui-input { height: 34px; font-size: 12.5px; }
-.routine-editor fieldset { min-width: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; border: 0; }
+/* 이전엔 <fieldset>/<legend>. legend 안의 "매일" 버튼이 일부 WebView에서 안 눌려 <div>로 바꿈. */
+.routine-editor__group { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .routine-editor__label-field { min-width: 0; }
-.routine-editor fieldset > legend { margin-bottom: 6px; }
-.routine-editor legend { width: 100%; display: flex; align-items: center; gap: 7px; }
-.routine-editor legend small { color: var(--color-text-faint); font-size: 10px; }
-.routine-editor legend .ui-button { min-height: 24px; margin-left: auto; padding: 0; }
+.routine-editor__group-title { display: flex; align-items: center; gap: 7px; }
+.routine-editor__group-title small { color: var(--color-text-faint); font-size: 10px; }
+.routine-editor__group-title .ui-button { min-height: 24px; margin-left: auto; padding: 0; }
 .routine-editor__days { display: flex; gap: 6px; }
 .routine-editor__day { width: 40px; height: 40px; padding: 0; border: 1px solid var(--color-border-strong); border-radius: 50%; background: var(--color-surface-subtle); color: var(--color-text-muted); font-size: 12px; font-weight: 600; cursor: pointer; }
 .routine-editor__day--selected { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-accent-foreground); }
 .routine-editor__period { padding: 2px; display: flex; gap: 2px; border-radius: var(--radius-control); background: var(--color-hover); }
 .routine-editor__period button { min-height: 30px; flex: 1; padding: 7px; border: 0; border-radius: 4px; background: transparent; color: var(--color-text-muted); font-size: 11.5px; font-weight: 600; cursor: pointer; }
 .routine-editor__period button[aria-checked="true"] { background: var(--color-surface); color: var(--color-text); }
-.routine-editor fieldset > p { margin: 0; color: var(--color-text-faint); font-size: 10.5px; line-height: 1.5; }
+.routine-editor__group > p { margin: 0; color: var(--color-text-faint); font-size: 10.5px; line-height: 1.5; }
 .routine-editor__end { padding: 11px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
 .routine-editor__end span { color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; }
 .routine-editor__label-field > .ui-select { width: 100%; }

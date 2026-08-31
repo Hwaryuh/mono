@@ -191,13 +191,15 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
       >
         <form className="routine-editor" id="routine-editor-form" onSubmit={submit}>
           <label><span>제목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 비타민 먹기" value={draft.title} /></label>
-          <fieldset><legend>반복 요일 <small>{draft.days.length === 7 ? "매일" : selectedDays.join(" · ") || "요일을 고르세요"}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">매일</Button></legend>
+          <div className="routine-editor__group">
+            <div className="routine-editor__group-title">반복 요일 <small>{draft.days.length === 7 ? "매일" : selectedDays.join(" · ") || "요일을 고르세요"}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">매일</Button></div>
             <div className="routine-editor__days" role="group" aria-label="반복 요일">{dayNames.map((name, day) => <button aria-pressed={draft.days.includes(day)} className={draft.days.includes(day) ? "routine-editor__day routine-editor__day--selected" : "routine-editor__day"} key={name} onClick={() => toggleDay(day)} type="button">{name}</button>)}</div>
-          </fieldset>
-          <fieldset><legend>기간</legend>
-            <div className="routine-editor__period" role="radiogroup"><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">종료일 지정</button></div>
+          </div>
+          <div className="routine-editor__group">
+            <div className="routine-editor__group-title">기간</div>
+            <div className="routine-editor__period" role="radiogroup" aria-label="기간"><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">종료일 지정</button></div>
             {draft.endless ? <p>끝을 정하지 않습니다. 언제든 루틴 화면에서 기간을 수정할 수 있습니다.</p> : <div className="routine-editor__end"><DatePicker align="end" label="종료일" min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>이 날짜까지만 지정 요일에 할 일이 생성됩니다. 이후에는 비활성 상태가 됩니다.</span></div>}
-          </fieldset>
+          </div>
           <div className="routine-editor__label-field">
             <div className="todo-editor__label-legend"><span>라벨</span><button onClick={() => setLabelManagerOpen(true)} type="button">관리</button></div>
             <Select label="라벨" onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />

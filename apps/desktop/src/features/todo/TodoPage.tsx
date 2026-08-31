@@ -243,11 +243,11 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
             );
           })}
         </fieldset>
-        <fieldset className="todo-filter-group todo-filter-group--labels">
-          <legend>
+        <div aria-label="라벨 필터" className="todo-filter-group todo-filter-group--labels" role="group">
+          <div className="todo-filter-group__title">
             <span>라벨</span>
             <button aria-label="라벨 관리" className="todo-label-manage-trigger" onClick={openLabelManager} type="button">관리</button>
-          </legend>
+          </div>
           {snapshot.labels.map((label) => {
             const selected = labelIds.includes(label.id);
             return (
@@ -265,7 +265,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
               </button>
             );
           })}
-        </fieldset>
+        </div>
       </aside>
 
       <section className="todo-content">
