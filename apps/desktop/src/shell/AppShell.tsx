@@ -550,7 +550,7 @@ function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMai
       <section aria-label="미사용 미디어 정리" className="settings-group settings-ai">
         <header>
           <strong>미사용 미디어</strong>
-          <span>수집함과 스크랩 어느 항목도 참조하지 않는 사진·영상입니다. 항목을 지워도 파일은 남아 있습니다.</span>
+          <span>수집함과 스크랩 어느 항목도 참조하지 않는 사진·영상입니다.</span>
         </header>
         <div className="settings-ai__status">
           <span>정리 대상</span>
