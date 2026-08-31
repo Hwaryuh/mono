@@ -78,7 +78,7 @@ describe("TodoPage", () => {
     fireEvent.click(within(picker).getByRole("button", { name: "2026년 8월 12일" }));
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith("task-5", expect.objectContaining({ dueDate: "2026-08-12" })));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("task-5", expect.objectContaining({ dueDate: "2026-08-12" }), expect.anything()));
   });
 
   it("라벨을 추가하고 Modal을 닫으면 focus를 복귀한다", async () => {

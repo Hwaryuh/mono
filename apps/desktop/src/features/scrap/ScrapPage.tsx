@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
-import { httpGetBlob } from "../../infrastructure/http/http-client";
+import { httpGetBlob, isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
 import { newMediaId } from "../../infrastructure/media/media-store";
 import type { ScrapRepository } from "./scrap-repository";
@@ -670,19 +671,30 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState(comment.text);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editingVersion, setEditingVersion] = useState(comment.version ?? 1);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const editButtonDomId = `scrap-comment-edit-${comment.id}`;
   const deleteButtonDomId = `scrap-comment-delete-${comment.id}`;
   const queryClient = useQueryClient();
   const updateMutation = useMutation({
-    mutationFn: (text: string) => repository.updateComment(scrapId, comment.id, { text }),
+    mutationFn: (text: string) => repository.updateComment(scrapId, comment.id, { text }, editingVersion),
     onMutate: () => setEditError(null),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: scrapQueryKey });
       setEditing(false);
       requestAnimationFrame(() => document.getElementById(editButtonDomId)?.focus());
     },
-    onError: (error) => setEditError(errorMessage(error)),
+    onError: async (error) => {
+      setEditError(errorMessage(error));
+      if (isConflictError(error)) {
+        const version = await resyncConflictVersion<ScrapSnapshot>(
+          queryClient, scrapQueryKey,
+          () => queryClient.invalidateQueries({ queryKey: scrapQueryKey }),
+          (snapshot) => snapshot.items.find((candidate) => candidate.id === scrapId)?.comments.find((candidate) => candidate.id === comment.id),
+        );
+        if (version !== null) setEditingVersion(version);
+      }
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: () => repository.deleteComment(scrapId, comment.id),
@@ -694,6 +706,7 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
 
   function startEditing() {
     setDraft(comment.text);
+    setEditingVersion(comment.version ?? 1);
     setEditError(null);
     setEditing(true);
   }

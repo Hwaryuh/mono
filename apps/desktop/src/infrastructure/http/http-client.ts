@@ -3,6 +3,18 @@ const DEFAULT_API_BASE_URL = "http://127.0.0.1:4174";
 export let API_BASE_URL = DEFAULT_API_BASE_URL;
 let apiToken = "";
 
+export class HttpError extends Error {
+  constructor(message: string, readonly status: number, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "HttpError";
+  }
+}
+
+/** 편집 충돌(다른 기기가 먼저 저장) — 낙관적 버전 불일치. 편집 폼은 닫지 않고 최신을 다시 읽는다. */
+export function isConflictError(error: unknown): error is HttpError {
+  return error instanceof HttpError && error.status === 409;
+}
+
 export function configureApiBaseUrl(value: string): void {
   API_BASE_URL = value.replace(/\/$/, "");
 }
@@ -31,9 +43,11 @@ function extractErrorMessage(body: unknown): string | null {
   return null;
 }
 
-function jsonInit(method: string, body?: unknown): RequestInit {
-  if (body === undefined) return { method };
-  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+function jsonInit(method: string, body?: unknown, expectedVersion?: number): RequestInit {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (expectedVersion !== undefined) headers["If-Match"] = `"${expectedVersion}"`;
+  return { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -46,7 +60,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(extractErrorMessage(body) ?? `요청이 실패했습니다. (${response.status})`);
+    throw new HttpError(
+      extractErrorMessage(body) ?? `요청이 실패했습니다. (${response.status})`,
+      response.status,
+    );
   }
   return body as T;
 }
@@ -54,6 +71,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const httpGet = <T>(path: string): Promise<T> => request<T>(path);
 export const httpPost = <T = void>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit("POST", body));
 export const httpPut = <T = void>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit("PUT", body));
+export const httpPutVersioned = <T = void>(path: string, expectedVersion: number | undefined, body?: unknown): Promise<T> =>
+  request<T>(path, jsonInit("PUT", body, expectedVersion));
 export const httpDelete = <T = void>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit("DELETE", body));
 
 // request()는 항상 JSON 응답을 가정한다. 미디어 업로드·다운로드는 바이너리라 별도 경로가 필요하다.

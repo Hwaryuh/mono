@@ -88,16 +88,27 @@ impl Categories {
         Ok(())
     }
 
-    pub fn update(&self, conn: &Connection, id: &str, name_raw: &str, color_raw: &str) -> ApiResult<()> {
+    pub fn update(
+        &self,
+        conn: &Connection,
+        id: &str,
+        name_raw: &str,
+        color_raw: &str,
+        expected: Option<i64>,
+    ) -> ApiResult<()> {
         self.require(conn, id)?;
         let name = validated_name(name_raw)?;
         let color = validated_color(color_raw)?;
         self.assert_unique_name(conn, &name, Some(id))?;
-        conn.execute(
-            &format!("UPDATE {} SET name = ?1, color = ?2 WHERE id = ?3", self.table),
-            params![name, color, id],
+        let changed = conn.execute(
+            &format!(
+                "UPDATE {} SET name = ?1, color = ?2, version = version + 1 \
+                 WHERE id = ?3 AND (?4 IS NULL OR version = ?4)",
+                self.table
+            ),
+            params![name, color, id, expected],
         )?;
-        Ok(())
+        crate::version::ensure_versioned_update(changed, expected)
     }
 
     pub fn reorder(&self, conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
