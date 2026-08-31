@@ -29,9 +29,41 @@ const maxPhotoBytes = 10 * 1024 * 1024;
 const photoPickerDomId = "scrap-photo-picker";
 const photoReplaceDomId = "scrap-photo-replace";
 const externalUrlOpener = PlatformExternalUrlOpener.of();
+const commentUrlPattern = /(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+const trailingUrlPunctuationPattern = /[),.!?;:\]}]+$/u;
+
+type CommentTextSegment = { text: string; externalUrl: string | null };
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+}
+
+function commentTextSegmentsOf(text: string): CommentTextSegment[] {
+  const segments: CommentTextSegment[] = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(commentUrlPattern)) {
+    const index = match.index;
+    const candidate = match[0];
+    const linkText = candidate.replace(trailingUrlPunctuationPattern, "");
+    const trailingText = candidate.slice(linkText.length);
+    const externalUrl = externalUrlOf(linkText);
+
+    if (index > cursor) segments.push({ text: text.slice(cursor, index), externalUrl: null });
+    if (externalUrl) segments.push({ text: linkText, externalUrl });
+    else segments.push({ text: candidate, externalUrl: null });
+    if (externalUrl && trailingText) segments.push({ text: trailingText, externalUrl: null });
+    cursor = index + candidate.length;
+  }
+
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), externalUrl: null });
+  return segments.length > 0 ? segments : [{ text, externalUrl: null }];
+}
+
+function submitFormOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
+  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  event.currentTarget.form?.requestSubmit();
 }
 
 function photoTitle(fileName: string) {
@@ -363,7 +395,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
 
       <Drawer
         className="scrap-detail-drawer"
-        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}><Input aria-label="새 댓글" disabled={commentBusyId === detail.id} onChange={(event) => setCommentText(event.target.value)} placeholder="새 댓글…" value={commentText} /><Button aria-label="댓글" loading={commentBusyId === detail.id} title="댓글 등록" type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>{commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}</form> : undefined}
+        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}><TextArea aria-label="새 댓글" disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder="새 댓글… (Shift+Enter로 줄바꿈)" rows={1} value={commentText} /><Button aria-label="댓글" loading={commentBusyId === detail.id} title="댓글 등록" type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>{commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}</form> : undefined}
         icon="scrap"
         onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
@@ -510,6 +542,31 @@ function ScrapMediaPreview({ item, meta, iconSize }: { item: ScrapItem; meta: { 
   const src = mediaSrc ?? previewSrc;
   if (src) return <img alt={item.kind === "image" ? item.title : ""} decoding="async" loading="lazy" src={src} />;
   return <><Icon name={meta.icon} size={iconSize} strokeWidth={1.4} /><span>{meta.label}</span></>;
+}
+
+function CommentContent({ text, urlOpener }: { text: string; urlOpener: ExternalUrlOpener }) {
+  const segments = commentTextSegmentsOf(text);
+  const previewUrl = segments.find((segment) => segment.externalUrl)?.externalUrl ?? null;
+
+  function openExternalUrl(event: MouseEvent<HTMLAnchorElement>, externalUrl: string) {
+    event.preventDefault();
+    void urlOpener.open(externalUrl);
+  }
+
+  return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
+}
+
+function CommentLinkPreview({ externalUrl, onOpen }: { externalUrl: string; onOpen: (event: MouseEvent<HTMLAnchorElement>, externalUrl: string) => void }) {
+  const { data: previewSrc } = useLinkPreviewImage(externalUrl);
+  if (!previewSrc) return null;
+
+  const hostname = new URL(externalUrl).hostname.replace(/^www\./, "");
+  return (
+    <a aria-label={`${hostname} 링크 미리보기 열기`} className="scrap-comment__link-preview" href={externalUrl} onClick={(event) => onOpen(event, externalUrl)} rel="noreferrer" target="_blank">
+      <img alt="" decoding="async" loading="lazy" src={previewSrc} />
+      <span><strong>{hostname}</strong><small>{externalUrl}</small></span>
+    </a>
+  );
 }
 
 function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
@@ -663,10 +720,10 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
       {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
     </form>
   ) : (<>
-    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 수정" onClick={startEditing} size="small" title="스크랩 수정" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} />)}</div></div>;
+    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 수정" onClick={startEditing} size="small" title="스크랩 수정" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div></div>;
 }
 
-function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string }) {
+function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string; urlOpener: ExternalUrlOpener }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState(comment.text);
@@ -752,7 +809,7 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
       </div>
       {editing ? (
         <form className="scrap-comment__editor" onSubmit={submitEdit}>
-          <Input
+          <TextArea
             aria-invalid={editError ? "true" : undefined}
             aria-label="댓글 수정"
             autoFocus
@@ -760,11 +817,15 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
             maxLength={2_000}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
-              event.preventDefault();
-              event.stopPropagation();
-              cancelEditing();
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelEditing();
+                return;
+              }
+              submitFormOnEnter(event);
             }}
+            rows={1}
             value={draft}
           />
           <div className="scrap-comment__editor-actions">
@@ -773,7 +834,7 @@ function ScrapCommentRow({ comment, repository, scrapId }: { comment: ScrapComme
           </div>
           {editError && <span className="scrap-comment__edit-error" role="alert">{editError}</span>}
         </form>
-      ) : <p>{comment.text}</p>}
+      ) : <CommentContent text={comment.text} urlOpener={urlOpener} />}
       {deleteError && <span className="scrap-comment__edit-error" role="alert">{deleteError}</span>}
     </article>
   );

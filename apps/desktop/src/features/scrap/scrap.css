@@ -182,8 +182,21 @@
 .scrap-comment__meta .ui-icon-button::before { content: ""; position: absolute; inset: -8px; }
 .scrap-comment time { color: var(--color-text-faint); font-size: 10px; }
 .scrap-comment p { margin: 0; color: var(--color-text); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.scrap-comment__text { white-space: pre-wrap; }
+.scrap-comment__text > a { color: var(--color-accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-accent) 38%, transparent); text-underline-offset: 2px; }
+.scrap-comment__text > a:hover { text-decoration-color: currentColor; }
+.scrap-comment__text > a:focus-visible,
+.scrap-comment__link-preview:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.scrap-comment__link-preview { min-width: 0; margin-top: 5px; overflow: hidden; display: flex; align-items: stretch; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); text-decoration: none; }
+.scrap-comment__link-preview:hover { border-color: var(--color-border-strong); background: var(--color-hover); }
+.scrap-comment__link-preview > img { width: 112px; height: 63px; flex: 0 0 112px; display: block; object-fit: cover; }
+.scrap-comment__link-preview > span { min-width: 0; padding: 9px 10px; display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 3px; }
+.scrap-comment__link-preview strong,
+.scrap-comment__link-preview small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scrap-comment__link-preview strong { font-size: 11px; font-weight: 600; }
+.scrap-comment__link-preview small { color: var(--color-text-faint); font-size: 9.5px; }
 .scrap-comment__editor { display: flex; flex-direction: column; gap: 7px; }
-.scrap-comment__editor .ui-input { height: 34px; background: var(--color-surface); font-size: 12px; }
+.scrap-comment__editor .ui-textarea { min-height: 34px; max-height: 112px; height: auto; background: var(--color-surface); font-size: 12px; resize: none; field-sizing: content; }
 .scrap-comment__editor-actions { display: flex; justify-content: flex-end; gap: 5px; }
 .scrap-comment__editor-actions .ui-button { min-height: 28px; }
 .scrap-comment__edit-error { color: var(--color-danger); font-size: 10px; line-height: 1.4; }
@@ -193,8 +206,8 @@
 .scrap-comment__confirm .ui-button { min-height: 24px; }
 .scrap-comment[aria-busy="true"] { opacity: 0.68; }
 .scrap-detail-drawer .ui-overlay__footer { padding-inline: 14px; }
-.scrap-comment-form { position: relative; min-width: 0; flex: 1; display: flex; gap: 8px; }
-.scrap-comment-form .ui-input { height: 34px; background: var(--color-surface); }
+.scrap-comment-form { position: relative; min-width: 0; flex: 1; display: flex; align-items: flex-end; gap: 8px; }
+.scrap-comment-form .ui-textarea { min-height: 34px; max-height: 112px; height: auto; background: var(--color-surface); resize: none; field-sizing: content; }
 .scrap-comment-form .ui-button { width: 34px; height: 34px; flex: 0 0 34px; padding: 0; }
 .scrap-comment-error { position: absolute; right: 0; bottom: 39px; max-width: 100%; padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: 4px; background: var(--color-surface); color: var(--color-danger); font-size: 10px; }
 

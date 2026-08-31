@@ -152,6 +152,67 @@ describe("ScrapPage", () => {
     expect(within(drawer).queryByRole("link", { name: unsafeUrl })).not.toBeInTheDocument();
   });
 
+  it("댓글 URL을 외부 링크와 첫 링크의 썸네일 카드로 표시한다", async () => {
+    const url = "https://www.youtube.com/watch?v=rop5hVsowDQ";
+    const open = vi.fn(async () => {});
+    renderPage(
+      repositoryOf({
+        tags: ["수집"],
+        items: [{ id: "comment-link", kind: "text", title: "댓글 링크", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-link-1", createdAt: "오늘", text: `첫 줄\n${url}.` }] }],
+      }),
+      "/scrap?detail=comment-link",
+      { open },
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const textLink = within(drawer).getByRole("link", { name: url });
+    expect(textLink).toHaveAttribute("href", url);
+    expect(textLink.closest("p")).toHaveTextContent(`첫 줄 ${url}.`);
+    expect(await within(drawer).findByRole("link", { name: "youtube.com 링크 미리보기 열기" })).toBeInTheDocument();
+    expect(httpClient.httpGetBlob).toHaveBeenCalledWith(`/link-previews/image?url=${encodeURIComponent(url)}`);
+
+    fireEvent.click(textLink);
+    expect(open).toHaveBeenCalledWith(url);
+  });
+
+  it("새 댓글은 Shift+Enter로 줄바꿈하고 Enter로 등록한다", async () => {
+    const addComment = vi.fn(async () => {});
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "comment-keyboard", kind: "text", title: "댓글 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [] }] }, { addComment }),
+      "/scrap?detail=comment-keyboard",
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const textarea = within(drawer).getByRole("textbox", { name: "새 댓글" });
+    fireEvent.change(textarea, { target: { value: "첫 줄" } });
+    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+    expect(addComment).not.toHaveBeenCalled();
+
+    fireEvent.change(textarea, { target: { value: "첫 줄\n둘째 줄" } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    await waitFor(() => expect(addComment).toHaveBeenCalledWith("comment-keyboard", { text: "첫 줄\n둘째 줄" }));
+  });
+
+  it("댓글 수정도 Shift+Enter로 줄바꿈하고 Enter로 저장한다", async () => {
+    const updateComment = vi.fn(async () => {});
+    const text = "수정 전";
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "edit-keyboard", kind: "text", title: "댓글 수정 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "edit-keyboard-comment", createdAt: "오늘", text }] }] }, { updateComment }),
+      "/scrap?detail=edit-keyboard",
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: `${text} 댓글 수정` }));
+    const textarea = within(drawer).getByRole("textbox", { name: "댓글 수정" });
+    fireEvent.change(textarea, { target: { value: "수정 첫 줄" } });
+    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+    expect(updateComment).not.toHaveBeenCalled();
+
+    fireEvent.change(textarea, { target: { value: "수정 첫 줄\n수정 둘째 줄" } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    await waitFor(() => expect(updateComment).toHaveBeenCalledWith("edit-keyboard", "edit-keyboard-comment", { text: "수정 첫 줄\n수정 둘째 줄" }, 1));
+  });
+
   it("댓글 mutation 성공 후 원본 댓글을 다시 읽고 상세 진입점으로 focus를 돌린다", async () => {
     renderPage();
     const card = await screen.findByRole("button", { name: /카메라 무빙 레퍼런스/ });
@@ -161,6 +222,7 @@ describe("ScrapPage", () => {
     fireEvent.change(within(drawer).getByRole("textbox", { name: "새 댓글" }), { target: { value: "구도를 다시 확인하기" } });
     fireEvent.click(within(drawer).getByRole("button", { name: "댓글" }));
     expect(await within(drawer).findByText("구도를 다시 확인하기")).toBeInTheDocument();
+    await waitFor(() => expect(within(drawer).getByRole("textbox", { name: "새 댓글" })).not.toBeDisabled());
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(card).toHaveFocus());
   });
@@ -205,6 +267,7 @@ describe("ScrapPage", () => {
     fireEvent.change(input, { target: { value: "마늘은 그대로 넣는 편이 낫다." } });
     fireEvent.click(within(input.closest("form")!).getByRole("button", { name: "저장" }));
 
+    await waitFor(async () => expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-1")?.comments.find((comment) => comment.id === "comment-1")?.text).toBe("마늘은 그대로 넣는 편이 낫다."));
     expect(await within(drawer).findByText("마늘은 그대로 넣는 편이 낫다.")).toBeInTheDocument();
     const updatedEditButton = within(drawer).getByRole("button", { name: "마늘은 그대로 넣는 편이 낫다. 댓글 수정" });
     await waitFor(() => expect(updatedEditButton).toHaveFocus());
