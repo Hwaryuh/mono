@@ -136,11 +136,17 @@ describe("TodoPage", () => {
     await waitFor(() => expect(name).toHaveFocus());
   });
 
-  it("완료 토글을 항목별로 반영한다", async () => {
+  it("전체에서 완료 토글한 항목을 미완료 항목 아래로 옮긴다", async () => {
     renderTodo();
     const checkbox = await screen.findByRole("checkbox", { name: "설거지 하기 완료 처리" });
     fireEvent.click(checkbox);
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "설거지 하기 미완료 처리" })).toBeChecked());
+
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(".todo-item"));
+    const firstDone = rows.findIndex((row) => row.classList.contains("todo-item--done"));
+    expect(firstDone).toBeGreaterThan(0);
+    expect(rows.slice(0, firstDone).every((row) => !row.classList.contains("todo-item--done"))).toBe(true);
+    expect(rows.slice(firstDone).every((row) => row.classList.contains("todo-item--done"))).toBe(true);
   });
 
   it("메모가 있는 할 일에만 메모 아이콘을 표시한다", async () => {

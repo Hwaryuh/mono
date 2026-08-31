@@ -1,7 +1,7 @@
 import { type TodoItem, type TodoLabel, type TodoSnapshot, type TodoWriteInput } from "@mono/contracts";
 import { Button, Checkbox, DatePicker, Icon, Input, Modal, Select, TextArea, TimePicker, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { TodoLabelManagerModal } from "./TodoLabelManagerModal";
 import type { TodoRepository } from "./todo-repository";
@@ -133,10 +133,13 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
       ? snapshot.items.filter((item) => !isAgedDone(item, now)).length
       : snapshot.items.filter((item) => statusOf(item, snapshot.today) === statusId).length,
   ])) as Record<TodoStatus, number>;
-  const visibleItems = snapshot.items.filter((item) => {
+  const filteredItems = snapshot.items.filter((item) => {
     const statusMatches = status === "all" ? !isAgedDone(item, now) : statusOf(item, snapshot.today) === status;
     return statusMatches && (labelIds.length === 0 || labelIds.includes(item.labelId));
   });
+  const visibleItems = status === "all"
+    ? [...filteredItems].sort((left, right) => Number(left.done) - Number(right.done))
+    : filteredItems;
   const title = labelIds.length > 0 ? "필터링된 할 일" : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -356,6 +359,10 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
 
 function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem; label: TodoLabel; snapshot: TodoSnapshot; repository: TodoRepository; onOpen: () => void }) {
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const rowRef = useRef<HTMLElement>(null);
+  const previousTopRef = useRef<number | null>(null);
+  const previousDoneRef = useRef(item.done);
+  const movementRef = useRef<Animation | null>(null);
   const queryClient = useQueryClient();
   const toggleMutation = useMutation({
     mutationFn: () => repository.toggleComplete(item.id),
@@ -370,6 +377,7 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
     onError: (error) => setMutationError(errorMessage(error)),
   });
   const status = statusOf(item, snapshot.today);
+  const justCompleted = item.done && !previousDoneRef.current;
   const dueText = item.done
     ? `완료: ${item.completedAt ? formatCompletedAt(item.completedAt) : "방금"}`
     : !item.dueDate
@@ -380,8 +388,29 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
           ? `기한: ${daysBetween(item.dueDate, snapshot.today)}일 지남`
           : `기한: ${formatDate(item.dueDate)}${item.dueTime ? ` ${item.dueTime}` : ""}`;
 
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const nextTop = row.getBoundingClientRect().top;
+    const previousTop = previousTopRef.current;
+    previousTopRef.current = nextTop;
+    previousDoneRef.current = item.done;
+    movementRef.current?.cancel();
+
+    const delta = previousTop === null ? 0 : previousTop - nextTop;
+    if (Math.abs(delta) < 1 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || !row.animate) return;
+    movementRef.current = row.animate(
+      [{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }],
+      { duration: 260, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+    );
+  });
+
   return (
-    <article aria-busy={toggleMutation.isPending} className={`todo-item ${item.done ? "todo-item--done" : ""}`}>
+    <article
+      aria-busy={toggleMutation.isPending}
+      className={`todo-item ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
+      ref={rowRef}
+    >
       <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={`${item.title} ${item.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => toggleMutation.mutate()} />
       <button aria-label={`${item.title} 수정`} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
         <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label="메모 있음" className="todo-item__note" name="note" role="img" size={12} />}</span></span>
