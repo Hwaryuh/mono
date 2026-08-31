@@ -92,7 +92,7 @@ describe("ScrapPage", () => {
       "/scrap?detail=iso",
     );
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
-    expect(within(drawer).getByText(/\d{4}\. \d{1,2}\. \d{1,2} \d{2}:\d{2} 저장/)).toBeInTheDocument();
+    expect(within(drawer).getByText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/)).toBeInTheDocument();
     expect(within(drawer).queryByText(/2026-08-27T/)).not.toBeInTheDocument();
   });
 

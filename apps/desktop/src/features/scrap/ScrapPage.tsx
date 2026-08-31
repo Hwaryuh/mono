@@ -37,6 +37,15 @@ function photoTitle(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").trim() || "사진";
 }
 
+// 스크랩 부제목 저장 시각: "2026. 08. 31. 10:35". 파싱 불가한 값(mock의 "방금" 등)은 그대로.
+function formatSavedAt(value: string) {
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  const date = new Date(parsed);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}. ${pad(date.getMonth() + 1)}. ${pad(date.getDate())}. ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -357,7 +366,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
         icon="scrap"
         onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
-        title={<span className="scrap-detail-title">스크랩{detail && <small>{formatTimestamp(detail.savedAt)} 저장</small>}</span>}
+        title={<span className="scrap-detail-title">스크랩{detail && <small>{formatSavedAt(detail.savedAt)}</small>}</span>}
       >
         {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
