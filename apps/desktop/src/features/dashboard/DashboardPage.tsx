@@ -90,7 +90,7 @@ function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onTog
     <Widget icon="todo" title="오늘 할 일" to="/todo" wide>
       {snapshot.tasks.length === 0 ? <WidgetEmpty icon="todo">오늘 할 일이 없습니다</WidgetEmpty> : (
         <div className="task-list">
-          {snapshot.tasks.map((task) => (
+          {snapshot.tasks.slice(0, 3).map((task) => (
             <div className={`task-row ${task.done ? "task-row--done" : ""}`} key={task.id}>
               <Checkbox checked={task.done} label={`${task.title} ${task.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => onToggle(task.id)} />
               <span className="task-row__title">{task.title}</span>

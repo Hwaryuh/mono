@@ -155,7 +155,7 @@ export function createMockPlatformState(): MockPlatformState {
       items: [
         { id: "task-1", title: "설거지 하기", labelId: "home", dueDate: "2026-08-05", dueTime: null, note: "", done: false, completedAt: null },
         { id: "task-2", title: "빨래 정리하기", labelId: "home", dueDate: "2026-08-05", dueTime: null, note: "", done: true, completedAt: "3시간 전" },
-        { id: "task-3", title: "홍길동이 보내준 기획안 검토하기", labelId: "work", dueDate: "2026-08-07", dueTime: "18:00", note: "", done: false, completedAt: null },
+        { id: "task-3", title: "홍길동이 보내준 기획안 검토하기", labelId: "work", dueDate: "2026-08-07", dueTime: "18:00", note: "3장 예산표 숫자 다시 확인하기", done: false, completedAt: null },
         { id: "task-4", title: "전기세 이체 확인", labelId: "money", dueDate: "2026-08-03", dueTime: null, note: "", done: false, completedAt: null },
         { id: "task-5", title: "렌즈 주문", labelId: "home", dueDate: "2026-08-11", dueTime: null, note: "", done: false, completedAt: null },
       ],

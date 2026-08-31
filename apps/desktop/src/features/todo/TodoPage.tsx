@@ -261,7 +261,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
                 type="button"
               >
                 <span className="todo-filter__dot" style={{ backgroundColor: label.color }} /><span>{label.name}</span>
-                <small>{snapshot.items.filter((item) => item.labelId === label.id && !item.done).length}</small>
+                <small>{snapshot.items.filter((item) => item.labelId === label.id).length}</small>
               </button>
             );
           })}
@@ -384,7 +384,7 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
     <article aria-busy={toggleMutation.isPending} className={`todo-item ${item.done ? "todo-item--done" : ""}`}>
       <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={`${item.title} ${item.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => toggleMutation.mutate()} />
       <button aria-label={`${item.title} 수정`} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
-        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span></span></span>
+        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label="메모 있음" className="todo-item__note" name="note" role="img" size={12} />}</span></span>
         <Icon name="chevronRight" size={13} />
       </button>
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}

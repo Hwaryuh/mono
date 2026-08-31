@@ -1,7 +1,7 @@
 import { calendarCategoryWriteInputSchema, type CalendarCategory, type CalendarCategoryWriteInput, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import type { CalendarRepository } from "./calendar-repository";
 import { addDays, weekdayOf } from "./recurrence";
@@ -229,6 +229,8 @@ function gridRange(visibleMonth: string): { from: string; to: string } {
 export function CalendarPage({ repository }: { repository: CalendarRepository }) {
   const [view, setView] = useState<CalendarView>("month");
   const [visibleMonth, setVisibleMonth] = useState(() => isoDate(new Date()).slice(0, 7));
+  // 월 전환 애니메이션 방향: 1 = 다음 달(왼쪽으로 슬라이드), -1 = 이전 달, 0 = 애니메이션 없음.
+  const [slideDir, setSlideDir] = useState<-1 | 0 | 1>(0);
   const [dayDialogDate, setDayDialogDate] = useState<string | null>(null);
   const [editorItem, setEditorItem] = useState<EditorItem>(null);
   const [draft, setDraft] = useState<Draft>({ title: "", startDate: "", startTime: "", endDate: "", endTime: "", location: "", categoryId: "", note: "", recurrence: null });
@@ -245,6 +247,46 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const [searchParams, setSearchParams] = useSearchParams();
   const handledParamRef = useRef("");
   const viewRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const moveMonth = useCallback((offset: number) => {
+    setSlideDir(offset > 0 ? 1 : -1);
+    setVisibleMonth((current) => {
+      const [year, month] = current.split("-").map(Number);
+      return monthKey(dateOf(year, month - 1 + offset, 1));
+    });
+  }, []);
+
+  // macOS 트랙패드 두 손가락 좌우 스와이프로 이전/다음 달 이동. 세로 스크롤과 모달 위에서는 무시.
+  // 콜백 ref로 붙여 로딩 → 로드 전환 시점에도 확실히 리스너가 걸리게 한다.
+  const wheelNavCleanup = useRef<(() => void) | undefined>(undefined);
+  const attachWheelNav = useCallback((node: HTMLDivElement | null) => {
+    wheelNavCleanup.current?.();
+    wheelNavCleanup.current = undefined;
+    if (!node) return;
+    let accum = 0;
+    let locked = false;
+    let resetTimer: number | undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      if (document.querySelector(".ui-overlay")) return;
+      event.preventDefault();
+      if (locked) return;
+      accum += event.deltaX;
+      window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => { accum = 0; }, 140);
+      if (Math.abs(accum) < 64) return;
+      const dir = accum > 0 ? 1 : -1;
+      accum = 0;
+      locked = true;
+      window.setTimeout(() => { locked = false; }, 420);
+      moveMonth(dir);
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    wheelNavCleanup.current = () => {
+      node.removeEventListener("wheel", onWheel);
+      window.clearTimeout(resetTimer);
+    };
+  }, [moveMonth]);
   const queryClient = useQueryClient();
   const range = gridRange(visibleMonth);
   const snapshotQuery = useQuery({
@@ -329,11 +371,6 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   const cells = monthCells(visibleMonth, snapshot.today, snapshot.events);
   const monthSpans = computeMonthSpans(cells, snapshot);
   const dayEvents = dayDialogDate ? sortEvents(snapshot.events.filter((event) => coversDate(event, dayDialogDate))) : [];
-
-  function moveMonth(offset: number) {
-    const [year, month] = visibleMonth.split("-").map(Number);
-    setVisibleMonth(monthKey(dateOf(year, month - 1 + offset, 1)));
-  }
 
   function openCreate(selectedDate = snapshot.today) {
     setDraft(blankDraft(snapshot, selectedDate));
@@ -480,14 +517,14 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
   }
 
   return (
-    <div className="calendar-page">
+    <div className="calendar-page" data-slide={slideDir} ref={attachWheelNav}>
       <div className="calendar-toolbar">
         <div className="calendar-toolbar__pager">
           <button aria-label="이전 달" onClick={() => moveMonth(-1)} type="button"><Icon name="arrowLeft" size={13} /></button>
           <button aria-label="다음 달" onClick={() => moveMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
         </div>
         <strong>{formatMonth(visibleMonth)}</strong>
-        <Button onClick={() => setVisibleMonth(snapshot.today.slice(0, 7))} size="small">오늘</Button>
+        <Button onClick={() => { setSlideDir(0); setVisibleMonth(snapshot.today.slice(0, 7)); }} size="small">오늘</Button>
         <div aria-label="일정 보기" className="calendar-view-tabs" role="tablist">
           {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => setView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? "월" : "일정표"}</button>)}
         </div>
@@ -496,7 +533,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
       {view === "month" ? (
         <div className="calendar-month" role="tabpanel">
           <div className="calendar-weekdays">{dayNames.map((name) => <span key={name}>{name}</span>)}</div>
-          <div className="calendar-grid">
+          <div className="calendar-grid" key={visibleMonth}>
             {cells.map((cell) => {
               const dayClassName = cell.today ? "calendar-cell__day calendar-cell__day--today" : "calendar-cell__day";
               const dayNumber = Number(cell.date.slice(-2));
@@ -546,7 +583,7 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
           </div>
         </div>
       ) : (
-        <div className="calendar-agenda" role="tabpanel">
+        <div className="calendar-agenda" key={visibleMonth} role="tabpanel">
           {agendaGroups(monthEvents).map((group) => <div className="calendar-agenda__group" key={group.date}><div className="calendar-agenda__date"><strong>{formatDay(group.date)}</strong><span className={group.date === snapshot.today ? "calendar-agenda__today" : ""}>{dayLabel(group.date, snapshot.today)}</span></div><div className="calendar-agenda__events">{group.events.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}</div></div>)}
           {monthEvents.length === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
         </div>
