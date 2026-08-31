@@ -388,10 +388,11 @@ export function AppShell({
             <strong>{meta.title}</strong>
             {meta.subtitle && <span>{meta.subtitle}</span>}
           </div>
-          <div className="topbar__actions">
-            <IconButton aria-label={t("app.action.search")} title={t("app.action.search")}><Icon name="search" size={14} strokeWidth={1.7} /></IconButton>
-            {meta.action && <Button onClick={openNewItemModal} title={`${meta.action} (${shortcutModifier}N)`} variant="primary"><Icon name="plus" size={13} strokeWidth={2} />{meta.action}</Button>}
-          </div>
+          {meta.action && (
+            <div className="topbar__actions">
+              <Button onClick={openNewItemModal} title={`${meta.action} (${shortcutModifier}N)`} variant="primary"><Icon name="plus" size={13} strokeWidth={2} />{meta.action}</Button>
+            </div>
+          )}
         </header>
         <section className="workspace__content"><Outlet /></section>
       </main>

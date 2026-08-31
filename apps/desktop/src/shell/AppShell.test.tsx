@@ -55,9 +55,11 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("사이드바 검색을 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
+  it("검색 UI를 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
     const { container } = renderShell();
     expect(container.querySelector(".sidebar__search")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "검색" })).not.toBeInTheDocument();
+    expect(container.querySelector(".topbar__actions")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "설정 열기" })).toHaveAttribute("title", "설정 (Ctrl+,)");
     const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
     collapseButton.focus();

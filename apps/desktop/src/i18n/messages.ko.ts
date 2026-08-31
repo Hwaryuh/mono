@@ -13,7 +13,6 @@ export const koMessages = {
   "app.action.newCalendar": "새 일정",
   "app.action.newScrap": "스크랩 추가",
   "app.action.newLedger": "지출 추가",
-  "app.action.search": "검색",
   "app.action.close": "닫기",
   "app.action.closeWarning": "경고 닫기",
   "app.sidebar.expand": "사이드바 확장",
