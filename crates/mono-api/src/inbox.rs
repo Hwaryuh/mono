@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
@@ -9,6 +10,7 @@ use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::ledger::{self, LedgerWriteInput};
 use super::common::*;
+use super::version::{ensure_versioned_update, expected_version};
 
 // ---------- DTO (packages/contracts/src/index.ts inbox* 스키마) ----------
 
@@ -24,6 +26,7 @@ struct InboxField {
 #[serde(rename_all = "camelCase")]
 struct InboxItem {
     id: String,
+    version: i64,
     source: String,
     raw: String,
     target: Option<String>,
@@ -190,22 +193,23 @@ fn require_item(conn: &Connection, id: &str) -> ApiResult<InboxRow> {
 fn get_snapshot(conn: &Connection) -> ApiResult<InboxSnapshot> {
     let items = conn
         .prepare(
-            "SELECT id, source, raw, target, confidence, status, pinned, received_at, \
+            "SELECT id, version, source, raw, target, confidence, status, pinned, received_at, \
              fields_json, images_json, videos_json FROM inbox_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
-            let images_json: Option<String> = row.get(9)?;
-            let videos_json: Option<String> = row.get(10)?;
+            let images_json: Option<String> = row.get(10)?;
+            let videos_json: Option<String> = row.get(11)?;
             Ok(InboxItem {
                 id: row.get(0)?,
-                source: row.get(1)?,
-                raw: row.get(2)?,
-                target: row.get(3)?,
-                confidence: row.get(4)?,
-                status: row.get(5)?,
-                pinned: row.get::<_, i64>(6)? != 0,
-                received_at: row.get(7)?,
-                fields: parse_fields(&row.get::<_, String>(8)?),
+                version: row.get(1)?,
+                source: row.get(2)?,
+                raw: row.get(3)?,
+                target: row.get(4)?,
+                confidence: row.get(5)?,
+                status: row.get(6)?,
+                pinned: row.get::<_, i64>(7)? != 0,
+                received_at: row.get(8)?,
+                fields: parse_fields(&row.get::<_, String>(9)?),
                 images: images_json.and_then(|j| serde_json::from_str(&j).ok()),
                 videos: videos_json.and_then(|j| serde_json::from_str(&j).ok()),
             })
@@ -408,7 +412,7 @@ fn approve_high_confidence(conn: &Connection, minimum: f64) -> ApiResult<()> {
     Ok(())
 }
 
-fn update(conn: &Connection, id: &str, input: InboxUpdateInput) -> ApiResult<()> {
+fn update(conn: &Connection, id: &str, input: InboxUpdateInput, expected: Option<i64>) -> ApiResult<()> {
     let row = require_item(conn, id)?;
     if !TARGET_MODULES.contains(&input.target.as_str()) {
         return Err(ApiError::validation("target이 올바르지 않습니다."));
@@ -425,17 +429,19 @@ fn update(conn: &Connection, id: &str, input: InboxUpdateInput) -> ApiResult<()>
     } else {
         scored.iter().sum::<f64>() / scored.len() as f64
     };
-    conn.execute(
-        "UPDATE inbox_items SET target = ?1, fields_json = ?2, confidence = ?3, status = 'pending', pinned = ?4 WHERE id = ?5",
+    let changed = conn.execute(
+        "UPDATE inbox_items SET target = ?1, fields_json = ?2, confidence = ?3, status = 'pending', \
+         pinned = ?4, version = version + 1 WHERE id = ?5 AND (?6 IS NULL OR version = ?6)",
         params![
             input.target,
             serde_json::to_string(&input.fields).unwrap(),
             confidence,
             (row.source == "video") as i64,
             id,
+            expected,
         ],
     )?;
-    Ok(())
+    ensure_versioned_update(changed, expected)
 }
 
 fn discard(conn: &Connection, id: &str) -> ApiResult<()> {
@@ -475,9 +481,10 @@ async fn approve_high_confidence_handler(
 async fn update_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<InboxUpdateInput>,
 ) -> ApiResult<Json<Value>> {
-    update(&db.conn(), &id, input)?;
+    update(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -707,6 +714,7 @@ mod tests {
                 target: "todo".into(),
                 fields: vec![InboxField { label: "제목".into(), value: "x".into(), confidence: None }],
             },
+            None,
         )
         .unwrap_err();
         assert!(matches!(err, ApiError::BadRequest(m) if m.contains("영상은 스크랩")));

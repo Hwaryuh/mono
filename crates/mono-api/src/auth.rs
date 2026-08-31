@@ -31,7 +31,14 @@ pub(crate) fn apply(router: Router, token: Option<&str>) -> Router {
         let expected = expected.clone();
         async move {
             let path = request.uri().path();
-            if request.method() == Method::OPTIONS || path == "/health" || path == "/version" {
+            // `/events`(SSE)도 공개다 — 브라우저 EventSource는 커스텀 헤더(Bearer)를 실을 수 없고,
+            // 토큰을 URL 쿼리로 넘기면 로그·프록시에 노출된다. 이벤트 페이로드는 { revision, modules }
+            // 무효화 신호뿐이라 실제 데이터가 없다. 데이터 재조회는 게이트된 snapshot 경로가 막는다.
+            if request.method() == Method::OPTIONS
+                || path == "/health"
+                || path == "/version"
+                || path == "/events"
+            {
                 return next.run(request).await;
             }
             let presented = request

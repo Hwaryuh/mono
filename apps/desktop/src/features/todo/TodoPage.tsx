@@ -3,6 +3,8 @@ import { Button, Checkbox, DatePicker, Icon, Input, Modal, Select, TextArea, Tim
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { TodoLabelManagerModal } from "./TodoLabelManagerModal";
 import type { TodoRepository } from "./todo-repository";
 
@@ -87,10 +89,20 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
     onError: (error) => setFormError(errorMessage(error)),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ itemId, input }: { itemId: string; input: TodoWriteInput }) => repository.update(itemId, input),
+    mutationFn: ({ itemId, input, expectedVersion }: { itemId: string; input: TodoWriteInput; expectedVersion: number }) =>
+      repository.update(itemId, input, expectedVersion),
     onMutate: () => setFormError(null),
     onSuccess: async () => { await invalidateSnapshots(); closeEditor(true); },
-    onError: (error) => setFormError(errorMessage(error)),
+    onError: async (error) => {
+      setFormError(errorMessage(error));
+      if (isConflictError(error) && editorItem && editorItem !== "new") {
+        const version = await resyncConflictVersion<TodoSnapshot>(
+          queryClient, todoQueryKey, invalidateSnapshots,
+          (snapshot) => snapshot.items.find((candidate) => candidate.id === editorItem.id),
+        );
+        if (version !== null) setEditorItem((current) => (current && current !== "new" ? { ...current, version } : current));
+      }
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: (itemId: string) => repository.delete(itemId),
@@ -219,7 +231,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
     if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
     if (!input.labelId) { setFormError("라벨을 선택해야 합니다."); return; }
     if (editorItem === "new") createMutation.mutate(input);
-    else if (editorItem) updateMutation.mutate({ itemId: editorItem.id, input });
+    else if (editorItem) updateMutation.mutate({ itemId: editorItem.id, input, expectedVersion: editorItem.version ?? 1 });
   }
 
   return (

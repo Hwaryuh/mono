@@ -3,6 +3,8 @@ import { Button, DatePicker, Icon, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
+import { isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { TodoLabelManagerModal } from "../todo/TodoLabelManagerModal";
 import type { TodoRepository } from "../todo/todo-repository";
 import type { RoutineRepository } from "./routine-repository";
@@ -82,10 +84,20 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
     onError: (error) => setFormError(errorMessage(error)),
   });
   const updateMutation = useMutation({
-    mutationFn: ({ routineId, input }: { routineId: string; input: RoutineWriteInput }) => repository.update(routineId, input),
+    mutationFn: ({ routineId, input, expectedVersion }: { routineId: string; input: RoutineWriteInput; expectedVersion: number }) =>
+      repository.update(routineId, input, expectedVersion),
     onMutate: () => setFormError(null),
     onSuccess: async () => { await invalidateSnapshots(); closeEditor(true); },
-    onError: (error) => setFormError(errorMessage(error)),
+    onError: async (error) => {
+      setFormError(errorMessage(error));
+      if (isConflictError(error) && editorItem && editorItem !== "new") {
+        const version = await resyncConflictVersion<RoutineSnapshot>(
+          queryClient, routineQueryKey, invalidateSnapshots,
+          (snapshot) => snapshot.items.find((candidate) => candidate.id === editorItem.id),
+        );
+        if (version !== null) setEditorItem((current) => (current && current !== "new" ? { ...current, version } : current));
+      }
+    },
   });
 
   useEffect(() => {
@@ -169,7 +181,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
     if (!input.labelId) { setFormError("라벨을 선택해야 합니다."); return; }
     if (!draft.endless && !draft.endDate) { setFormError("종료일을 입력해야 합니다."); return; }
     if (editorItem === "new") createMutation.mutate(input);
-    else if (editorItem) updateMutation.mutate({ routineId: editorItem.id, input });
+    else if (editorItem) updateMutation.mutate({ routineId: editorItem.id, input, expectedVersion: editorItem.version ?? 1 });
   }
 
   const selectedDays = dayNames.filter((_, day) => draft.days.includes(day));

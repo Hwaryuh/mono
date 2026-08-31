@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use chrono::Datelike;
@@ -9,6 +10,7 @@ use serde_json::Value;
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::common::*;
+use super::version::{ensure_versioned_update, expected_version};
 
 // ---------- DTO (packages/contracts/src/index.ts routine* 스키마) ----------
 
@@ -23,6 +25,7 @@ struct RoutineLabel {
 #[serde(rename_all = "camelCase")]
 struct RoutineDefinition {
     id: String,
+    version: i64,
     title: String,
     label_id: String,
     days: Vec<i64>,
@@ -95,6 +98,7 @@ fn occurrence_id(routine_id: &str, date: &str) -> String {
 
 struct RoutineRow {
     id: String,
+    version: i64,
     title: String,
     label_id: String,
     days: Vec<i64>,
@@ -115,7 +119,7 @@ fn parse_days(raw: &str) -> Vec<i64> {
     serde_json::from_str(raw).unwrap_or_default()
 }
 
-const ROUTINE_COLUMNS: &str = "id, title, label_id, days_json, start_date, end_date";
+const ROUTINE_COLUMNS: &str = "id, title, label_id, days_json, start_date, end_date, version";
 
 fn row_to_routine(row: &rusqlite::Row) -> rusqlite::Result<RoutineRow> {
     Ok(RoutineRow {
@@ -125,6 +129,7 @@ fn row_to_routine(row: &rusqlite::Row) -> rusqlite::Result<RoutineRow> {
         days: parse_days(&row.get::<_, String>(3)?),
         start_date: row.get(4)?,
         end_date: row.get(5)?,
+        version: row.get(6)?,
     })
 }
 
@@ -244,6 +249,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<RoutineSnapshot> {
         .into_iter()
         .map(|r| RoutineDefinition {
             id: r.id,
+            version: r.version,
             title: r.title,
             label_id: r.label_id,
             days: r.days,
@@ -289,15 +295,16 @@ fn create(conn: &Connection, input: RoutineWriteInput) -> ApiResult<()> {
     Ok(())
 }
 
-fn update(conn: &Connection, id: &str, input: RoutineWriteInput) -> ApiResult<()> {
+fn update(conn: &Connection, id: &str, input: RoutineWriteInput, expected: Option<i64>) -> ApiResult<()> {
     require_routine(conn, id)?;
     let title = validated_title(&input.title)?;
     let days = validated_days(&input.days)?;
-    conn.execute(
-        "UPDATE routine_items SET title = ?1, label_id = ?2, days_json = ?3, end_date = ?4 WHERE id = ?5",
-        params![title, input.label_id, serde_json::to_string(&days).unwrap(), input.end_date, id],
+    let changed = conn.execute(
+        "UPDATE routine_items SET title = ?1, label_id = ?2, days_json = ?3, end_date = ?4, \
+         version = version + 1 WHERE id = ?5 AND (?6 IS NULL OR version = ?6)",
+        params![title, input.label_id, serde_json::to_string(&days).unwrap(), input.end_date, id, expected],
     )?;
-    Ok(())
+    ensure_versioned_update(changed, expected)
 }
 
 fn toggle_today(conn: &Connection, id: &str) -> ApiResult<()> {
@@ -375,9 +382,10 @@ async fn create_handler(
 async fn update_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<RoutineWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update(&db.conn(), &id, input)?;
+    update(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -502,7 +510,7 @@ mod tests {
     fn missing_routine_update_is_not_found() {
         let db = db::open_memory();
         let conn = db.lock().unwrap();
-        let err = update(&conn, "nope", write_input("x", vec![0], None)).unwrap_err();
+        let err = update(&conn, "nope", write_input("x", vec![0], None), None).unwrap_err();
         assert!(matches!(err, ApiError::NotFound(m) if m.contains("찾을 수 없습니다")));
     }
 

@@ -1,6 +1,19 @@
 import { inboxTargetModuleIds, normalizeColorToOklch, platformModuleIds } from "@mono/domain";
 import { z } from "zod";
 
+export const realtimeModuleIds = ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger"] as const;
+
+export const realtimeChangeEventSchema = z.object({
+  revision: z.number().int().positive(),
+  modules: z.array(z.enum(realtimeModuleIds)).min(1),
+});
+
+export type RealtimeModuleId = (typeof realtimeModuleIds)[number];
+export type RealtimeChangeEvent = z.infer<typeof realtimeChangeEventSchema>;
+
+// 서버 우선 배포 기간에는 구버전 snapshot도 읽는다. 새 서버는 항상 version을 반환한다.
+const recordVersionSchema = z.number().int().positive().optional();
+
 export const oklchColorSchema = z.string().transform((value, context) => {
   const normalized = normalizeColorToOklch(value);
   if (normalized) return normalized;
@@ -126,6 +139,7 @@ export type CaptureAnalysisContext = z.infer<typeof captureAnalysisContextSchema
 
 export const inboxItemSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   source: z.enum(["text", "url", "image", "video"]),
   raw: z.string(),
   target: z.enum(inboxTargetModuleIds).nullable(),
@@ -154,6 +168,7 @@ export type InboxUpdateInput = z.infer<typeof inboxUpdateInputSchema>;
 
 export const todoLabelSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   name: z.string(),
   color: oklchColorSchema,
 });
@@ -167,6 +182,7 @@ export const todoLabelOrderSchema = z.array(z.string().min(1)).min(1);
 
 export const todoItemSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   title: z.string(),
   labelId: z.string(),
   dueDate: z.string().nullable(),
@@ -203,6 +219,7 @@ const routineDaysSchema = z.array(z.number().int().min(0).max(6)).min(1).max(7)
 
 export const routineDefinitionSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   title: z.string(),
   labelId: z.string(),
   days: routineDaysSchema,
@@ -239,6 +256,7 @@ export type RoutineWriteInput = z.infer<typeof routineWriteInputSchema>;
 
 export const calendarCategorySchema = z.object({
   id: z.string().min(1),
+  version: recordVersionSchema,
   name: z.string().min(1),
   color: oklchColorSchema,
 });
@@ -266,6 +284,7 @@ export const calendarEditScopeSchema = z.enum(["this", "future", "all"]);
 
 export const calendarEventSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   title: z.string(),
   startDate: z.string(),
   startTime: z.string().nullable(),
@@ -288,7 +307,7 @@ export const calendarSnapshotSchema = z.object({
 });
 
 export const calendarWriteInputSchema = calendarEventSchema
-  .omit({ id: true, seriesId: true, occurrenceDate: true, recurrence: true })
+  .omit({ id: true, version: true, seriesId: true, occurrenceDate: true, recurrence: true })
   .extend({
     title: z.string().trim().min(1).max(500),
     location: z.string().max(500),
@@ -309,6 +328,7 @@ export const scrapKindSchema = z.enum(["image", "url", "text", "video"]);
 
 export const scrapCommentSchema = z.object({
   id: z.string(),
+  version: recordVersionSchema,
   createdAt: z.string(),
   text: z.string(),
 });
@@ -364,6 +384,7 @@ export const wonAmountSchema = z.preprocess((value) => {
 
 export const ledgerCategorySchema = z.object({
   id: z.string().min(1),
+  version: recordVersionSchema,
   name: z.string().min(1),
   color: oklchColorSchema,
 });
