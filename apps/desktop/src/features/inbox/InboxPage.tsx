@@ -1,4 +1,4 @@
-import type { CalendarCategory, InboxField, InboxItem, InboxUpdateInput, LedgerCategory, TodoLabel } from "@mono/contracts";
+import type { CalendarCategory, InboxField, InboxItem, InboxSnapshot, InboxUpdateInput, LedgerCategory, TodoLabel } from "@mono/contracts";
 import { formatTimestamp, inboxTargetModuleIds, type InboxTargetModuleId } from "@mono/domain";
 import {
   Badge,
@@ -18,6 +18,8 @@ import {
 } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { useMedia } from "../../infrastructure/media/media-store-context";
 import type { CalendarRepository } from "../calendar/calendar-repository";
 import { LedgerAmountInput } from "../ledger/LedgerAmountInput";
@@ -472,6 +474,7 @@ function InboxRow({
   labelCatalog: InboxLabelCatalog;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorVersion, setEditorVersion] = useState(1);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [target, setTarget] = useState<InboxTargetModuleId>(item.target ?? "todo");
   const [fields, setFields] = useState<InboxField[]>(item.target ? item.fields : defaultFields("todo", item.raw));
@@ -501,13 +504,22 @@ function InboxRow({
     onError: (error) => setActionError(errorMessage(error)),
   });
   const updateMutation = useMutation({
-    mutationFn: (input: InboxUpdateInput) => repository.update(item.id, input),
+    mutationFn: (input: InboxUpdateInput) => repository.update(item.id, input, editorVersion),
     onMutate: () => setActionError(null),
     onSuccess: async () => {
       await invalidateSnapshots();
       setEditorOpen(false);
     },
-    onError: (error) => setActionError(errorMessage(error)),
+    onError: async (error) => {
+      setActionError(errorMessage(error));
+      if (isConflictError(error)) {
+        const version = await resyncConflictVersion<InboxSnapshot>(
+          queryClient, inboxQueryKey, invalidateSnapshots,
+          (snapshot) => snapshot.items.find((candidate) => candidate.id === item.id),
+        );
+        if (version !== null) setEditorVersion(version);
+      }
+    },
   });
   const discardMutation = useMutation({
     mutationFn: () => repository.discard(item.id),
@@ -526,6 +538,7 @@ function InboxRow({
     setTarget(initialTarget);
     setFields(item.target ? item.fields.map((field) => ({ ...field, label: unifiedFieldLabel(field.label) })) : defaultFields(initialTarget, item.raw));
     setActionError(null);
+    setEditorVersion(item.version ?? 1);
     setEditorOpen(true);
   }
 

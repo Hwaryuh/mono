@@ -1,8 +1,10 @@
-import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerWriteInput } from "@mono/contracts";
+import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerSnapshot, type LedgerWriteInput } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
+import { isConflictError } from "../../infrastructure/http/http-client";
+import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import type { LedgerRepository } from "./ledger-repository";
 import { LedgerAmountInput } from "./LedgerAmountInput";
 import { summarizeLedgerMonth } from "./ledger-summary";
@@ -20,7 +22,7 @@ type Draft = {
 
 type CategoryCommand =
   | { type: "create"; input: LedgerCategoryWriteInput }
-  | { type: "update"; categoryId: string; input: LedgerCategoryWriteInput }
+  | { type: "update"; categoryId: string; input: LedgerCategoryWriteInput; expectedVersion: number }
   | { type: "reorder"; categoryIds: string[] }
   | { type: "delete"; categoryId: string };
 
@@ -43,6 +45,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
   const [open, setOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryVersion, setEditingCategoryVersion] = useState(1);
   const [categoryDraft, setCategoryDraft] = useState<LedgerCategoryWriteInput>(blankCategoryDraft);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
   const categoryMutation = useMutation({
     mutationFn: async (command: CategoryCommand) => {
       if (command.type === "create") await repository.createCategory(command.input);
-      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input);
+      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input, command.expectedVersion);
       else if (command.type === "reorder") await repository.reorderCategories(command.categoryIds);
       else await repository.deleteCategory(command.categoryId);
     },
@@ -107,7 +110,16 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
       }
       await invalidateSnapshots();
     },
-    onError: (error) => setCategoryError(errorMessage(error)),
+    onError: async (error) => {
+      setCategoryError(errorMessage(error));
+      if (isConflictError(error) && editingCategoryId) {
+        const version = await resyncConflictVersion<LedgerSnapshot>(
+          queryClient, ledgerQueryKey, invalidateSnapshots,
+          (snapshot) => snapshot.categories.find((candidate) => candidate.id === editingCategoryId),
+        );
+        if (version !== null) setEditingCategoryVersion(version);
+      }
+    },
   });
 
   useEffect(() => {
@@ -185,6 +197,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
 
   function editCategory(category: LedgerCategory) {
     setEditingCategoryId(category.id);
+    setEditingCategoryVersion(category.version ?? 1);
     setCategoryDraft({ name: category.name, color: category.color });
     setCategoryError(null);
   }
@@ -196,7 +209,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
       setCategoryError(parsed.error.issues[0]?.message ?? "라벨 입력값을 확인해야 합니다.");
       return;
     }
-    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data });
+    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
     else categoryMutation.mutate({ type: "create", input: parsed.data });
   }
 

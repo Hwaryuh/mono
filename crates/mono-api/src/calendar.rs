@@ -1,4 +1,5 @@
 use axum::extract::{Path, Query, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use chrono::{Datelike, Days, Months, NaiveDate};
@@ -10,6 +11,7 @@ use super::category::{self, Categories};
 use super::common::*;
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::version::{ensure_versioned_update, expected_version};
 
 // (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
 const CATS: Categories = Categories {
@@ -25,6 +27,7 @@ const CATS: Categories = Categories {
 #[derive(Serialize)]
 struct CalendarCategory {
     id: String,
+    version: i64,
     name: String,
     color: String,
 }
@@ -44,6 +47,7 @@ struct Recurrence {
 #[serde(rename_all = "camelCase")]
 struct CalendarEvent {
     id: String,
+    version: i64,
     title: String,
     start_date: String,
     start_time: Option<String>,
@@ -156,6 +160,7 @@ struct MasterRow {
     category_id: String,
     note: String,
     recurrence: Option<Recurrence>,
+    version: i64,
 }
 
 struct ExceptionRow {
@@ -177,7 +182,7 @@ fn load_masters(conn: &Connection) -> ApiResult<Vec<MasterRow>> {
         .prepare(
             "SELECT e.id, e.title, e.start_date, e.start_time, e.end_date, e.end_time, \
                     e.location, e.category_id, e.note, \
-                    r.freq, r.interval_n, r.weekdays_json, r.until_date, r.count_n \
+                    r.freq, r.interval_n, r.weekdays_json, r.until_date, r.count_n, e.version \
              FROM calendar_events e LEFT JOIN calendar_recurrences r ON r.event_id = e.id \
              ORDER BY e.seq DESC",
         )?
@@ -205,6 +210,7 @@ fn load_masters(conn: &Connection) -> ApiResult<Vec<MasterRow>> {
                 category_id: row.get(7)?,
                 note: row.get(8)?,
                 recurrence,
+                version: row.get(14)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -335,6 +341,7 @@ fn to_event(master: &MasterRow, slot: Option<NaiveDate>, span_days: i64) -> Cale
     match slot {
         None => CalendarEvent {
             id: master.id.clone(),
+            version: master.version,
             title: master.title.clone(),
             start_date: master.start_date.clone(),
             start_time: master.start_time.clone(),
@@ -352,6 +359,7 @@ fn to_event(master: &MasterRow, slot: Option<NaiveDate>, span_days: i64) -> Cale
             let occ = date_str(date);
             CalendarEvent {
                 id: format!("{}::{}", master.id, occ),
+                version: master.version,
                 title: master.title.clone(),
                 start_date: occ.clone(),
                 start_time: master.start_time.clone(),
@@ -453,9 +461,9 @@ fn get_snapshot(conn: &Connection, from: Option<&str>, to: Option<&str>) -> ApiR
         .unwrap_or_else(|| today_date + chrono::Duration::days(45));
 
     let categories = conn
-        .prepare("SELECT id, name, color FROM calendar_categories ORDER BY order_index ASC")?
+        .prepare("SELECT id, version, name, color FROM calendar_categories ORDER BY order_index ASC")?
         .query_map([], |row| {
-            Ok(CalendarCategory { id: row.get(0)?, name: row.get(1)?, color: row.get(2)? })
+            Ok(CalendarCategory { id: row.get(0)?, version: row.get(1)?, name: row.get(2)?, color: row.get(3)? })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
@@ -492,8 +500,8 @@ fn create_category(conn: &Connection, input: CategoryWriteInput) -> ApiResult<()
     CATS.insert(conn, &input.name, &input.color)
 }
 
-fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput) -> ApiResult<()> {
-    CATS.update(conn, id, &input.name, &input.color)
+fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput, expected: Option<i64>) -> ApiResult<()> {
+    CATS.update(conn, id, &input.name, &input.color, expected)
 }
 
 fn reorder_categories(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
@@ -515,7 +523,7 @@ fn delete_category(conn: &mut Connection, id: &str, replacement: &str) -> ApiRes
     }
     let tx = conn.transaction()?;
     tx.execute(
-        "UPDATE calendar_events SET category_id = ?1 WHERE category_id = ?2",
+        "UPDATE calendar_events SET category_id = ?1, version = version + 1 WHERE category_id = ?2",
         params![replacement, id],
     )?;
     tx.execute("DELETE FROM calendar_categories WHERE id = ?1", [id])?;
@@ -628,10 +636,11 @@ fn create_event(conn: &Connection, input: CalendarWriteInput) -> ApiResult<()> {
     insert_event(conn, &uuid::Uuid::new_v4().to_string(), &event, recurrence.as_ref())
 }
 
-fn set_master_columns(conn: &Connection, id: &str, event: &EventColumns) -> ApiResult<()> {
-    conn.execute(
+fn set_master_columns(conn: &Connection, id: &str, event: &EventColumns, expected: Option<i64>) -> ApiResult<()> {
+    let changed = conn.execute(
         "UPDATE calendar_events SET title = ?1, start_date = ?2, start_time = ?3, end_date = ?4, \
-         end_time = ?5, location = ?6, category_id = ?7, note = ?8 WHERE id = ?9",
+         end_time = ?5, location = ?6, category_id = ?7, note = ?8, version = version + 1 \
+         WHERE id = ?9 AND (?10 IS NULL OR version = ?10)",
         params![
             event.title,
             event.start_date,
@@ -642,9 +651,10 @@ fn set_master_columns(conn: &Connection, id: &str, event: &EventColumns) -> ApiR
             event.category_id,
             event.note,
             id,
+            expected,
         ],
     )?;
-    Ok(())
+    ensure_versioned_update(changed, expected)
 }
 
 fn set_recurrence(conn: &Connection, id: &str, recurrence: Option<&Recurrence>) -> ApiResult<()> {
@@ -743,7 +753,7 @@ fn delete_series(conn: &Connection, master_id: &str) -> ApiResult<()> {
     Ok(())
 }
 
-fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput) -> ApiResult<()> {
+fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput, expected: Option<i64>) -> ApiResult<()> {
     let (master_id, occ) = split_event_id(raw_id);
     let master = load_master(conn, &master_id)?;
     let event = validate_event(&input)?;
@@ -752,7 +762,7 @@ fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput) -> A
 
     // 단발 일정: 그대로 수정.
     if master.recurrence.is_none() && occ.is_none() {
-        set_master_columns(conn, &master_id, &event)?;
+        set_master_columns(conn, &master_id, &event, expected)?;
         set_recurrence(conn, &master_id, recurrence.as_ref())?;
         return Ok(());
     }
@@ -775,7 +785,7 @@ fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput) -> A
         }
         _ => {
             // all: 마스터 갱신, 개별 예외는 정리.
-            set_master_columns(conn, &master_id, &event)?;
+            set_master_columns(conn, &master_id, &event, expected)?;
             set_recurrence(conn, &master_id, recurrence.or_else(|| master.recurrence.clone()).as_ref())?;
             conn.execute("DELETE FROM calendar_event_exceptions WHERE master_id = ?1", [master_id.as_str()])?;
         }
@@ -840,9 +850,10 @@ async fn create_event_handler(
 async fn update_event_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<CalendarWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_event(&db.conn(), &id, input)?;
+    update_event(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -867,9 +878,10 @@ async fn create_category_handler(
 async fn update_category_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_category(&db.conn(), &id, input)?;
+    update_category(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 
@@ -1007,7 +1019,7 @@ mod tests {
         edit.end_date = "2026-08-10".into();
         edit.start_time = Some("14:00".into());
         edit.scope = Some("this".into());
-        update_event(&conn, &format!("{master}::2026-08-10"), edit).unwrap();
+        update_event(&conn, &format!("{master}::2026-08-10"), edit, None).unwrap();
 
         let snap = get_snapshot(&conn, Some("2026-08-01"), Some("2026-08-31")).unwrap();
         let occ = snap.events.iter().find(|e| e.occurrence_date.as_deref() == Some("2026-08-10")).unwrap();
@@ -1051,7 +1063,7 @@ mod tests {
         edit.start_time = Some("09:00".into());
         edit.recurrence = Some(weekly(1, vec![1], None, None));
         edit.scope = Some("future".into());
-        update_event(&conn, &format!("{master}::2026-08-17"), edit).unwrap();
+        update_event(&conn, &format!("{master}::2026-08-17"), edit, None).unwrap();
 
         let snap = get_snapshot(&conn, Some("2026-08-01"), Some("2026-08-31")).unwrap();
         let by_date = |d: &str| snap.events.iter().find(|e| e.start_date == d).cloned();
@@ -1155,10 +1167,10 @@ mod tests {
 
         let mut edited = event_input("수정됨", &category);
         edited.title = "수정됨".into();
-        update_event(&conn, &id, edited).unwrap();
+        update_event(&conn, &id, edited, None).unwrap();
         assert_eq!(snapshot(&conn).events[0].title, "수정됨");
 
-        let err = update_event(&conn, "nope", event_input("x", &category)).unwrap_err();
+        let err = update_event(&conn, "nope", event_input("x", &category), None).unwrap_err();
         assert!(matches!(err, ApiError::NotFound(m) if m.contains("찾을 수 없습니다")));
     }
 }

@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use rusqlite::{params, Connection};
@@ -9,6 +10,7 @@ use super::category::{self, Categories};
 use super::common::*;
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::version::expected_version;
 
 // (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
 const CATS: Categories = Categories {
@@ -24,6 +26,7 @@ const CATS: Categories = Categories {
 #[derive(Serialize)]
 struct LedgerCategory {
     id: String,
+    version: i64,
     name: String,
     color: String,
 }
@@ -177,9 +180,9 @@ fn get_snapshot(conn: &Connection) -> ApiResult<LedgerSnapshot> {
     let month = today[..7].to_string();
 
     let categories = conn
-        .prepare("SELECT id, name, color FROM ledger_categories ORDER BY order_index ASC")?
+        .prepare("SELECT id, version, name, color FROM ledger_categories ORDER BY order_index ASC")?
         .query_map([], |row| {
-            Ok(LedgerCategory { id: row.get(0)?, name: row.get(1)?, color: row.get(2)? })
+            Ok(LedgerCategory { id: row.get(0)?, version: row.get(1)?, name: row.get(2)?, color: row.get(3)? })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
@@ -278,8 +281,8 @@ fn create_category(conn: &Connection, input: CategoryWriteInput) -> ApiResult<()
     CATS.insert(conn, &input.name, &input.color)
 }
 
-fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput) -> ApiResult<()> {
-    CATS.update(conn, id, &input.name, &input.color)
+fn update_category(conn: &Connection, id: &str, input: CategoryWriteInput, expected: Option<i64>) -> ApiResult<()> {
+    CATS.update(conn, id, &input.name, &input.color, expected)
 }
 
 fn reorder_categories(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> {
@@ -361,9 +364,10 @@ async fn create_category_handler(
 async fn update_category_handler(
     State(db): State<Db>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<CategoryWriteInput>,
 ) -> ApiResult<Json<Value>> {
-    update_category(&db.conn(), &id, input)?;
+    update_category(&db.conn(), &id, input, expected_version(&headers)?)?;
     Ok(ok())
 }
 

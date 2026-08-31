@@ -8,6 +8,7 @@ mod auth;
 pub mod backup;
 mod calendar;
 mod category;
+mod change;
 mod color;
 mod common;
 mod dashboard;
@@ -21,6 +22,7 @@ mod routine;
 mod scrap;
 mod secret;
 mod todo;
+mod version;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,6 +31,7 @@ use std::{error::Error, fmt};
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method};
+use axum::middleware;
 use axum::routing::get;
 use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
@@ -160,6 +163,7 @@ fn build_router(
         .allow_headers(Any);
 
     let secret_state = SecretState { db: database.clone(), crypto };
+    let change_hub = change::ChangeHub::new();
 
     let router = Router::new()
         .route("/health", get(|| async { "ok" }))
@@ -181,6 +185,12 @@ fn build_router(
         .merge(media::routes(secret_state.clone()))
         .merge(ai::routes(secret_state))
         .merge(link_preview::routes(link_preview::state()))
+        .merge(change::routes(change_hub.clone()))
+        // 성공한 mutation 응답을 감지해 모듈 변경 이벤트를 발행한다(SSE 구독자에게 무효화 신호).
+        .layer(middleware::from_fn_with_state(
+            change_hub,
+            change::publish_successful_mutation,
+        ))
         // 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록. 실제 상한은
         // 각 라우트가 검증한다(media.rs UPLOAD_LIMIT_BYTES, dashboard capture 등).
         .layer(DefaultBodyLimit::disable());
@@ -306,5 +316,102 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(body_json(response).await["version"], env!("CARGO_PKG_VERSION"));
+    }
+
+    #[tokio::test]
+    async fn stale_item_update_is_409_over_http() {
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
+        router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/todo/items")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"title":"원본","labelId":"other","dueDate":null,"dueTime":null,"note":""}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let snapshot = body_json(
+            router
+                .clone()
+                .oneshot(Request::builder().uri("/todo/snapshot").body(Body::empty()).unwrap())
+                .await
+                .unwrap(),
+        )
+        .await;
+        let item_id = snapshot["items"][0]["id"].as_str().unwrap();
+        let body = r#"{"title":"수정","labelId":"other","dueDate":null,"dueTime":null,"note":""}"#;
+
+        let first = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/todo/items/{item_id}"))
+                    .header("content-type", "application/json")
+                    .header("if-match", "\"1\"")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::OK);
+
+        // 같은 버전으로 다시 저장하면 409 — 다른 기기가 먼저 수정한 상황과 동일.
+        let stale = router
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/todo/items/{item_id}"))
+                    .header("content-type", "application/json")
+                    .header("if-match", "\"1\"")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(stale.status(), StatusCode::CONFLICT);
+        assert!(body_json(stale).await["error"].as_str().unwrap().contains("다른 기기"));
+    }
+
+    #[tokio::test]
+    async fn successful_mutation_emits_sse_change() {
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], None);
+        let events = router
+            .clone()
+            .oneshot(Request::builder().uri("/events").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(events.status(), StatusCode::OK);
+        let mut event_body = events.into_body();
+
+        let created = router
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/todo/items")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"title":"알림","labelId":"other","dueDate":null,"dueTime":null,"note":""}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED);
+
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(1), event_body.frame())
+            .await
+            .expect("SSE 변경 이벤트 시간 초과")
+            .expect("SSE 스트림 종료")
+            .expect("SSE 프레임 읽기 실패");
+        let payload = String::from_utf8(frame.into_data().expect("SSE 데이터 프레임 아님").to_vec()).unwrap();
+        assert!(payload.contains("event: change"));
+        assert!(payload.contains("\"todo\""));
+        assert!(payload.contains("\"dashboard\""));
     }
 }

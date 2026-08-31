@@ -9,7 +9,9 @@ import { RouterProvider } from "react-router";
 import { createAppRouter } from "./app/router";
 import { createHttpRepositories } from "./infrastructure/http/http-repositories";
 import { PlatformApiEndpointProvider } from "./infrastructure/http/api-endpoint";
-import { configureApiBaseUrl, configureApiToken } from "./infrastructure/http/http-client";
+import { API_BASE_URL, configureApiBaseUrl, configureApiToken } from "./infrastructure/http/http-client";
+import { SseRealtimeChangeSource } from "./infrastructure/realtime/realtime-change-source";
+import { RealtimeQuerySync } from "./infrastructure/realtime/realtime-query-sync";
 import { HttpAiSettingsStore } from "./infrastructure/http/http-ai-settings-store";
 import { HttpMediaMaintenance } from "./infrastructure/http/http-media-maintenance";
 import { HttpMediaStore } from "./infrastructure/http/http-media-store";
@@ -43,6 +45,11 @@ async function start() {
   const endpoint = PlatformApiEndpointProvider.of();
   configureApiBaseUrl(await endpoint.resolve());
   configureApiToken(await endpoint.resolveToken());
+  const stopRealtimeSync = RealtimeQuerySync.of(
+    queryClient,
+    SseRealtimeChangeSource.of(`${API_BASE_URL}/events`),
+  ).start();
+  window.addEventListener("beforeunload", stopRealtimeSync, { once: true });
   const {
     dashboardRepository,
     inboxRepository,

@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS todo_labels (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   color TEXT NOT NULL,
-  order_index INTEGER NOT NULL
+  order_index INTEGER NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS todo_items (
   id TEXT PRIMARY KEY,
@@ -38,13 +39,15 @@ CREATE TABLE IF NOT EXISTS todo_items (
   done INTEGER NOT NULL DEFAULT 0,
   completed_at TEXT,
   routine_id TEXT,
-  occurrence_date TEXT
+  occurrence_date TEXT,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS ledger_categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   color TEXT NOT NULL,
-  order_index INTEGER NOT NULL
+  order_index INTEGER NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS ledger_expenses (
   id TEXT PRIMARY KEY,
@@ -62,7 +65,8 @@ CREATE TABLE IF NOT EXISTS routine_items (
   label_id TEXT NOT NULL,
   days_json TEXT NOT NULL,
   start_date TEXT NOT NULL,
-  end_date TEXT
+  end_date TEXT,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS routine_occurrences (
   id TEXT PRIMARY KEY,
@@ -75,7 +79,8 @@ CREATE TABLE IF NOT EXISTS calendar_categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   color TEXT NOT NULL,
-  order_index INTEGER NOT NULL
+  order_index INTEGER NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS calendar_events (
   id TEXT PRIMARY KEY,
@@ -87,7 +92,8 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   end_time TEXT,
   location TEXT NOT NULL DEFAULT '',
   category_id TEXT NOT NULL,
-  note TEXT NOT NULL DEFAULT ''
+  note TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1
 );
 -- 반복 규칙. calendar_events의 마스터 행이 여기 항목을 가지면 반복 시리즈다.
 CREATE TABLE IF NOT EXISTS calendar_recurrences (
@@ -135,7 +141,8 @@ CREATE TABLE IF NOT EXISTS scrap_comments (
   scrap_id TEXT NOT NULL,
   seq INTEGER NOT NULL,
   created_at TEXT NOT NULL,
-  text TEXT NOT NULL
+  text TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS inbox_items (
   id TEXT PRIMARY KEY,
@@ -149,7 +156,8 @@ CREATE TABLE IF NOT EXISTS inbox_items (
   received_at TEXT NOT NULL,
   fields_json TEXT NOT NULL DEFAULT '[]',
   images_json TEXT,
-  videos_json TEXT
+  videos_json TEXT,
+  version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS secrets (
   key TEXT PRIMARY KEY,
@@ -175,10 +183,41 @@ VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
 INSERT OR IGNORE INTO scrap_tags (tag) VALUES ('기타');
 "#;
 
+// 편집 충돌 방지용 낙관적 버전 컬럼을 갖는 테이블. 기존 DB에는 시작 시 누락 컬럼을 추가한다.
+const VERSIONED_TABLES: [&str; 8] = [
+    "todo_labels",
+    "todo_items",
+    "ledger_categories",
+    "routine_items",
+    "calendar_categories",
+    "calendar_events",
+    "scrap_comments",
+    "inbox_items",
+];
+
+fn migrate_version_columns(conn: &Connection) -> rusqlite::Result<()> {
+    for table in VERSIONED_TABLES {
+        let mut columns = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+        let has_version = columns
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .iter()
+            .any(|column| column == "version");
+        if !has_version {
+            // table 이름은 위의 고정 상수에서만 오므로 SQL 식별자 주입 경로가 없다.
+            conn.execute_batch(&format!(
+                "ALTER TABLE {table} ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
+            ))?;
+        }
+    }
+    Ok(())
+}
+
 fn init(conn: &Connection) -> rusqlite::Result<()> {
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
     conn.execute_batch(DDL)?;
+    migrate_version_columns(conn)?;
     conn.execute_batch(SEED)?;
     Ok(())
 }
@@ -194,4 +233,29 @@ pub fn open_memory() -> Db {
     let conn = Connection::open_in_memory().expect("in-memory sqlite");
     init(&conn).expect("init schema");
     Arc::new(Mutex::new(conn))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adds_version_to_existing_tables_without_losing_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        for table in VERSIONED_TABLES {
+            conn.execute_batch(&format!(
+                "CREATE TABLE {table} (id TEXT PRIMARY KEY); INSERT INTO {table} (id) VALUES ('kept');"
+            ))
+            .unwrap();
+        }
+
+        migrate_version_columns(&conn).unwrap();
+
+        for table in VERSIONED_TABLES {
+            let version: i64 = conn
+                .query_row(&format!("SELECT version FROM {table} WHERE id = 'kept'"), [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(version, 1);
+        }
+    }
 }

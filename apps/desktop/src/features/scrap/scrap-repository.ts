@@ -2,7 +2,7 @@ import type { ScrapCommentInput, ScrapSnapshot, ScrapWriteInput } from "@mono/co
 
 export interface ScrapCommentRepository {
   addComment(scrapId: string, input: ScrapCommentInput): Promise<void>;
-  updateComment(scrapId: string, commentId: string, input: ScrapCommentInput): Promise<void>;
+  updateComment(scrapId: string, commentId: string, input: ScrapCommentInput, expectedVersion?: number): Promise<void>;
   deleteComment(scrapId: string, commentId: string): Promise<void>;
 }
 
