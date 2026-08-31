@@ -397,11 +397,11 @@ mod tests {
     use crate::db;
 
     fn today() -> String {
-        chrono::Local::now().date_naive().to_string()
+        today_iso()
     }
 
     fn today_weekday() -> i64 {
-        chrono::Local::now().date_naive().weekday().num_days_from_sunday() as i64
+        kst_now().date_naive().weekday().num_days_from_sunday() as i64
     }
 
     fn other_weekday() -> i64 {
@@ -477,7 +477,7 @@ mod tests {
     fn no_occurrence_after_end_date() {
         let db = db::open_memory();
         let conn = db.lock().unwrap();
-        let yesterday = chrono::Local::now()
+        let yesterday = kst_now()
             .date_naive()
             .checked_sub_days(chrono::Days::new(1))
             .unwrap()

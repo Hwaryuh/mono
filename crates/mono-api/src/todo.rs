@@ -508,7 +508,7 @@ mod tests {
         use chrono::Datelike;
         let db = db::open_memory();
         let conn = db.lock().unwrap();
-        let today_weekday = chrono::Local::now().date_naive().weekday().num_days_from_sunday();
+        let today_weekday = kst_now().date_naive().weekday().num_days_from_sunday();
         conn.execute(
             "INSERT INTO routine_items (id, seq, title, label_id, days_json, start_date, end_date) \
              VALUES ('r1', 1, '물 마시기', 'health', ?1, '2000-01-01', NULL)",

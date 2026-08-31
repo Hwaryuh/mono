@@ -184,7 +184,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         .collect();
 
     let todo_tasks = conn
-        .prepare("SELECT id, title, label_id, done FROM todo_items ORDER BY seq DESC LIMIT 2")?
+        .prepare("SELECT id, title, label_id, done FROM todo_items ORDER BY seq DESC LIMIT 3")?
         .query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -519,11 +519,11 @@ mod tests {
     use rusqlite::params;
 
     fn today() -> String {
-        chrono::Local::now().date_naive().to_string()
+        today_iso()
     }
 
     fn today_weekday() -> i64 {
-        chrono::Local::now().date_naive().weekday().num_days_from_sunday() as i64
+        kst_now().date_naive().weekday().num_days_from_sunday() as i64
     }
 
     fn add_todo_label(conn: &Connection, id: &str) {

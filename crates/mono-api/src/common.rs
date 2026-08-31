@@ -22,9 +22,14 @@ pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-/// 로컬 타임존 기준 오늘 날짜 (YYYY-MM-DD).
+/// 한국 표준시(UTC+9, 서머타임 없음) 기준 현재 시각. 서버 호스트가 어느 타임존이든 동일.
+pub fn kst_now() -> chrono::DateTime<chrono::FixedOffset> {
+    chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).expect("KST offset"))
+}
+
+/// KST 기준 오늘 날짜 (YYYY-MM-DD).
 pub fn today_iso() -> String {
-    chrono::Local::now().date_naive().to_string()
+    kst_now().date_naive().to_string()
 }
 
 /// 색상 입력을 OKLCH로 정규화하거나 검증 에러.
