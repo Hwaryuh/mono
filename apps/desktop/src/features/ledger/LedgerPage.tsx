@@ -8,6 +8,7 @@ import { resyncConflictVersion } from "../../infrastructure/http/conflict-recove
 import type { LedgerRepository } from "./ledger-repository";
 import { LedgerAmountInput } from "./LedgerAmountInput";
 import { summarizeLedgerMonth } from "./ledger-summary";
+import { ledgerViewStateStoreOf, type LedgerViewStateStore } from "./ledger-view-state-store";
 
 export const ledgerQueryKey = ["ledger"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
@@ -36,11 +37,13 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "지출을 저장하지 못했습니다.";
 }
 
-export function LedgerPage({ repository }: { repository: LedgerRepository }) {
+export function LedgerPage({ repository, viewStateStore }: { repository: LedgerRepository; viewStateStore?: LedgerViewStateStore }) {
+  const [store] = useState(() => viewStateStore ?? ledgerViewStateStoreOf());
+  const [viewState, setViewState] = useState(() => store.read());
+  const { viewMonth } = viewState;
   const [draft, setDraft] = useState<Draft>({ title: "", amountWon: "", date: "", categoryId: "", note: "" });
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
-  const [viewMonth, setViewMonth] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
@@ -158,7 +161,13 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
     const [y, m] = activeMonth.split("-").map(Number);
     const shifted = new Date(y, m - 1 + offset, 1);
     const next = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
-    setViewMonth(next === currentMonth ? null : next);
+    selectMonth(next === currentMonth ? null : next);
+  }
+
+  function selectMonth(nextMonth: string | null) {
+    const next = { viewMonth: nextMonth };
+    store.write(next);
+    setViewState(next);
   }
 
   function closeModal(force = false) {
@@ -246,7 +255,7 @@ export function LedgerPage({ repository }: { repository: LedgerRepository }) {
             <IconButton aria-label="이전 월" onClick={() => stepMonth(-1)} size="small" type="button" variant="ghost"><Icon name="arrowLeft" size={15} /></IconButton>
             <span className="ledger-month-nav__label">{year}년 {month}월 지출</span>
             <IconButton aria-label="다음 월" disabled={isCurrentMonth} onClick={() => stepMonth(1)} size="small" type="button" variant="ghost"><Icon name="chevronRight" size={15} /></IconButton>
-            {!isCurrentMonth && <button className="ledger-month-nav__today" onClick={() => setViewMonth(null)} type="button">이번 달</button>}
+            {!isCurrentMonth && <button className="ledger-month-nav__today" onClick={() => selectMonth(null)} type="button">이번 달</button>}
           </div>
           <strong className={summary.totalWon >= 1_000_000_000 ? "ledger-total-card__amount--large" : undefined}>{formatWon(summary.totalWon)}</strong>
           {isCurrentMonth && <small>{comparison}</small>}

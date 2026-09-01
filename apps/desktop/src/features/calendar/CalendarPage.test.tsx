@@ -5,14 +5,31 @@ import { describe, expect, it, vi } from "vitest";
 import { createMockCalendarRepository } from "../../infrastructure/mock/mock-calendar-repository";
 import type { CalendarRepository } from "./calendar-repository";
 import { CalendarPage } from "./CalendarPage";
+import { calendarViewStateStoreOf, type CalendarViewStateStore } from "./calendar-view-state-store";
 
-function renderCalendar(repository: CalendarRepository = createMockCalendarRepository(), initialEntry = "/calendar") {
+function renderCalendar(repository: CalendarRepository = createMockCalendarRepository(), initialEntry = "/calendar", viewStateStore: CalendarViewStateStore = calendarViewStateStoreOf("2026-08")) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const result = render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[initialEntry]}><CalendarPage repository={repository} /></MemoryRouter></QueryClientProvider>);
+  const result = render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[initialEntry]}><CalendarPage repository={repository} viewStateStore={viewStateStore} /></MemoryRouter></QueryClientProvider>);
   return { ...result, repository };
 }
 
 describe("CalendarPage", () => {
+  it("다시 열어도 마지막 보기와 조회 월을 유지한다", async () => {
+    const repository = createMockCalendarRepository();
+    const viewStateStore = calendarViewStateStoreOf("2026-08");
+    const first = renderCalendar(repository, "/calendar", viewStateStore);
+    await screen.findByText("2026년 8월");
+    fireEvent.click(screen.getByRole("button", { name: "다음 달" }));
+    await screen.findByText("2026년 9월");
+    fireEvent.click(screen.getByRole("tab", { name: "일정표" }));
+    first.unmount();
+
+    renderCalendar(repository, "/calendar", viewStateStore);
+
+    expect(await screen.findByText("2026년 9월")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "일정표" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("42칸 월 경계, 오늘, 긴 제목과 일정표 키보드 전환을 표시한다", async () => {
     const { container } = renderCalendar();
     expect(await screen.findByText("2026년 8월")).toBeInTheDocument();

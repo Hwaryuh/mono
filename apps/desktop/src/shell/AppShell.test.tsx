@@ -12,6 +12,7 @@ import { createMockRoutineRepository } from "../infrastructure/mock/mock-routine
 import { createMockCalendarRepository } from "../infrastructure/mock/mock-calendar-repository";
 import { createMockScrapRepository } from "../infrastructure/mock/mock-scrap-repository";
 import { TodoPage } from "../features/todo/TodoPage";
+import { todoViewStateStoreOf } from "../features/todo/todo-view-state-store";
 import { AppShell } from "./AppShell";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
@@ -30,6 +31,7 @@ import { InMemoryServerSettingsStore, type ServerSettingsStore } from "../infras
 function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(), serverSettingsStore: ServerSettingsStore = new InMemoryServerSettingsStore()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const todoRepository = createMockTodoRepository();
+  const todoViewStateStore = todoViewStateStoreOf();
   return render(
     <QueryClientProvider client={queryClient}>
       <MediaStoreProvider value={mediaStore}>
@@ -38,7 +40,7 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
             <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />}>
               <Route path="dashboard" element={<div>대시보드 경로</div>} />
               <Route path="inbox" element={<div>수집함 경로</div>} />
-              <Route path="todo" element={<TodoPage repository={todoRepository} />} />
+              <Route path="todo" element={<TodoPage repository={todoRepository} viewStateStore={todoViewStateStore} />} />
               <Route path="calendar" element={<CalendarPage repository={calendarRepository} />} />
               <Route path="scrap" element={<ScrapPage repository={scrapRepository} />} />
               <Route path="ledger" element={<LedgerPage repository={ledgerRepository} />} />
@@ -55,6 +57,20 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
+  it("다른 화면을 다녀와도 마지막 할 일 필터를 유지한다", async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /오늘/ }));
+    fireEvent.click(screen.getByRole("button", { name: "업무 1" }));
+
+    fireEvent.click(screen.getByRole("link", { name: "스크랩" }));
+    await waitFor(() => expect(screen.getByRole("link", { name: "스크랩" })).toHaveAttribute("aria-current", "page"));
+    fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
+
+    expect(await screen.findByRole("radio", { name: /오늘/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "업무 1" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("검색 UI를 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
     const { container } = renderShell();
     expect(container.querySelector(".sidebar__search")).not.toBeInTheDocument();

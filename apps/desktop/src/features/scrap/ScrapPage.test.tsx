@@ -9,6 +9,7 @@ import { MediaStoreProvider } from "../../infrastructure/media/media-store-conte
 import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import { ScrapPage } from "./ScrapPage";
 import type { ScrapRepository } from "./scrap-repository";
+import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
 
 const httpClient = vi.hoisted(() => ({ httpGetBlob: vi.fn() }));
 vi.mock("../../infrastructure/http/http-client", async (importOriginal) => ({
@@ -20,9 +21,9 @@ beforeEach(() => {
   httpClient.httpGetBlob.mockReset().mockResolvedValue(new Blob(["img"], { type: "image/png" }));
 });
 
-function renderPage(repository: ScrapRepository = createMockScrapRepository(), initialEntry = "/scrap", urlOpener?: ExternalUrlOpener, mediaStore?: MediaStore) {
+function renderPage(repository: ScrapRepository = createMockScrapRepository(), initialEntry = "/scrap", urlOpener?: ExternalUrlOpener, mediaStore?: MediaStore, viewStateStore?: ScrapViewStateStore) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const page = <MemoryRouter initialEntries={[initialEntry]}><Routes><Route path="/scrap" element={<ScrapPage repository={repository} urlOpener={urlOpener} />} /></Routes></MemoryRouter>;
+  const page = <MemoryRouter initialEntries={[initialEntry]}><Routes><Route path="/scrap" element={<ScrapPage repository={repository} urlOpener={urlOpener} viewStateStore={viewStateStore} />} /></Routes></MemoryRouter>;
   return render(<QueryClientProvider client={queryClient}>{mediaStore ? <MediaStoreProvider value={mediaStore}>{page}</MediaStoreProvider> : page}</QueryClientProvider>);
 }
 
@@ -43,6 +44,21 @@ function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepositor
 }
 
 describe("ScrapPage", () => {
+  it("다시 열어도 마지막 라벨 필터를 유지한다", async () => {
+    const repository = createMockScrapRepository();
+    const viewStateStore = scrapViewStateStoreOf();
+    const first = renderPage(repository, "/scrap", undefined, undefined, viewStateStore);
+    await screen.findByRole("button", { name: /들기름 파스타 레시피/ });
+    fireEvent.click(screen.getByRole("button", { name: "음악" }));
+    first.unmount();
+
+    renderPage(repository, "/scrap", undefined, undefined, viewStateStore);
+
+    expect(await screen.findByRole("button", { name: "음악" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /합주실 후보 정리/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /들기름 파스타 레시피/ })).not.toBeInTheDocument();
+  });
+
   it("정상 목록과 라벨 필터를 표시하고 키보드로 라벨 사이를 이동한다", async () => {
     renderPage();
     expect(await screen.findByRole("button", { name: /들기름 파스타 레시피/ })).toBeInTheDocument();

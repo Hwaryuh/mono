@@ -12,6 +12,7 @@ import type { ScrapRepository } from "../scrap/scrap-repository";
 import type { TodoRepository } from "../todo/todo-repository";
 import type { InboxRepository } from "./inbox-repository";
 import { InboxPage } from "./InboxPage";
+import { inboxViewStateStoreOf, type InboxViewStateStore } from "./inbox-view-state-store";
 
 function renderInbox(
   repository: InboxRepository = createMockInboxRepository(),
@@ -19,14 +20,15 @@ function renderInbox(
   todoRepository: TodoRepository = createMockTodoRepository(),
   scrapRepository: ScrapRepository = createMockScrapRepository(),
   ledgerRepository: LedgerRepository = createMockLedgerRepository(),
+  viewStateStore?: InboxViewStateStore,
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
-      <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={repository} scrapRepository={scrapRepository} todoRepository={todoRepository} />
+      <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={repository} scrapRepository={scrapRepository} todoRepository={todoRepository} viewStateStore={viewStateStore} />
     </QueryClientProvider>,
   );
-  return { repository };
+  return { ...result, repository };
 }
 
 async function rowFor(text: string) {
@@ -37,7 +39,33 @@ async function rowFor(text: string) {
   return row as HTMLElement;
 }
 
+function moveDatePickerTo(dialog: HTMLElement, targetMonth: string) {
+  const label = within(dialog).getByRole("group").getAttribute("aria-label") ?? "";
+  const match = /^(\d{4})년 (\d{1,2})월$/.exec(label);
+  if (!match) throw new Error(`날짜 선택기 월을 읽을 수 없습니다: ${label}`);
+  const [targetYear, target] = targetMonth.split("-").map(Number);
+  const offset = (targetYear - Number(match[1])) * 12 + target - Number(match[2]);
+  const button = within(dialog).getByRole("button", { name: offset < 0 ? "이전 달" : "다음 달" });
+  for (let index = 0; index < Math.abs(offset); index += 1) fireEvent.click(button);
+}
+
 describe("InboxPage", () => {
+  it("다시 열어도 마지막 상태 탭을 유지한다", async () => {
+    const repository = createMockInboxRepository();
+    const calendarRepository = createMockCalendarRepository();
+    const todoRepository = createMockTodoRepository();
+    const scrapRepository = createMockScrapRepository();
+    const ledgerRepository = createMockLedgerRepository();
+    const viewStateStore = inboxViewStateStoreOf();
+    const first = renderInbox(repository, calendarRepository, todoRepository, scrapRepository, ledgerRepository, viewStateStore);
+    fireEvent.click(await screen.findByRole("tab", { name: /분류 실패/ }));
+    first.unmount();
+
+    renderInbox(repository, calendarRepository, todoRepository, scrapRepository, ledgerRepository, viewStateStore);
+
+    expect(await screen.findByRole("tab", { name: /분류 실패/ })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("탭 필터를 키보드와 포인터로 전환한다", async () => {
     renderInbox();
     const pendingTab = await screen.findByRole("tab", { name: /대기/ });
@@ -108,6 +136,7 @@ describe("InboxPage", () => {
 
     fireEvent.click(dueDatePicker);
     const dueDateDialog = screen.getByRole("dialog", { name: "마감일 선택" });
+    moveDatePickerTo(dueDateDialog, "2026-08");
     fireEvent.click(within(dueDateDialog).getByRole("button", { name: /^2026년 8월 12일/ }));
     expect(dueDatePicker).toHaveTextContent("2026-08-12");
 

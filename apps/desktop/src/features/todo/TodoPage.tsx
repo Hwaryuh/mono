@@ -7,12 +7,15 @@ import { isConflictError } from "../../infrastructure/http/http-client";
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { TodoLabelManagerModal } from "./TodoLabelManagerModal";
 import type { TodoRepository } from "./todo-repository";
+import {
+  todoViewStateStoreOf,
+  todoStatusOrder,
+  type TodoStatus,
+  type TodoViewStateStore,
+} from "./todo-view-state-store";
 
 export const todoQueryKey = ["todo"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
-const statusOrder = ["all", "today", "upcoming", "overdue", "done"] as const;
-type TodoStatus = (typeof statusOrder)[number];
-
 type Draft = {
   title: string;
   labelId: string;
@@ -61,9 +64,10 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
 }
 
-export function TodoPage({ repository }: { repository: TodoRepository }) {
-  const [status, setStatus] = useState<TodoStatus>("all");
-  const [labelIds, setLabelIds] = useState<string[]>([]);
+export function TodoPage({ repository, viewStateStore }: { repository: TodoRepository; viewStateStore?: TodoViewStateStore }) {
+  const [store] = useState(() => viewStateStore ?? todoViewStateStoreOf());
+  const [viewState, setViewState] = useState(() => store.read());
+  const { status, labelIds } = viewState;
   const [editorItem, setEditorItem] = useState<TodoItem | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>({ title: "", labelId: "", dueDate: "", dueTime: "", note: "" });
   const [formError, setFormError] = useState<string | null>(null);
@@ -139,7 +143,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
   const snapshot = snapshotQuery.data;
 
   const now = Date.now();
-  const counts = Object.fromEntries(statusOrder.map((statusId) => [
+  const counts = Object.fromEntries(todoStatusOrder.map((statusId) => [
     statusId,
     statusId === "all"
       ? snapshot.items.filter((item) => !isAgedDone(item, now)).length
@@ -157,24 +161,35 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   function selectStatus(nextStatus: TodoStatus, focus = false) {
-    setStatus(nextStatus);
+    setViewState((current) => {
+      const next = { ...current, status: nextStatus };
+      store.write(next);
+      return next;
+    });
     if (focus) document.querySelector<HTMLButtonElement>(`[data-todo-status="${nextStatus}"]`)?.focus();
   }
 
   function onStatusKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: TodoStatus) {
-    const index = statusOrder.indexOf(current);
+    const index = todoStatusOrder.indexOf(current);
     let next: TodoStatus | undefined;
-    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = statusOrder[(index + 1) % statusOrder.length];
-    if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = statusOrder[(index - 1 + statusOrder.length) % statusOrder.length];
-    if (event.key === "Home") next = statusOrder[0];
-    if (event.key === "End") next = statusOrder[statusOrder.length - 1];
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = todoStatusOrder[(index + 1) % todoStatusOrder.length];
+    if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = todoStatusOrder[(index - 1 + todoStatusOrder.length) % todoStatusOrder.length];
+    if (event.key === "Home") next = todoStatusOrder[0];
+    if (event.key === "End") next = todoStatusOrder[todoStatusOrder.length - 1];
     if (!next) return;
     event.preventDefault();
     selectStatus(next, true);
   }
 
   function toggleLabel(labelId: string, focus = false) {
-    setLabelIds((current) => current.includes(labelId) ? current.filter((id) => id !== labelId) : [...current, labelId]);
+    setViewState((current) => {
+      const labelIds = current.labelIds.includes(labelId)
+        ? current.labelIds.filter((id) => id !== labelId)
+        : [...current.labelIds, labelId];
+      const next = { ...current, labelIds };
+      store.write(next);
+      return next;
+    });
     if (focus) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-todo-label="${labelId}"]`)?.focus());
   }
 
@@ -239,7 +254,7 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
       <aside aria-label="할 일 필터" className="todo-filters">
         <fieldset className="todo-filter-group">
           <legend>상태</legend>
-          {statusOrder.map((statusId) => {
+          {todoStatusOrder.map((statusId) => {
             const meta = statusMeta[statusId];
             return (
               <button
@@ -345,7 +360,11 @@ export function TodoPage({ repository }: { repository: TodoRepository }) {
         labels={snapshot.labels}
         onClose={closeLabelManager}
         onLabelDeleted={(labelId, replacementLabelId) => {
-          setLabelIds((current) => current.filter((candidate) => candidate !== labelId));
+          setViewState((current) => {
+            const next = { ...current, labelIds: current.labelIds.filter((candidate) => candidate !== labelId) };
+            store.write(next);
+            return next;
+          });
           setDraft((current) => current.labelId === labelId ? { ...current, labelId: replacementLabelId } : current);
         }}
         open={labelManagerOpen}

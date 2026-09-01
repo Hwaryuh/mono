@@ -6,12 +6,13 @@ import { createMockLedgerRepository } from "../../infrastructure/mock/mock-ledge
 import { createMockPlatformState } from "../../infrastructure/mock/mock-platform-state";
 import type { LedgerRepository } from "./ledger-repository";
 import { LedgerPage } from "./LedgerPage";
+import { ledgerViewStateStoreOf, type LedgerViewStateStore } from "./ledger-view-state-store";
 
-function renderLedger(repository: LedgerRepository = createMockLedgerRepository(), initialEntry = "/ledger") {
+function renderLedger(repository: LedgerRepository = createMockLedgerRepository(), initialEntry = "/ledger", viewStateStore?: LedgerViewStateStore) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  render(
+  return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}><LedgerPage repository={repository} /></MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}><LedgerPage repository={repository} viewStateStore={viewStateStore} /></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -39,6 +40,20 @@ async function fillRequiredFields() {
 }
 
 describe("LedgerPage", () => {
+  it("다시 열어도 마지막 조회 월을 유지한다", async () => {
+    const repository = createMockLedgerRepository();
+    const viewStateStore = ledgerViewStateStoreOf();
+    const first = renderLedger(repository, "/ledger", viewStateStore);
+    await screen.findByText("2026년 8월 지출");
+    fireEvent.click(screen.getByRole("button", { name: "이전 월" }));
+    first.unmount();
+
+    renderLedger(repository, "/ledger", viewStateStore);
+
+    expect(await screen.findByText("2026년 7월 지출")).toBeInTheDocument();
+    expect(screen.getByText("전기세")).toBeInTheDocument();
+  });
+
   it("월 합계, 비교, 라벨별 금액과 현재 월 목록을 표시한다", async () => {
     renderLedger();
 

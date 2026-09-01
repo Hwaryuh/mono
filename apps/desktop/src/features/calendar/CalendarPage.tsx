@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import type { CalendarRepository } from "./calendar-repository";
+import { calendarViewStateStoreOf, type CalendarView, type CalendarViewStateStore } from "./calendar-view-state-store";
 import { addDays, weekdayOf } from "./recurrence";
 
 export const calendarQueryKey = ["calendar"] as const;
@@ -13,7 +14,6 @@ const maxVisibleEventsPerDay = 3;
 // 월간 셀에서 이어지는 일정 막대를 몇 줄까지 그릴지. 넘치는 건 날짜별 일정 창에서 본다.
 const maxSpanLanes = 3;
 
-type CalendarView = "month" | "agenda";
 type EditorItem = CalendarEvent | "new" | null;
 type Draft = Omit<CalendarWriteInput, "startTime" | "endTime" | "recurrence"> & { startTime: string; endTime: string; recurrence: CalendarRecurrence | null };
 type RecurrencePreset = "none" | "daily" | "weekly" | "weekdays" | "biweekly" | "monthly" | "yearly" | "custom";
@@ -227,9 +227,10 @@ function gridRange(visibleMonth: string): { from: string; to: string } {
   return { from: addDays(start, -7), to: addDays(start, 48) };
 }
 
-export function CalendarPage({ repository }: { repository: CalendarRepository }) {
-  const [view, setView] = useState<CalendarView>("month");
-  const [visibleMonth, setVisibleMonth] = useState(() => isoDate(new Date()).slice(0, 7));
+export function CalendarPage({ repository, viewStateStore }: { repository: CalendarRepository; viewStateStore?: CalendarViewStateStore }) {
+  const [store] = useState(() => viewStateStore ?? calendarViewStateStoreOf());
+  const [viewState, setViewState] = useState(() => store.read());
+  const { view, visibleMonth } = viewState;
   // 월 전환 애니메이션 방향: 1 = 다음 달(왼쪽으로 슬라이드), -1 = 이전 달, 0 = 애니메이션 없음.
   const [slideDir, setSlideDir] = useState<-1 | 0 | 1>(0);
   const [dayDialogDate, setDayDialogDate] = useState<string | null>(null);
@@ -252,11 +253,13 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
 
   const moveMonth = useCallback((offset: number) => {
     setSlideDir(offset > 0 ? 1 : -1);
-    setVisibleMonth((current) => {
-      const [year, month] = current.split("-").map(Number);
-      return monthKey(dateOf(year, month - 1 + offset, 1));
+    setViewState((current) => {
+      const [year, month] = current.visibleMonth.split("-").map(Number);
+      const next = { ...current, visibleMonth: monthKey(dateOf(year, month - 1 + offset, 1)) };
+      store.write(next);
+      return next;
     });
-  }, []);
+  }, [store]);
 
   // macOS 트랙패드 두 손가락 좌우 스와이프로 이전/다음 달 이동. 세로 스크롤과 모달 위에서는 무시.
   // 콜백 ref로 붙여 로딩 → 로드 전환 시점에도 확실히 리스너가 걸리게 한다.
@@ -537,8 +540,25 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
     else return;
     event.preventDefault();
     const nextView: CalendarView = next === 0 ? "month" : "agenda";
-    setView(nextView);
+    selectView(nextView);
     viewRefs.current[next]?.focus();
+  }
+
+  function selectView(nextView: CalendarView) {
+    setViewState((current) => {
+      const next = { ...current, view: nextView };
+      store.write(next);
+      return next;
+    });
+  }
+
+  function showCurrentMonth() {
+    setSlideDir(0);
+    setViewState((current) => {
+      const next = { ...current, visibleMonth: snapshot.today.slice(0, 7) };
+      store.write(next);
+      return next;
+    });
   }
 
   return (
@@ -549,9 +569,9 @@ export function CalendarPage({ repository }: { repository: CalendarRepository })
           <button aria-label="다음 달" onClick={() => moveMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
         </div>
         <strong>{formatMonth(visibleMonth)}</strong>
-        <Button onClick={() => { setSlideDir(0); setVisibleMonth(snapshot.today.slice(0, 7)); }} size="small">오늘</Button>
+        <Button onClick={showCurrentMonth} size="small">오늘</Button>
         <div aria-label="일정 보기" className="calendar-view-tabs" role="tablist">
-          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => setView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? "월" : "일정표"}</button>)}
+          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? "월" : "일정표"}</button>)}
         </div>
       </div>
 

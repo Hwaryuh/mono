@@ -11,6 +11,7 @@ import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-
 import { newMediaId } from "../../infrastructure/media/media-store";
 import type { ScrapRepository } from "./scrap-repository";
 import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type SortKey } from "./scrap-sort";
+import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
 
 export const scrapQueryKey = ["scrap"] as const;
 
@@ -84,8 +85,10 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repository: ScrapRepository; urlOpener?: ExternalUrlOpener }) {
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewStateStore }: { repository: ScrapRepository; urlOpener?: ExternalUrlOpener; viewStateStore?: ScrapViewStateStore }) {
+  const [store] = useState(() => viewStateStore ?? scrapViewStateStoreOf());
+  const [viewState, setViewState] = useState(() => store.read());
+  const { activeTag } = viewState;
   const [sortKey, setSortKey] = useState<SortKey>(loadSortKey);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
@@ -302,7 +305,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     try {
       await repository.deleteTag(deleteTagName, replacementTag);
       await invalidateSnapshots();
-      setActiveTag((current) => current === deleteTagName ? null : current);
+      changeActiveTag((current) => current === deleteTagName ? null : current);
       setDraft((current) => current.tag === deleteTagName ? { ...current, tag: replacementTag } : current);
       setEditingTag((current) => current === deleteTagName ? null : current);
       setDeleteTagName(null);
@@ -331,7 +334,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
       if (editingTag) {
         await repository.renameTag(editingTag, tag);
         await invalidateSnapshots();
-        setActiveTag((current) => current === editingTag ? tag : current);
+        changeActiveTag((current) => current === editingTag ? tag : current);
         setDraft((current) => current.tag === editingTag ? { ...current, tag } : current);
         setEditingTag(null);
       } else {
@@ -358,6 +361,15 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
     tagRefs.current[next]?.focus();
   }
 
+  function changeActiveTag(next: string | null | ((current: string | null) => string | null)) {
+    setViewState((current) => {
+      const activeTag = typeof next === "function" ? next(current.activeTag) : next;
+      const nextState = { activeTag };
+      store.write(nextState);
+      return nextState;
+    });
+  }
+
   return (
     <div className="scrap-page">
       <div className="scrap-toolbar">
@@ -367,7 +379,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
               aria-pressed={activeTag === tag}
               className={activeTag === tag ? "scrap-tag scrap-tag--active" : "scrap-tag"}
               key={tag}
-              onClick={() => setActiveTag((current) => current === tag ? null : tag)}
+              onClick={() => changeActiveTag((current) => current === tag ? null : tag)}
               onKeyDown={(event) => onTagKeyDown(event, index)}
               ref={(element) => { tagRefs.current[index] = element; }}
               type="button"
@@ -387,7 +399,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener }: { repos
         )}
       </div>
 
-      {snapshot.items.length === 0 ? <ScrapEmpty onCreate={openCreate} /> : visibleItems.length === 0 ? <ScrapFilterEmpty onReset={() => setActiveTag(null)} /> : (
+      {snapshot.items.length === 0 ? <ScrapEmpty onCreate={openCreate} /> : visibleItems.length === 0 ? <ScrapFilterEmpty onReset={() => changeActiveTag(null)} /> : (
         <div className="scrap-list">
           {visibleItems.map((item) => <ScrapCard item={item} key={item.id} onOpen={() => { setDetailId(item.id); setCommentText(""); setSearchParams({ detail: item.id }, { replace: true }); }} />)}
         </div>

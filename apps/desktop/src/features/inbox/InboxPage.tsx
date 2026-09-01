@@ -27,6 +27,7 @@ import type { LedgerRepository } from "../ledger/ledger-repository";
 import type { ScrapRepository } from "../scrap/scrap-repository";
 import type { TodoRepository } from "../todo/todo-repository";
 import type { InboxRepository } from "./inbox-repository";
+import { inboxTabOrder, inboxViewStateStoreOf, type InboxTab, type InboxViewStateStore } from "./inbox-view-state-store";
 
 const inboxQueryKey = ["inbox"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
@@ -94,9 +95,6 @@ function labelCatalogOf(
 function unifiedFieldLabel(label: string) {
   return label === "분류" || label === "태그" ? "라벨" : label;
 }
-
-type Tab = "pending" | "approved" | "failed";
-const tabOrder: Tab[] = ["pending", "approved", "failed"];
 
 function defaultFields(target: InboxTargetModuleId, raw: string): InboxField[] {
   return fieldLabels[target].map((label, index) => ({
@@ -350,10 +348,13 @@ interface InboxPageProps {
   ledgerRepository: LedgerRepository;
   scrapRepository: ScrapRepository;
   todoRepository: TodoRepository;
+  viewStateStore?: InboxViewStateStore;
 }
 
-export function InboxPage({ repository, calendarRepository, ledgerRepository, scrapRepository, todoRepository }: InboxPageProps) {
-  const [tab, setTab] = useState<Tab>("pending");
+export function InboxPage({ repository, calendarRepository, ledgerRepository, scrapRepository, todoRepository, viewStateStore }: InboxPageProps) {
+  const [store] = useState(() => viewStateStore ?? inboxViewStateStoreOf());
+  const [viewState, setViewState] = useState(() => store.read());
+  const { tab } = viewState;
   const queryClient = useQueryClient();
   const snapshotQuery = useQuery({ queryKey: inboxQueryKey, queryFn: () => repository.getSnapshot() });
   const calendarQuery = useQuery({ queryKey: calendarQueryKey, queryFn: () => calendarRepository.getSnapshot() });
@@ -388,24 +389,26 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
     scrapQuery.data?.tags ?? [],
     todoQuery.data?.labels ?? [],
   );
-  const tabs: Array<{ id: Tab; label: string; count: number }> = [
+  const tabs: Array<{ id: InboxTab; label: string; count: number }> = [
     { id: "pending", label: "대기", count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
     { id: "approved", label: "승인됨", count: items.filter((item) => item.status === "approved").length },
     { id: "failed", label: "분류 실패", count: items.filter((item) => item.status === "failed").length },
   ];
 
-  function selectTab(nextTab: Tab) {
-    setTab(nextTab);
+  function selectTab(nextTab: InboxTab) {
+    const next = { tab: nextTab };
+    store.write(next);
+    setViewState(next);
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-inbox-tab="${nextTab}"]`)?.focus());
   }
 
-  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: Tab) {
-    const index = tabOrder.indexOf(current);
-    let next: Tab | undefined;
-    if (event.key === "ArrowRight") next = tabOrder[(index + 1) % tabOrder.length];
-    if (event.key === "ArrowLeft") next = tabOrder[(index - 1 + tabOrder.length) % tabOrder.length];
-    if (event.key === "Home") next = tabOrder[0];
-    if (event.key === "End") next = tabOrder[tabOrder.length - 1];
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: InboxTab) {
+    const index = inboxTabOrder.indexOf(current);
+    let next: InboxTab | undefined;
+    if (event.key === "ArrowRight") next = inboxTabOrder[(index + 1) % inboxTabOrder.length];
+    if (event.key === "ArrowLeft") next = inboxTabOrder[(index - 1 + inboxTabOrder.length) % inboxTabOrder.length];
+    if (event.key === "Home") next = inboxTabOrder[0];
+    if (event.key === "End") next = inboxTabOrder[inboxTabOrder.length - 1];
     if (!next) return;
     event.preventDefault();
     selectTab(next);
