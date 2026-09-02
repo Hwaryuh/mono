@@ -33,6 +33,7 @@ export const koMessages = {
   "settings.section.about": "정보",
   "settings.group.appearance": "모양",
   "settings.group.connection": "연결",
+  "settings.group.module": "모듈",
   "settings.group.etc": "기타",
   "settings.appearance.description": "앱 전체의 색상과 화면 표현을 변경합니다.",
   "settings.theme.title": "테마",

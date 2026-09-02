@@ -89,7 +89,7 @@ const settingsSections: SettingsSectionDefinition[] = [
   { id: "server", labelKey: "settings.section.server", icon: "server", groupKey: "settings.group.connection" },
   { id: "ai", labelKey: "settings.section.ai", icon: "sparkles", groupKey: "settings.group.connection" },
   { id: "storage", labelKey: "settings.section.storage", icon: "layers", groupKey: "settings.group.connection" },
-  { id: "timer", labelKey: "settings.section.timer", icon: "clock", groupKey: "settings.group.etc" },
+  { id: "timer", labelKey: "settings.section.timer", icon: "clock", groupKey: "settings.group.module" },
   { id: "about", labelKey: "settings.section.about", icon: "note", groupKey: "settings.group.etc" },
 ];
 
