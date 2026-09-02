@@ -20,11 +20,10 @@ import {
 const DAILY_GOAL = 8;
 const TICK_MS = 250;
 
-type Phase = "focus" | "shortBreak" | "longBreak";
+type Phase = "focus" | "shortBreak";
 
 function minutesOf(settings: TimerSettings, phase: Phase): number {
-  if (phase === "focus") return settings.focusMinutes;
-  return phase === "longBreak" ? settings.longBreakMinutes : settings.shortBreakMinutes;
+  return phase === "focus" ? settings.focusMinutes : settings.shortBreakMinutes;
 }
 
 function formatClock(seconds: number) {
@@ -143,8 +142,7 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
       })
       : sessions;
     if (record) setSessions(done);
-    const nextPhase: Phase = done.length > 0 && done.length % settings.longBreakEvery === 0 ? "longBreak" : "shortBreak";
-    startPhase(nextPhase, record && settings.autoStartBreak);
+    startPhase("shortBreak", record && settings.autoStartBreak);
   }
 
   function toggle() {

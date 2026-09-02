@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useI18n } from "../../i18n/i18n";
 import {
   normalizeTimerSettings,
-  timerCycleBounds,
   timerMinuteBounds,
   TIMER_SETTINGS_EVENT,
   type TimerSettings,
@@ -26,7 +25,7 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
     window.dispatchEvent(new Event(TIMER_SETTINGS_EVENT));
   }
 
-  function numberField(key: "focusMinutes" | "shortBreakMinutes" | "longBreakMinutes" | "longBreakEvery", labelKey: Parameters<typeof t>[0], bounds: { min: number; max: number }) {
+  function numberField(key: "focusMinutes" | "shortBreakMinutes", labelKey: Parameters<typeof t>[0], bounds: { min: number; max: number }) {
     return (
       <label className="timer-settings__field">
         <span>{t(labelKey)}</span>
@@ -56,13 +55,10 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
       <section className="settings-group">
         <header>
           <strong>{t("settings.timer.length.title")}</strong>
-          <span>{t("settings.timer.length.description")}</span>
         </header>
         <div className="timer-settings__lengths">
           {numberField("focusMinutes", "settings.timer.focus", timerMinuteBounds)}
           {numberField("shortBreakMinutes", "settings.timer.shortBreak", timerMinuteBounds)}
-          {numberField("longBreakMinutes", "settings.timer.longBreak", timerMinuteBounds)}
-          {numberField("longBreakEvery", "settings.timer.longBreakEvery", timerCycleBounds)}
         </div>
       </section>
 
@@ -95,7 +91,6 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
       <section className="settings-group">
         <header>
           <strong>{t("settings.timer.scope.title")}</strong>
-          <span>{t("settings.timer.scope.description")}</span>
         </header>
         <div className="settings-locale-control">
           <Select
@@ -107,7 +102,6 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
             ]}
             value={settings.todoScope}
           />
-          <p>{t("settings.timer.scope.hint")}</p>
         </div>
       </section>
     </>

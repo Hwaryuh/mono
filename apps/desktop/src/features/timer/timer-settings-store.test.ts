@@ -20,11 +20,17 @@ function storageOf(initial: Record<string, string> = {}): Storage {
 
 describe("timer settings", () => {
   it("범위를 벗어난 값은 경계로 잘라낸다", () => {
-    const settings = normalizeTimerSettings({ focusMinutes: 999, shortBreakMinutes: 0, longBreakEvery: 1 });
+    const settings = normalizeTimerSettings({ focusMinutes: 999, shortBreakMinutes: 0 });
 
     expect(settings.focusMinutes).toBe(180);
     expect(settings.shortBreakMinutes).toBe(1);
-    expect(settings.longBreakEvery).toBe(2);
+  });
+
+  it("예전 긴 휴식 설정은 폐기한다", () => {
+    const settings = normalizeTimerSettings({ longBreakMinutes: 15, longBreakEvery: 4 });
+
+    expect(settings).not.toHaveProperty("longBreakMinutes");
+    expect(settings).not.toHaveProperty("longBreakEvery");
   });
 
   it("빠지거나 깨진 값은 기본값으로 채운다", () => {

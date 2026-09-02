@@ -7,8 +7,6 @@ export type TimerTodoScope = "all" | "today";
 export type TimerSettings = {
   focusMinutes: number;
   shortBreakMinutes: number;
-  longBreakMinutes: number;
-  longBreakEvery: number;
   autoStartBreak: boolean;
   autoStartFocus: boolean;
   todoScope: TimerTodoScope;
@@ -17,15 +15,12 @@ export type TimerSettings = {
 export const defaultTimerSettings: TimerSettings = {
   focusMinutes: 25,
   shortBreakMinutes: 5,
-  longBreakMinutes: 15,
-  longBreakEvery: 4,
   autoStartBreak: true,
   autoStartFocus: false,
   todoScope: "all",
 };
 
 export const timerMinuteBounds = { min: 1, max: 180 } as const;
-export const timerCycleBounds = { min: 2, max: 12 } as const;
 
 function clamp(value: unknown, fallback: number, bounds: { min: number; max: number }): number {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -39,8 +34,6 @@ export function normalizeTimerSettings(value: unknown): TimerSettings {
   return {
     focusMinutes: clamp(raw.focusMinutes, defaultTimerSettings.focusMinutes, timerMinuteBounds),
     shortBreakMinutes: clamp(raw.shortBreakMinutes, defaultTimerSettings.shortBreakMinutes, timerMinuteBounds),
-    longBreakMinutes: clamp(raw.longBreakMinutes, defaultTimerSettings.longBreakMinutes, timerMinuteBounds),
-    longBreakEvery: clamp(raw.longBreakEvery, defaultTimerSettings.longBreakEvery, timerCycleBounds),
     autoStartBreak: typeof raw.autoStartBreak === "boolean" ? raw.autoStartBreak : defaultTimerSettings.autoStartBreak,
     autoStartFocus: typeof raw.autoStartFocus === "boolean" ? raw.autoStartFocus : defaultTimerSettings.autoStartFocus,
     todoScope: raw.todoScope === "today" ? "today" : "all",
