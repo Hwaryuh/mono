@@ -405,7 +405,7 @@ function formatWon(amountWon: number) {
 
 function formatDate(date: string) {
   const [, month, day] = date.split("-");
-  return `${Number(month)}/${String(Number(day)).padStart(2, "0")}`;
+  return `${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
 }
 
 function LedgerLoading() {
