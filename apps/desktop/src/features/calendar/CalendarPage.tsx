@@ -55,7 +55,7 @@ function formatDay(date: string) {
 
 function formatRange(event: CalendarEvent) {
   if (!event.startTime && !event.endTime) return translate("calendar.time.allDay");
-  if (event.startDate === event.endDate) return `${event.startTime ?? "00:00"}–${event.endTime ?? event.startTime ?? "00:00"}`;
+  if (event.startDate === event.endDate) return `${event.startTime ?? "00:00"} - ${event.endTime ?? event.startTime ?? "00:00"}`;
   return translate("calendar.event.dateTimeRange", { startDate: formatDay(event.startDate), startTime: event.startTime ?? translate("calendar.time.allDay"), endDate: formatDay(event.endDate), endTime: event.endTime ?? translate("calendar.time.allDay") });
 }
 

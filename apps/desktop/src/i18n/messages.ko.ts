@@ -444,7 +444,7 @@ export const koMessages = {
   "calendar.date.month": "{year}년 {month}월",
   "calendar.date.monthDay": "{month}월 {day}일",
   "calendar.time.allDay": "종일",
-  "calendar.event.dateTimeRange": "{startDate} {startTime}–{endDate} {endTime}",
+  "calendar.event.dateTimeRange": "{startDate} {startTime} - {endDate} {endTime}",
   "calendar.recurrence.unit.week": "주",
   "calendar.recurrence.unit.month": "개월",
   "calendar.recurrence.unit.year": "년",

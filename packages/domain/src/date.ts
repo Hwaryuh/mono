@@ -31,7 +31,7 @@ export function koreanMonthLabel(iso: string): string {
 }
 
 /**
- * ISO 타임스탬프 → "2026. 8. 27 09:38"(로컬 시계). 파싱 불가한 값(mock의 "방금",
+ * ISO 타임스탬프 → "2026. 08. 27. 09:38"(로컬 시계). 파싱 불가한 값(mock의 "방금",
  * "2분 전" 등 사람이 읽는 문자열)은 그대로 돌려준다.
  */
 export function formatTimestamp(value: string): string {
@@ -39,5 +39,5 @@ export function formatTimestamp(value: string): string {
   if (Number.isNaN(parsed)) return value;
   const date = new Date(parsed);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}. ${pad(date.getMonth() + 1)}. ${pad(date.getDate())}. ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
