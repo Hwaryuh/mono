@@ -1,6 +1,6 @@
 import { Badge, Button, ColorPicker, Icon, IconButton, Input, Modal, MorphingIcon, Select, StatusIndicator, type IconName } from "@mono/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import type { DashboardRepository } from "../features/dashboard/dashboard-repository";
 import { dashboardQueryKey, formatMediaSize, QuickCapture } from "../features/dashboard/QuickCapture";
@@ -81,15 +81,16 @@ interface SettingsSectionDefinition {
   id: SettingsSectionId;
   labelKey: TranslationKey;
   icon: IconName;
+  groupKey: TranslationKey;
 }
 
 const settingsSections: SettingsSectionDefinition[] = [
-  { id: "appearance", labelKey: "settings.section.appearance", icon: "sun" },
-  { id: "timer", labelKey: "settings.section.timer", icon: "clock" },
-  { id: "server", labelKey: "settings.section.server", icon: "server" },
-  { id: "ai", labelKey: "settings.section.ai", icon: "sparkles" },
-  { id: "storage", labelKey: "settings.section.storage", icon: "layers" },
-  { id: "about", labelKey: "settings.section.about", icon: "note" },
+  { id: "appearance", labelKey: "settings.section.appearance", icon: "sun", groupKey: "settings.group.appearance" },
+  { id: "server", labelKey: "settings.section.server", icon: "server", groupKey: "settings.group.connection" },
+  { id: "ai", labelKey: "settings.section.ai", icon: "sparkles", groupKey: "settings.group.connection" },
+  { id: "storage", labelKey: "settings.section.storage", icon: "layers", groupKey: "settings.group.connection" },
+  { id: "timer", labelKey: "settings.section.timer", icon: "clock", groupKey: "settings.group.etc" },
+  { id: "about", labelKey: "settings.section.about", icon: "note", groupKey: "settings.group.etc" },
 ];
 
 const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(window.localStorage);
@@ -449,17 +450,21 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
         <aside className="settings-navigation">
           <span>{t("settings.title")}</span>
           <nav aria-label={t("settings.navigation")}>
-            {settingsSections.map((section) => (
-              <button
-                aria-current={activeSection === section.id ? "page" : undefined}
-                className={activeSection === section.id ? "settings-navigation__item settings-navigation__item--active" : "settings-navigation__item"}
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                type="button"
-              >
-                <Icon name={section.icon} size={14} />
-                <span>{t(section.labelKey)}</span>
-              </button>
+            {settingsSections.map((section, index) => (
+              <Fragment key={section.id}>
+                {section.groupKey !== settingsSections[index - 1]?.groupKey && (
+                  <span className="settings-navigation__group">{t(section.groupKey)}</span>
+                )}
+                <button
+                  aria-current={activeSection === section.id ? "page" : undefined}
+                  className={activeSection === section.id ? "settings-navigation__item settings-navigation__item--active" : "settings-navigation__item"}
+                  onClick={() => setActiveSection(section.id)}
+                  type="button"
+                >
+                  <Icon name={section.icon} size={14} />
+                  <span>{t(section.labelKey)}</span>
+                </button>
+              </Fragment>
             ))}
           </nav>
         </aside>
