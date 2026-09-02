@@ -191,6 +191,21 @@ describe("ScrapPage", () => {
     expect(open).toHaveBeenCalledWith(url);
   });
 
+  it("댓글의 ~~취소선~~ 마크다운을 <s>로 렌더한다", async () => {
+    renderPage(
+      repositoryOf({
+        tags: ["수집"],
+        items: [{ id: "comment-strike", kind: "text", title: "댓글 취소선", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-strike-1", createdAt: "오늘", text: "이건 ~~틀림~~ 맞음" }] }],
+      }),
+      "/scrap?detail=comment-strike",
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const struck = within(drawer).getByText("틀림");
+    expect(struck.tagName).toBe("S");
+    expect(struck.closest("p")).toHaveTextContent("이건 틀림 맞음");
+  });
+
   it("새 댓글은 Shift+Enter로 줄바꿈하고 Enter로 등록한다", async () => {
     const addComment = vi.fn(async () => {});
     renderPage(

@@ -33,8 +33,22 @@ const photoReplaceDomId = "scrap-photo-replace";
 const externalUrlOpener = PlatformExternalUrlOpener.of();
 const commentUrlPattern = /(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 const trailingUrlPunctuationPattern = /[),.!?;:\]}]+$/u;
+const commentStrikePattern = /~~(.+?)~~/g;
 
-type CommentTextSegment = { text: string; externalUrl: string | null };
+type CommentTextSegment = { text: string; externalUrl: string | null; strike?: boolean };
+
+// ~~취소선~~ 마크다운을 조각으로 쪼갠다. URL 조각 안쪽은 건드리지 않는다.
+function splitCommentStrike(text: string): CommentTextSegment[] {
+  const segments: CommentTextSegment[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(commentStrikePattern)) {
+    if (match.index > cursor) segments.push({ text: text.slice(cursor, match.index), externalUrl: null });
+    segments.push({ text: match[1], externalUrl: null, strike: true });
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), externalUrl: null });
+  return segments;
+}
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : translate("common.error.actionFailed");
@@ -59,7 +73,8 @@ function commentTextSegmentsOf(text: string): CommentTextSegment[] {
   }
 
   if (cursor < text.length) segments.push({ text: text.slice(cursor), externalUrl: null });
-  return segments.length > 0 ? segments : [{ text, externalUrl: null }];
+  const linked = segments.length > 0 ? segments : [{ text, externalUrl: null }];
+  return linked.flatMap((segment) => segment.externalUrl ? [segment] : splitCommentStrike(segment.text));
 }
 
 function submitFormOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -557,7 +572,7 @@ function CommentContent({ text, urlOpener }: { text: string; urlOpener: External
     void urlOpener.open(externalUrl);
   }
 
-  return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
+  return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.strike ? <s key={`${index}-${segment.text}`}>{segment.text}</s> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
 }
 
 function CommentLinkPreview({ externalUrl, onOpen }: { externalUrl: string; onOpen: (event: MouseEvent<HTMLAnchorElement>, externalUrl: string) => void }) {
