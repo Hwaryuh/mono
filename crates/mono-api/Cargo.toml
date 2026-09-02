@@ -1,7 +1,7 @@
 [package]
 name = "mono-api"
 version.workspace = true
-description = "mono API 서버 — 임베드(Tauri) + standalone 공용"
+description = "mono API Server"
 edition = "2021"
 rust-version = "1.77.2"
 

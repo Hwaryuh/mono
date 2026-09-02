@@ -1,7 +1,7 @@
 [package]
 name = "mono-desktop"
 version.workspace = true
-description = "개인 관리 플랫폼 데스크톱 앱"
+description = "A Workspace for Simple Productivity"
 edition = "2021"
 rust-version = "1.77.2"
 
