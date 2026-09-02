@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./icons";
+import { uiMessage } from "./i18n";
 
 export type SelectOption = {
   value: string;
@@ -174,13 +175,13 @@ export function Select({ value, label, options, onChange, align = "start", disab
         type="button"
       >
         {selectedOption?.dotColor && <span aria-hidden="true" className="ui-select__dot" style={{ backgroundColor: selectedOption.dotColor }} />}
-        <span className="ui-select__value">{selectedOption?.label ?? "선택"}</span>
+        <span className="ui-select__value">{selectedOption?.label ?? uiMessage("select")}</span>
         <Icon className="ui-select__chevron" name="chevronDown" size={13} />
       </button>
 
       {open && listboxPosition && createPortal(
         <div
-          aria-label={`${label} 옵션`}
+          aria-label={uiMessage("options", { label })}
           className={`ui-select__listbox ui-select__listbox--${listboxPosition.placement}`}
           id={listboxId}
           ref={listboxRef}

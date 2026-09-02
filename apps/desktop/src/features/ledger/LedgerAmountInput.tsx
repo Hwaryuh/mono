@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { Input } from "@mono/ui";
 
 interface LedgerAmountInputProps {
@@ -12,7 +13,7 @@ export function formatLedgerAmountInput(raw: string) {
   return digits ? Number(digits).toLocaleString("ko-KR") : "";
 }
 
-export function LedgerAmountInput({ autoFocus = false, label = "금액", onChange, value }: LedgerAmountInputProps) {
+export function LedgerAmountInput({ autoFocus = false, label = translate("inbox.text.010"), onChange, value }: LedgerAmountInputProps) {
   return (
     <div className="ledger-amount-input">
       <b aria-hidden="true">₩</b>

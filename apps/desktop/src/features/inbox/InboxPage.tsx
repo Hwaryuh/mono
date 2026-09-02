@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import type { CalendarCategory, InboxField, InboxItem, InboxSnapshot, InboxUpdateInput, LedgerCategory, TodoLabel } from "@mono/contracts";
 import { formatTimestamp, inboxTargetModuleIds, type InboxTargetModuleId } from "@mono/domain";
 import {
@@ -36,24 +37,24 @@ const ledgerQueryKey = ["ledger"] as const;
 const scrapQueryKey = ["scrap"] as const;
 const calendarQueryKey = ["calendar"] as const;
 const moduleMeta: Record<InboxTargetModuleId, { name: string; color: string; icon: IconName }> = {
-  todo: { name: "할 일", color: "oklch(0.539 0.082 160.129)", icon: "todo" },
-  calendar: { name: "일정", color: "oklch(0.604 0.149 260.322)", icon: "calendar" },
-  scrap: { name: "스크랩", color: "oklch(0.502 0.132 309.199)", icon: "scrap" },
-  ledger: { name: "가계부", color: "oklch(0.603 0.109 75.876)", icon: "wallet" },
+  todo: { name: translate("app.navigation.todo"), color: "oklch(0.539 0.082 160.129)", icon: "todo" },
+  calendar: { name: translate("app.navigation.calendar"), color: "oklch(0.604 0.149 260.322)", icon: "calendar" },
+  scrap: { name: translate("app.navigation.scrap"), color: "oklch(0.502 0.132 309.199)", icon: "scrap" },
+  ledger: { name: translate("app.navigation.ledger"), color: "oklch(0.603 0.109 75.876)", icon: "wallet" },
 };
 
 const sourceMeta: Record<InboxItem["source"], { name: string; icon: IconName }> = {
-  text: { name: "텍스트 입력", icon: "note" },
-  url: { name: "링크 입력", icon: "scrap" },
-  image: { name: "파일 입력", icon: "image" },
-  video: { name: "영상 입력", icon: "video" },
+  text: { name: translate("inbox.text.001"), icon: "note" },
+  url: { name: translate("inbox.text.002"), icon: "scrap" },
+  image: { name: translate("inbox.text.003"), icon: "image" },
+  video: { name: translate("inbox.text.004"), icon: "video" },
 };
 
 const fieldLabels: Record<InboxTargetModuleId, string[]> = {
-  todo: ["제목", "라벨", "마감", "메모"],
-  calendar: ["제목", "일시", "장소", "라벨"],
-  scrap: ["제목", "메모", "원문", "라벨"],
-  ledger: ["항목", "금액", "날짜", "라벨"],
+  todo: [translate("scrap.text.028"), translate("scrap.text.040"), translate("inbox.text.005"), translate("scrap.text.007")],
+  calendar: [translate("scrap.text.028"), translate("inbox.text.006"), translate("inbox.text.007"), translate("scrap.text.040")],
+  scrap: [translate("scrap.text.028"), translate("scrap.text.007"), translate("inbox.text.008"), translate("scrap.text.040")],
+  ledger: [translate("inbox.text.009"), translate("inbox.text.010"), translate("inbox.text.011"), translate("scrap.text.040")],
 };
 
 type InboxLabelCatalog = Record<InboxTargetModuleId, {
@@ -70,41 +71,41 @@ function labelCatalogOf(
 ): InboxLabelCatalog {
   return {
     todo: {
-      inputLabel: "할 일 라벨",
-      emptyMessage: "할 일 라벨 목록을 불러오지 못했습니다.",
+      inputLabel: translate("inbox.text.012"),
+      emptyMessage: translate("inbox.text.013"),
       options: todoLabels.map((label) => ({ value: label.name, label: label.name, dotColor: label.color })),
     },
     calendar: {
-      inputLabel: "일정 라벨",
-      emptyMessage: "일정 라벨 목록을 불러오지 못했습니다.",
+      inputLabel: translate("inbox.text.014"),
+      emptyMessage: translate("inbox.text.015"),
       options: calendarCategories.map((category) => ({ value: category.name, label: category.name, dotColor: category.color })),
     },
     scrap: {
-      inputLabel: "스크랩 라벨",
-      emptyMessage: "스크랩 라벨 목록을 불러오지 못했습니다.",
+      inputLabel: translate("inbox.text.016"),
+      emptyMessage: translate("inbox.text.017"),
       options: scrapLabels.map((label) => ({ value: label, label })),
     },
     ledger: {
-      inputLabel: "가계부 라벨",
-      emptyMessage: "가계부 라벨 목록을 불러오지 못했습니다.",
+      inputLabel: translate("inbox.text.018"),
+      emptyMessage: translate("inbox.text.019"),
       options: ledgerCategories.map((category) => ({ value: category.name, label: category.name, dotColor: category.color })),
     },
   };
 }
 
 function unifiedFieldLabel(label: string) {
-  return label === "분류" || label === "태그" ? "라벨" : label;
+  return label === translate("inbox.text.020") || label === translate("inbox.text.021") ? translate("scrap.text.040") : label;
 }
 
 function defaultFields(target: InboxTargetModuleId, raw: string): InboxField[] {
   return fieldLabels[target].map((label, index) => ({
     label,
-    value: index === 0 ? raw : label === "메모" || label === "원문" ? raw : label === "마감" ? "기한 없음" : "미지정",
+    value: index === 0 ? raw : label === translate("scrap.text.007") || label === translate("inbox.text.008") ? raw : label === translate("inbox.text.005") ? translate("inbox.text.022") : translate("routine.text.033"),
   }));
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("scrap.text.010");
 }
 
 type ModuleTargetPickerProps = {
@@ -175,11 +176,11 @@ function ModuleTargetPicker({ value, onChange }: ModuleTargetPickerProps) {
 
   return (
     <fieldset className="inbox-editor__targets" ref={rootRef}>
-      <legend>저장할 모듈</legend>
+      <legend>{translate("inbox.text.023")}</legend>
       <button
         aria-controls={listId}
         aria-expanded={open}
-        aria-label={`저장할 모듈: ${selectedMeta.name}`}
+        aria-label={translate("inbox.text.024", { value1: selectedMeta.name })}
         className="inbox-editor__target-trigger"
         onClick={() => open ? setOpen(false) : openList()}
         ref={triggerRef}
@@ -187,11 +188,11 @@ function ModuleTargetPicker({ value, onChange }: ModuleTargetPickerProps) {
       >
         <Icon name={selectedMeta.icon} size={15} style={{ color: selectedMeta.color }} />
         <span>{selectedMeta.name}</span>
-        <small>변경</small>
+        <small>{translate("inbox.text.025")}</small>
         <Icon className="inbox-editor__target-chevron" name="chevronDown" size={12} />
       </button>
       {open && (
-        <div aria-label="저장할 모듈 목록" className="inbox-editor__target-list" id={listId} role="radiogroup">
+        <div aria-label={translate("inbox.text.026")} className="inbox-editor__target-list" id={listId} role="radiogroup">
           {inboxTargetModuleIds.map((moduleId) => {
             const meta = moduleMeta[moduleId];
             const selected = value === moduleId;
@@ -262,29 +263,28 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
   return (
     <fieldset className="inbox-editor__schedule">
       <legend>
-        일시
-        {field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(field.confidence * 100)}%</small>}
+        {translate("inbox.text.006")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}
       </legend>
       <div className="inbox-editor__schedule-grid">
         <label>
-          <span>시작 날짜</span>
+          <span>{translate("inbox.text.028")}</span>
           <DatePicker
-            label="시작 날짜"
+            label={translate("inbox.text.028")}
             onChange={(startDate) => update({ startDate, endDate: draft.endDate && draft.endDate >= startDate ? draft.endDate : startDate })}
             value={draft.startDate}
           />
         </label>
         <label>
-          <span>종료 날짜</span>
-          <DatePicker align="end" label="종료 날짜" min={draft.startDate} onChange={(endDate) => update({ endDate })} value={draft.endDate} />
+          <span>{translate("inbox.text.029")}</span>
+          <DatePicker align="end" label={translate("inbox.text.029")} min={draft.startDate} onChange={(endDate) => update({ endDate })} value={draft.endDate} />
         </label>
         <label>
-          <span>시작 시간</span>
-          <TimePicker label="시작 시간" onChange={(startTime) => update({ startTime })} value={draft.startTime} />
+          <span>{translate("inbox.text.030")}</span>
+          <TimePicker label={translate("inbox.text.030")} onChange={(startTime) => update({ startTime })} value={draft.startTime} />
         </label>
         <label>
-          <span>종료 시간</span>
-          <TimePicker align="end" label="종료 시간" onChange={(endTime) => update({ endTime })} value={draft.endTime} />
+          <span>{translate("inbox.text.031")}</span>
+          <TimePicker align="end" label={translate("inbox.text.031")} onChange={(endTime) => update({ endTime })} value={draft.endTime} />
         </label>
       </div>
     </fieldset>
@@ -294,7 +294,7 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
 function InboxLabelField({ field, source, onChange }: { field: InboxField; source: InboxLabelCatalog[InboxTargetModuleId]; onChange: (value: string) => void }) {
   return (
     <label>
-      <span>라벨{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(field.confidence * 100)}%</small>}</span>
+      <span>{translate("scrap.text.040")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
       <Select
         disabled={source.options.length === 0}
         label={source.inputLabel}
@@ -321,12 +321,12 @@ function InboxLedgerAmountDateFields({
   return (
     <div className="ledger-expense-form__pair">
       <label>
-        <span>금액{amountField.confidence !== undefined && <small className={amountField.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(amountField.confidence * 100)}%</small>}</span>
+        <span>{translate("inbox.text.010")}{amountField.confidence !== undefined && <small className={amountField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(amountField.confidence * 100)}%</small>}</span>
         <LedgerAmountInput onChange={(value) => onAmountChange(value ? `₩ ${value}` : "")} value={amountField.value} />
       </label>
       <label>
-        <span>날짜{dateField.confidence !== undefined && <small className={dateField.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(dateField.confidence * 100)}%</small>}</span>
-        <DatePicker align="end" label="날짜" onChange={onDateChange} value={dateField.value} />
+        <span>{translate("inbox.text.011")}{dateField.confidence !== undefined && <small className={dateField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(dateField.confidence * 100)}%</small>}</span>
+        <DatePicker align="end" label={translate("inbox.text.011")} onChange={onDateChange} value={dateField.value} />
       </label>
     </div>
   );
@@ -336,8 +336,8 @@ function InboxTodoDueField({ field, onChange }: { field: InboxField; onChange: (
   const dueDate = field.value.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "";
   return (
     <label>
-      <span>마감{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(field.confidence * 100)}%</small>}</span>
-      <DatePicker label="마감일" onChange={(value) => onChange(value || "기한 없음")} value={dueDate} />
+      <span>{translate("inbox.text.005")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
+      <DatePicker label={translate("inbox.text.032")} onChange={(value) => onChange(value || translate("inbox.text.022"))} value={dueDate} />
     </label>
   );
 }
@@ -377,7 +377,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
 
   if (snapshotQuery.isPending) return <InboxLoading />;
   if (snapshotQuery.isError) {
-    return <div className="inbox-state" role="alert"><StatusIndicator icon="alert" label="수집함을 불러오지 못했습니다" tone="danger" /></div>;
+    return <div className="inbox-state" role="alert"><StatusIndicator icon="alert" label={translate("inbox.text.033")} tone="danger" /></div>;
   }
 
   const items = snapshotQuery.data.items;
@@ -390,9 +390,9 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
     todoQuery.data?.labels ?? [],
   );
   const tabs: Array<{ id: InboxTab; label: string; count: number }> = [
-    { id: "pending", label: "대기", count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
-    { id: "approved", label: "승인됨", count: items.filter((item) => item.status === "approved").length },
-    { id: "failed", label: "분류 실패", count: items.filter((item) => item.status === "failed").length },
+    { id: "pending", label: translate("inbox.text.034"), count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
+    { id: "approved", label: translate("inbox.text.035"), count: items.filter((item) => item.status === "approved").length },
+    { id: "failed", label: translate("inbox.text.036"), count: items.filter((item) => item.status === "failed").length },
   ];
 
   function selectTab(nextTab: InboxTab) {
@@ -420,7 +420,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
 
   return (
     <div className="inbox-page">
-      <div aria-label="수집함 상태" className="inbox-tabs" role="tablist">
+      <div aria-label={translate("inbox.text.037")} className="inbox-tabs" role="tablist">
         {tabs.map((item) => (
           <button
             aria-controls={`inbox-panel-${item.id}`}
@@ -439,8 +439,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
           </button>
         ))}
         <Button disabled={highConfidenceCount === 0} loading={approveAllMutation.isPending} onClick={() => approveAllMutation.mutate()} size="small">
-          확신도 90% 이상 {highConfidenceCount}건 일괄 승인
-        </Button>
+          {translate("inbox.text.038", { count: highConfidenceCount })}</Button>
       </div>
 
       {approveAllMutation.isError && <div className="inbox-bulk-error" role="alert">{errorMessage(approveAllMutation.error)}</div>}
@@ -456,7 +455,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
           />
         ))}
         {visible.length === 0 && (
-          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>남은 항목이 없습니다</strong></div>
+          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>{translate("inbox.text.040")}</strong></div>
         )}
       </div>
     </div>
@@ -486,8 +485,8 @@ function InboxRow({
   const source = sourceMeta[item.source];
   const targetMeta = item.target ? moduleMeta[item.target] : null;
   const videoRoutingLocked = item.source === "video";
-  const ledgerAmountFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === "금액") : -1;
-  const ledgerDateFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === "날짜") : -1;
+  const ledgerAmountFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("inbox.text.010")) : -1;
+  const ledgerDateFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("inbox.text.011")) : -1;
 
   async function invalidateSnapshots() {
     await Promise.all([
@@ -550,9 +549,9 @@ function InboxRow({
     setTarget(nextTarget);
     setFields(defaultFields(nextTarget, item.raw).map((field) => {
       if (nextTarget === "calendar") {
-        if (field.label === "일시") return { ...field, value: calendarToday };
+        if (field.label === translate("inbox.text.006")) return { ...field, value: calendarToday };
       }
-      if (field.label === "라벨") return { ...field, value: labelCatalog[nextTarget].options[0]?.value ?? "" };
+      if (field.label === translate("scrap.text.040")) return { ...field, value: labelCatalog[nextTarget].options[0]?.value ?? "" };
       return field;
     }));
   }
@@ -564,19 +563,19 @@ function InboxRow({
   function submitUpdate(event: FormEvent) {
     event.preventDefault();
     const normalizedFields = fields.map((field) => ({ ...field, value: field.value.trim() }));
-    const label = normalizedFields.find((field) => field.label === "라벨")?.value;
+    const label = normalizedFields.find((field) => field.label === translate("scrap.text.040"))?.value;
     if (label !== undefined && !labelCatalog[target].options.some((option) => option.value === label)) {
-      setActionError(`${moduleMeta[target].name} 라벨을 선택해야 합니다.`);
+      setActionError(translate("inbox.text.041", { value1: moduleMeta[target].name }));
       return;
     }
     if (normalizedFields.some((field) => !field.value)) {
-      setActionError("모든 필드에 값을 입력해야 합니다.");
+      setActionError(translate("inbox.text.042"));
       return;
     }
     if (target === "calendar") {
-      const schedule = normalizedFields.find((field) => field.label === "일시")?.value ?? "";
+      const schedule = normalizedFields.find((field) => field.label === translate("inbox.text.006"))?.value ?? "";
       if (!/\d{4}-\d{2}-\d{2}/.test(schedule)) {
-        setActionError("일정 날짜를 선택해야 합니다.");
+        setActionError(translate("inbox.text.043"));
         return;
       }
     }
@@ -591,29 +590,29 @@ function InboxRow({
         {item.source === "image" && (item.images?.length
           ? <div className="inbox-item__thumbnails">{item.images.map((image, index) => <InboxMediaThumbnail key={`${image.mediaId}-${index}`} mediaId={image.mediaId} name={image.name} />)}</div>
           : <div className="inbox-item__thumbnail"><Icon name="image" size={18} /></div>)}
-        {item.source === "video" && <div aria-label="영상" className="inbox-item__thumbnail" role="img"><Icon name="video" size={18} /></div>}
+        {item.source === "video" && <div aria-label={translate("inbox.text.044")} className="inbox-item__thumbnail" role="img"><Icon name="video" size={18} /></div>}
       </div>
 
       <div className="inbox-item__result">
         {item.status === "failed" ? (
-          <div className="inbox-item__failure"><StatusIndicator icon="alert" label="분류하지 못했습니다" tone="warning" /><span>대상을 직접 고르면 그대로 저장됩니다.</span></div>
+          <div className="inbox-item__failure"><StatusIndicator icon="alert" label={translate("inbox.text.045")} tone="warning" /><span>{translate("inbox.text.046")}</span></div>
         ) : item.status === "approved" ? (
-          <div className="inbox-item__approved"><StatusIndicator icon="check" label={`${targetMeta?.name ?? "대상"}에 저장했습니다`} tone="success" /><span>확신도 {Math.round(item.confidence * 100)}%</span></div>
+          <div className="inbox-item__approved"><StatusIndicator icon="check" label={translate("inbox.text.047", { value1: targetMeta?.name ?? translate("inbox.text.069") })} tone="success" /><span>{translate("inbox.text.048")}{Math.round(item.confidence * 100)}%</span></div>
         ) : item.status === "processing" ? (
-          <div className="inbox-item__processing"><StatusIndicator icon="sync" label="모듈 분류 중…" tone="accent" /></div>
+          <div className="inbox-item__processing"><StatusIndicator icon="sync" label={translate("inbox.text.049")} tone="accent" /></div>
         ) : (
           <>
             <div className="inbox-item__classification">
               <ConfidenceIndicator value={item.confidence} />
-              <div><span className="inbox-item__confidence-label">{videoRoutingLocked ? "영상 규칙 분류 · AI 분석 생략" : item.pinned ? "지정된 모듈" : "AI 분류 결과"}</span>
+              <div><span className="inbox-item__confidence-label">{videoRoutingLocked ? translate("inbox.text.050") : item.pinned ? translate("inbox.text.051") : translate("inbox.text.052")}</span>
                 <div className="inbox-item__target">
                   {targetMeta && (
-                    <Button aria-label={videoRoutingLocked ? "스크랩 필드 수정" : `분류 대상 변경: ${targetMeta.name}`} disabled={busy} onClick={openEditor} size="small" style={{ backgroundColor: `color-mix(in srgb, ${targetMeta.color} 13%, var(--color-surface))` }}>
+                    <Button aria-label={videoRoutingLocked ? translate("inbox.text.053") : translate("inbox.text.054", { value1: targetMeta.name })} disabled={busy} onClick={openEditor} size="small" style={{ backgroundColor: `color-mix(in srgb, ${targetMeta.color} 13%, var(--color-surface))` }}>
                       <Icon name={targetMeta.icon} size={13} style={{ color: targetMeta.color }} />{targetMeta.name}{!videoRoutingLocked && <Icon name="chevronDown" size={11} />}
                     </Button>
                   )}
-                  {item.confidence < 0.75 && <Badge tone="warning">검토 권장</Badge>}
-                  {videoRoutingLocked && <Badge>영상 · 스크랩 고정</Badge>}
+                  {item.confidence < 0.75 && <Badge tone="warning">{translate("inbox.text.055")}</Badge>}
+                  {videoRoutingLocked && <Badge>{translate("inbox.text.056")}</Badge>}
                 </div>
               </div>
             </div>
@@ -621,7 +620,7 @@ function InboxRow({
               {item.fields.map((field, index) => {
                 const fieldLabel = unifiedFieldLabel(field.label);
                 return (
-                <button aria-label={`${fieldLabel} 필드 수정`} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
+                <button aria-label={translate("inbox.text.057", { value1: fieldLabel })} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
                   <span>{fieldLabel}</span><strong>{field.value}</strong>{field.confidence !== undefined && <small className={field.confidence < 0.6 ? "inbox-field--low" : ""}>{Math.round(field.confidence * 100)}%</small>}
                   <Icon name="edit" size={12} />
                 </button>
@@ -635,34 +634,34 @@ function InboxRow({
 
       {(item.status === "pending" || item.status === "failed") && (
         <div className="inbox-item__actions">
-          {item.status === "pending" && <Button loading={approveMutation.isPending} onClick={() => approveMutation.mutate()} variant="primary">승인하고 저장</Button>}
-          <Button disabled={busy} onClick={openEditor}>{item.status === "failed" ? "직접 분류" : "필드 수정"}</Button>
-          <Button disabled={busy} onClick={() => { setActionError(null); setDiscardOpen(true); }} variant="ghost">버리기</Button>
+          {item.status === "pending" && <Button loading={approveMutation.isPending} onClick={() => approveMutation.mutate()} variant="primary">{translate("inbox.text.058")}</Button>}
+          <Button disabled={busy} onClick={openEditor}>{item.status === "failed" ? translate("inbox.text.059") : translate("inbox.text.060")}</Button>
+          <Button disabled={busy} onClick={() => { setActionError(null); setDiscardOpen(true); }} variant="ghost">{translate("inbox.text.061")}</Button>
         </div>
       )}
 
       <Modal
         className="inbox-editor"
-        footer={<><Button disabled={updateMutation.isPending} onClick={() => setEditorOpen(false)}>취소</Button><Button form={`inbox-editor-${item.id}`} loading={updateMutation.isPending} type="submit" variant="primary">저장</Button></>}
+        footer={<><Button disabled={updateMutation.isPending} onClick={() => setEditorOpen(false)}>{translate("scrap.text.025")}</Button><Button form={`inbox-editor-${item.id}`} loading={updateMutation.isPending} type="submit" variant="primary">{translate("settings.text.021")}</Button></>}
         icon={moduleMeta[target].icon}
         onClose={() => { if (!updateMutation.isPending) setEditorOpen(false); }}
         open={editorOpen}
-        title={item.status === "failed" ? "직접 분류" : "필드 수정"}
+        title={item.status === "failed" ? translate("inbox.text.059") : translate("inbox.text.060")}
       >
         <form id={`inbox-editor-${item.id}`} onSubmit={submitUpdate}>
-          <div className="inbox-editor__source"><span>{source.name} 원문</span><p>{item.raw}</p></div>
+          <div className="inbox-editor__source"><span>{source.name} {translate("inbox.text.062")}</span><p>{item.raw}</p></div>
           {videoRoutingLocked
-            ? <div className="inbox-editor__fixed-target"><span>저장 모듈</span><strong><Icon name="scrap" size={13} />스크랩</strong><small>영상은 AI 분석 없이 스크랩으로 고정됩니다.</small></div>
+            ? <div className="inbox-editor__fixed-target"><span>{translate("inbox.text.063")}</span><strong><Icon name="scrap" size={13} />{translate("app.navigation.scrap")}</strong><small>{translate("inbox.text.064")}</small></div>
             : <ModuleTargetPicker onChange={changeTarget} value={target} />}
           <div className="inbox-editor__fields">
             {fields.map((field, index) => {
-              if (target === "calendar" && field.label === "일시") {
+              if (target === "calendar" && field.label === translate("inbox.text.006")) {
                 return <InboxScheduleField fallbackDate={calendarToday} field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
               }
-              if (field.label === "라벨") {
+              if (field.label === translate("scrap.text.040")) {
                 return <InboxLabelField field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} source={labelCatalog[target]} />;
               }
-              if (target === "todo" && field.label === "마감") {
+              if (target === "todo" && field.label === translate("inbox.text.005")) {
                 return <InboxTodoDueField field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
               }
               if (index === ledgerAmountFieldIndex && ledgerDateFieldIndex >= 0) {
@@ -677,10 +676,10 @@ function InboxRow({
                 );
               }
               if (index === ledgerDateFieldIndex && ledgerAmountFieldIndex >= 0) return null;
-              const multiline = field.label === "메모" || field.label === "원문" || field.label === "원인";
+              const multiline = field.label === translate("scrap.text.007") || field.label === translate("inbox.text.008") || field.label === translate("inbox.text.065");
               return (
                 <label key={`${field.label}-${index}`}>
-                  <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>AI 확신도 {Math.round(field.confidence * 100)}%</small>}</span>
+                  <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
                   {multiline
                     ? <TextArea autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} rows={3} value={field.value} />
                     : <Input autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} value={field.value} />}
@@ -694,13 +693,13 @@ function InboxRow({
 
       <Modal
         className="inbox-discard-modal"
-        footer={<><Button autoFocus disabled={discardMutation.isPending} onClick={() => setDiscardOpen(false)}>취소</Button><Button loading={discardMutation.isPending} onClick={() => discardMutation.mutate()} variant="danger">버리기</Button></>}
+        footer={<><Button autoFocus disabled={discardMutation.isPending} onClick={() => setDiscardOpen(false)}>{translate("scrap.text.025")}</Button><Button loading={discardMutation.isPending} onClick={() => discardMutation.mutate()} variant="danger">{translate("inbox.text.061")}</Button></>}
         icon="alert"
         onClose={() => { if (!discardMutation.isPending) setDiscardOpen(false); }}
         open={discardOpen}
-        title="이 항목을 버릴까요?"
+        title={translate("inbox.text.066")}
       >
-        <p>수집함에서 제거합니다. 이 작업은 되돌릴 수 없습니다.</p>
+        <p>{translate("inbox.text.067")}</p>
         <blockquote>{item.raw}</blockquote>
         {actionError && <div className="inbox-editor__error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
       </Modal>
@@ -715,5 +714,5 @@ function InboxMediaThumbnail({ mediaId, name }: { mediaId: string; name: string 
 }
 
 function InboxLoading() {
-  return <div className="inbox-list inbox-list--loading" aria-label="수집함 불러오는 중">{Array.from({ length: 4 }, (_, index) => <Card className="inbox-item inbox-item--skeleton" key={index} />)}</div>;
+  return <div className="inbox-list inbox-list--loading" aria-label={translate("inbox.text.068")}>{Array.from({ length: 4 }, (_, index) => <Card className="inbox-item inbox-item--skeleton" key={index} />)}</div>;
 }

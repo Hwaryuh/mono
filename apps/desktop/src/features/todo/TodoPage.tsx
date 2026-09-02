@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { type TodoItem, type TodoLabel, type TodoSnapshot, type TodoWriteInput } from "@mono/contracts";
 import { Button, Checkbox, DatePicker, Icon, Input, Modal, Select, TextArea, TimePicker, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,11 +26,11 @@ type Draft = {
 };
 
 const statusMeta: Record<TodoStatus, { name: string; title: string; icon: IconName }> = {
-  all: { name: "전체", title: "전체 할 일", icon: "layers" },
-  today: { name: "오늘", title: "오늘 할 일", icon: "clock" },
-  upcoming: { name: "예정", title: "예정된 할 일", icon: "calendar" },
-  overdue: { name: "지연", title: "지연된 할 일", icon: "alert" },
-  done: { name: "완료", title: "완료된 할 일", icon: "check" },
+  all: { name: translate("todo.text.001"), title: translate("todo.text.002"), icon: "layers" },
+  today: { name: translate("todo.text.003"), title: translate("dashboard.text.005"), icon: "clock" },
+  upcoming: { name: translate("todo.text.004"), title: translate("todo.text.005"), icon: "calendar" },
+  overdue: { name: translate("todo.text.006"), title: translate("todo.text.007"), icon: "alert" },
+  done: { name: translate("todo.text.008"), title: translate("todo.text.009"), icon: "check" },
 };
 
 function statusOf(item: TodoItem, today: string): TodoStatus {
@@ -61,7 +62,7 @@ function draftOf(item: TodoItem): Draft {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("scrap.text.010");
 }
 
 export function TodoPage({ repository, viewStateStore }: { repository: TodoRepository; viewStateStore?: TodoViewStateStore }) {
@@ -139,7 +140,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   }, [deleteOpen, editorItem, snapshotQuery.data, status]);
 
   if (snapshotQuery.isPending) return <TodoLoading />;
-  if (snapshotQuery.isError) return <div className="todo-state" role="alert"><Icon name="alert" size={18} />할 일을 불러오지 못했습니다.</div>;
+  if (snapshotQuery.isError) return <div className="todo-state" role="alert"><Icon name="alert" size={18} />{translate("todo.text.010")}</div>;
   const snapshot = snapshotQuery.data;
 
   const now = Date.now();
@@ -156,7 +157,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   const visibleItems = status === "all"
     ? [...filteredItems].sort((left, right) => Number(left.done) - Number(right.done))
     : filteredItems;
-  const title = labelIds.length > 0 ? "필터링된 할 일" : statusMeta[status].title;
+  const title = labelIds.length > 0 ? translate("todo.text.011") : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
@@ -243,17 +244,17 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
       dueTime: draft.dueDate && draft.dueTime ? draft.dueTime : null,
       note: draft.note.trim(),
     };
-    if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
-    if (!input.labelId) { setFormError("라벨을 선택해야 합니다."); return; }
+    if (!input.title) { setFormError(translate("scrap.text.013")); return; }
+    if (!input.labelId) { setFormError(translate("scrap.text.014")); return; }
     if (editorItem === "new") createMutation.mutate(input);
     else if (editorItem) updateMutation.mutate({ itemId: editorItem.id, input, expectedVersion: editorItem.version ?? 1 });
   }
 
   return (
     <div className="todo-page">
-      <aside aria-label="할 일 필터" className="todo-filters">
+      <aside aria-label={translate("todo.text.012")} className="todo-filters">
         <fieldset className="todo-filter-group">
-          <legend>상태</legend>
+          <legend>{translate("settings.text.022")}</legend>
           {todoStatusOrder.map((statusId) => {
             const meta = statusMeta[statusId];
             return (
@@ -273,10 +274,10 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
             );
           })}
         </fieldset>
-        <div aria-label="라벨 필터" className="todo-filter-group todo-filter-group--labels" role="group">
+        <div aria-label={translate("todo.text.013")} className="todo-filter-group todo-filter-group--labels" role="group">
           <div className="todo-filter-group__title">
-            <span>라벨</span>
-            <button aria-label="라벨 관리" className="todo-label-manage-trigger" onClick={openLabelManager} type="button">관리</button>
+            <span>{translate("scrap.text.040")}</span>
+            <button aria-label={translate("scrap.text.042")} className="todo-label-manage-trigger" onClick={openLabelManager} type="button">{translate("scrap.text.041")}</button>
           </div>
           {snapshot.labels.map((label) => {
             const selected = labelIds.includes(label.id);
@@ -300,11 +301,11 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
 
       <section className="todo-content">
         <header className="todo-list-header">
-          <strong>{title}</strong><span>{visibleItems.length}개</span>
+          <strong>{title}</strong><span>{visibleItems.length}{translate("scrap.text.044")}</span>
           {labelIds.map((labelId) => {
             const label = snapshot.labels.find((candidate) => candidate.id === labelId);
             return label && (
-              <button aria-label={`${label.name} 필터 해제`} className="todo-active-filter" key={label.id} onClick={() => toggleLabel(label.id)} type="button">
+              <button aria-label={translate("todo.text.014", { value1: label.name })} className="todo-active-filter" key={label.id} onClick={() => toggleLabel(label.id)} type="button">
                 <span style={{ backgroundColor: label.color }} />{label.name}<Icon name="close" size={10} strokeWidth={2.6} />
               </button>
             );
@@ -316,10 +317,10 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
             return <TodoRow item={item} key={item.id} label={label} onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)} repository={repository} snapshot={snapshot} />;
           })}
           {visibleItems.length === 0 && snapshot.items.length > 0 && (
-            <div className="todo-empty"><Icon name="todo" size={26} /><strong>조건에 맞는 할 일이 없습니다</strong><span>필터를 해제하거나 새 할 일을 만드세요.</span></div>
+            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.text.015")}</strong><span>{translate("todo.text.016")}</span></div>
           )}
           {snapshot.items.length === 0 && (
-            <div className="todo-empty"><Icon name="todo" size={26} /><strong>아직 할 일이 없습니다</strong><span>첫 할 일을 만들어 시작하세요.</span><Button onClick={openCreate} variant="primary">새 할 일</Button></div>
+            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.text.017")}</strong><span>{translate("todo.text.018")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newTodo")}</Button></div>
           )}
         </div>
       </section>
@@ -327,31 +328,31 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
       <Modal
         className="todo-editor-modal"
         footer={<>
-          {activeEditorItem && <Button className="todo-editor__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">삭제</Button>}
-          <Button disabled={editorBusy} onClick={() => closeEditor()}>취소</Button>
-          <Button form="todo-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? "생성" : "저장"}</Button>
+          {activeEditorItem && <Button className="todo-editor__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("settings.text.029")}</Button>}
+          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("scrap.text.025")}</Button>
+          <Button form="todo-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.text.013") : translate("settings.text.021")}</Button>
         </>}
         icon="todo"
         onClose={closeEditor}
         open={editorItem !== null}
-        title={editorItem === "new" ? "새 할 일" : "할 일 수정"}
+        title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.text.019")}
       >
         <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
-          <label><span>제목 <b>필수</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
+          <label><span>{translate("todo.text.020")}<b>{translate("todo.text.021")}</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
           <div className="todo-editor__field">
-            <div className="todo-editor__label-legend"><span>라벨</span><button onClick={openLabelManager} type="button">관리</button></div>
+            <div className="todo-editor__label-legend"><span>{translate("scrap.text.040")}</span><button onClick={openLabelManager} type="button">{translate("scrap.text.041")}</button></div>
             <Select
-              label="라벨"
+              label={translate("scrap.text.040")}
               onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))}
               options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))}
               value={draft.labelId}
             />
           </div>
           <div className="todo-editor__due">
-            <fieldset><legend>마감일</legend><DatePicker label="마감일" onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
-            <label><span>시간</span><TimePicker disabled={!draft.dueDate} label="마감 시간" onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
+            <fieldset><legend>{translate("inbox.text.032")}</legend><DatePicker label={translate("inbox.text.032")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
+            <label><span>{translate("todo.text.022")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.text.023")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
           </div>
-          <label><span>메모</span><TextArea onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={4} value={draft.note} /></label>
+          <label><span>{translate("scrap.text.007")}</span><TextArea onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={4} value={draft.note} /></label>
           {formError && !deleteOpen && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
@@ -374,13 +375,13 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
 
       <Modal
         className="todo-delete-modal"
-        footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>취소</Button><Button loading={deleteMutation.isPending} onClick={() => activeEditorItem && deleteMutation.mutate(activeEditorItem.id)} variant="danger">삭제</Button></>}
+        footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("scrap.text.025")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeEditorItem && deleteMutation.mutate(activeEditorItem.id)} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteOpen(false); }}
         open={deleteOpen}
-        title="이 할 일을 삭제할까요?"
+        title={translate("todo.text.024")}
       >
-        <p>삭제한 할 일은 복구할 수 없습니다.</p>
+        <p>{translate("todo.text.025")}</p>
         <blockquote>{activeEditorItem?.title}</blockquote>
         {formError && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
@@ -410,14 +411,14 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
   const status = statusOf(item, snapshot.today);
   const justCompleted = item.done && !previousDoneRef.current;
   const dueText = item.done
-    ? `완료: ${item.completedAt ? formatCompletedAt(item.completedAt) : "방금"}`
+    ? translate("todo.text.026", { value1: item.completedAt ? formatCompletedAt(item.completedAt) : translate("todo.text.033") })
     : !item.dueDate
-      ? "기한 없음"
+      ? translate("inbox.text.022")
       : item.dueDate === snapshot.today
-        ? item.dueTime ? `오늘 ${item.dueTime}` : "오늘"
+        ? item.dueTime ? translate("todo.text.027", { value1: item.dueTime }) : translate("todo.text.003")
         : status === "overdue"
-          ? `기한: ${daysBetween(item.dueDate, snapshot.today)}일 지남`
-          : `기한: ${formatDate(item.dueDate)}${item.dueTime ? ` ${item.dueTime}` : ""}`;
+          ? translate("todo.text.028", { value1: daysBetween(item.dueDate, snapshot.today) })
+          : translate("todo.text.029", { value1: formatDate(item.dueDate), value2: item.dueTime ? ` ${item.dueTime}` : "" });
 
   useLayoutEffect(() => {
     const row = rowRef.current;
@@ -442,9 +443,9 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
       className={`todo-item ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
       ref={rowRef}
     >
-      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={`${item.title} ${item.done ? "미완료" : "완료"} 처리`} onCheckedChange={() => toggleMutation.mutate()} />
-      <button aria-label={`${item.title} 수정`} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
-        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label="메모 있음" className="todo-item__note" name="note" role="img" size={12} />}</span></span>
+      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.text.032", { value1: item.title, value2: item.done ? translate("routine.text.038") : translate("todo.text.008") })} onCheckedChange={() => toggleMutation.mutate()} />
+      <button aria-label={translate("todo.text.030", { value1: item.title })} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
+        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.text.031")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
         <Icon name="chevronRight" size={13} />
       </button>
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
@@ -470,5 +471,5 @@ function daysBetween(from: string, to: string) {
 }
 
 function TodoLoading() {
-  return <div aria-label="할 일 불러오는 중" className="todo-page todo-page--loading"><aside className="todo-filters" /><div className="todo-list">{Array.from({ length: 5 }, (_, index) => <div className="todo-item todo-item--skeleton" key={index} />)}</div></div>;
+  return <div aria-label={translate("todo.text.032")} className="todo-page todo-page--loading"><aside className="todo-filters" /><div className="todo-list">{Array.from({ length: 5 }, (_, index) => <div className="todo-item todo-item--skeleton" key={index} />)}</div></div>;
 }

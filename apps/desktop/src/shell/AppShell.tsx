@@ -26,7 +26,7 @@ import { checkServerCompatibility, serverBehindOf } from "../infrastructure/serv
 import { CHECK_UPDATE_EVENT } from "../features/updater/AppUpdater";
 import { TimerSettingsPanel } from "../features/timer/TimerSettingsPanel";
 import { LocalStorageTimerSettingsStore } from "../features/timer/timer-settings-store";
-import { localeOptions, useI18n, type Locale } from "../i18n/i18n";
+import { localeOptions, translate, useI18n, type Locale } from "../i18n/i18n";
 import type { TranslationKey } from "../i18n/messages.ko";
 
 type NavigationItem = {
@@ -555,39 +555,38 @@ function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMai
 
   return (
     <>
-      <SettingsHeading description="R2에 남은 사진·영상 파일을 관리합니다." title="저장공간" />
-      <section aria-label="미사용 미디어 정리" className="settings-group settings-ai">
+      <SettingsHeading description={translate("settings.text.001")} title={translate("settings.section.storage")} />
+      <section aria-label={translate("settings.text.002")} className="settings-group settings-ai">
         <header>
-          <strong>미사용 미디어</strong>
-          <span>수집함과 스크랩 어느 항목도 참조하지 않는 사진·영상입니다.</span>
+          <strong>{translate("settings.text.003")}</strong>
+          <span>{translate("settings.text.004")}</span>
         </header>
         <div className="settings-ai__status">
-          <span>정리 대상</span>
+          <span>{translate("settings.text.005")}</span>
           <strong>
-            {usage === null ? "확인 필요" : usage.count === 0 ? "없음" : `${usage.count}개 · ${formatMediaSize(usage.bytes)}`}
+            {usage === null ? translate("settings.text.006") : usage.count === 0 ? translate("settings.text.007") : translate("settings.text.008", { value1: usage.count, value2: formatMediaSize(usage.bytes) })}
           </strong>
           <Button loading={pending === "scan"} onClick={() => void run("scan", async () => {
             const scanned = await mediaMaintenance.orphanUsage();
             setUsage(scanned);
-            if (scanned.count === 0) setMessage("정리할 미디어가 없습니다.");
-          })} type="button">확인</Button>
+            if (scanned.count === 0) setMessage(translate("settings.text.009"));
+          })} type="button">{translate("settings.text.010")}</Button>
           <Button
             disabled={!usage || usage.count === 0}
             loading={pending === "clean"}
             onClick={() => void run("clean", async () => {
               const deleted = await mediaMaintenance.gc();
               setUsage({ count: 0, bytes: 0 });
-              setMessage(`미디어 ${deleted}개를 삭제했습니다.`);
+              setMessage(translate("settings.text.011", { value1: deleted }));
             })}
             type="button"
             variant="danger"
           >
-            정리
-          </Button>
+            {translate("settings.text.012")}</Button>
         </div>
         {message && <p className="settings-ai__message" role="status">{message}</p>}
         {error && <p className="settings-ai__error" role="alert">{error}</p>}
-        <p className="settings-ai__notice-text">삭제한 파일은 되돌릴 수 없습니다.</p>
+        <p className="settings-ai__notice-text">{translate("settings.text.013")}</p>
       </section>
     </>
   );
@@ -627,10 +626,10 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
   const canSave = accountId.trim().length > 0 && accessKeyId.trim().length > 0 && secretAccessKey.trim().length > 0 && bucket.trim().length > 0;
 
   return (
-    <section aria-label="R2 자격증명 설정" className="settings-group settings-ai">
+    <section aria-label={translate("settings.text.014")} className="settings-group settings-ai">
       <header>
         <strong>Cloudflare R2</strong>
-        <span>사진·영상은 이 자격증명으로 R2 버킷에 저장됩니다. 서버에 암호화되어 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
+        <span>{translate("settings.text.015")}</span>
       </header>
       <form onSubmit={(event) => {
         event.preventDefault();
@@ -641,27 +640,27 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
           setSecretAccessKey("");
           setBucket("");
           setHasCredentials(true);
-          setMessage("R2 자격증명을 저장했습니다.");
+          setMessage(translate("settings.text.016"));
         });
       }}>
-        <Input aria-label="계정 ID" autoComplete="off" onChange={(event) => setAccountId(event.target.value)} placeholder="계정 ID" value={accountId} />
-        <Input aria-label="액세스 키 ID" autoComplete="off" onChange={(event) => setAccessKeyId(event.target.value)} placeholder="액세스 키 ID" type="password" value={accessKeyId} />
-        <Input aria-label="시크릿 액세스 키" autoComplete="off" onChange={(event) => setSecretAccessKey(event.target.value)} placeholder="시크릿 액세스 키" type="password" value={secretAccessKey} />
-        <Input aria-label="버킷 이름" autoComplete="off" onChange={(event) => setBucket(event.target.value)} placeholder="버킷 이름" value={bucket} />
-        <Button disabled={!canSave} loading={pending === "save"} type="submit" variant="primary">저장</Button>
+        <Input aria-label={translate("settings.text.017")} autoComplete="off" onChange={(event) => setAccountId(event.target.value)} placeholder={translate("settings.text.017")} value={accountId} />
+        <Input aria-label={translate("settings.text.018")} autoComplete="off" onChange={(event) => setAccessKeyId(event.target.value)} placeholder={translate("settings.text.018")} type="password" value={accessKeyId} />
+        <Input aria-label={translate("settings.text.019")} autoComplete="off" onChange={(event) => setSecretAccessKey(event.target.value)} placeholder={translate("settings.text.019")} type="password" value={secretAccessKey} />
+        <Input aria-label={translate("settings.text.020")} autoComplete="off" onChange={(event) => setBucket(event.target.value)} placeholder={translate("settings.text.020")} value={bucket} />
+        <Button disabled={!canSave} loading={pending === "save"} type="submit" variant="primary">{translate("settings.text.021")}</Button>
       </form>
       <div className="settings-ai__status">
-        <span>상태</span>
-        <strong>{hasCredentials === null ? "확인 중" : hasCredentials ? "설정됨" : "설정 안 됨"}</strong>
+        <span>{translate("settings.text.022")}</span>
+        <strong>{hasCredentials === null ? translate("settings.text.023") : hasCredentials ? translate("settings.text.024") : translate("settings.text.025")}</strong>
         <Button disabled={!hasCredentials} loading={pending === "test"} onClick={() => void run("test", async () => {
           await store.testConnection();
-          setMessage("R2 읽기·쓰기 연결에 성공했습니다.");
-        })} type="button">연결 테스트</Button>
+          setMessage(translate("settings.text.026"));
+        })} type="button">{translate("settings.text.027")}</Button>
         <Button disabled={!hasCredentials} loading={pending === "delete"} onClick={() => void run("delete", async () => {
           await store.deleteCredentials();
           setHasCredentials(false);
-          setMessage("R2 자격증명을 삭제했습니다.");
-        })} type="button">삭제</Button>
+          setMessage(translate("settings.text.028"));
+        })} type="button">{translate("settings.text.029")}</Button>
       </div>
       {message && <p className="settings-ai__message" role="status">{message}</p>}
       {error && <p className="settings-ai__error" role="alert">{error}</p>}
@@ -672,16 +671,16 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
 const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string; keySource: string; dataNotice: string; model: string }> = {
   gemini: {
     label: "Gemini",
-    keyPlaceholder: "Google AI Studio API 키",
+    keyPlaceholder: translate("settings.text.030"),
     keySource: "Google AI Studio",
-    dataNotice: "분류할 텍스트와 사진은 Google Gemini API로 전송됩니다. 무료 등급에서는 Google 정책에 따라 제출 데이터가 제품 개선에 사용될 수 있습니다.",
+    dataNotice: translate("settings.text.031"),
     model: "gemini-2.5-flash-lite",
   },
   openai: {
     label: "OpenAI",
-    keyPlaceholder: "OpenAI API 키",
+    keyPlaceholder: translate("settings.text.032"),
     keySource: "OpenAI Platform",
-    dataNotice: "분류할 텍스트와 사진은 OpenAI API로 전송됩니다.",
+    dataNotice: translate("settings.text.033"),
     model: "gpt-5-nano",
   },
 };
@@ -714,9 +713,9 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description="각 API 키에서 빠른 캡처에 사용할 모델을 선택합니다." title="AI" />
+      <SettingsHeading description={translate("settings.text.034")} title="AI" />
       {providerError?.provider === null && <p className="settings-ai__error settings-ai__provider-error" role="alert">{providerError.message}</p>}
-      <div aria-label="사용할 AI 모델" className="settings-ai-providers" role="radiogroup">
+      <div aria-label={translate("settings.text.035")} className="settings-ai-providers" role="radiogroup">
         {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
           <ApiKeySection
             active={activeProvider === provider}
@@ -770,13 +769,13 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
   }
 
   return (
-    <section aria-label={`${meta.label} API 키 설정`} className={`settings-group settings-ai settings-ai--provider ${active ? "settings-ai--active" : "settings-ai--inactive"}`}>
+    <section aria-label={translate("settings.text.036", { value1: meta.label })} className={`settings-group settings-ai settings-ai--provider ${active ? "settings-ai--active" : "settings-ai--inactive"}`}>
       <header className="settings-ai__provider-header">
         <label>
           <input checked={active} disabled={providerPending} name="active-ai-provider" onChange={onSelect} type="radio" />
-          <span className="settings-ai__provider-title"><strong>{meta.label} API 키</strong><small>{meta.model}</small></span>
+          <span className="settings-ai__provider-title"><strong>{meta.label} {translate("settings.text.037")}</strong><small>{meta.model}</small></span>
         </label>
-        <span>서버에 암호화되어 저장되며 앱 화면으로 다시 노출되지 않습니다.</span>
+        <span>{translate("settings.text.038")}</span>
       </header>
       <div className="settings-ai__body">
         <form onSubmit={(event) => {
@@ -785,31 +784,31 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
             await store.setApiKey(provider, apiKey);
             setApiKey("");
             setHasKey(true);
-            setMessage("API 키를 저장했습니다.");
+            setMessage(translate("settings.text.039"));
           });
         }}>
           <Input
-            aria-label={`${meta.label} API 키`}
+            aria-label={translate("settings.text.040", { value1: meta.label })}
             autoComplete="off"
             onChange={(event) => setApiKey(event.target.value)}
-            placeholder={hasKey ? "새 키로 교체" : meta.keyPlaceholder}
+            placeholder={hasKey ? translate("settings.text.041") : meta.keyPlaceholder}
             type="password"
             value={apiKey}
           />
-          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">저장</Button>
+          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">{translate("settings.text.021")}</Button>
         </form>
         <div className="settings-ai__status">
-          <span>상태</span>
-          <strong>{hasKey === null ? "확인 중" : hasKey ? "키 저장됨" : "키 없음"}</strong>
+          <span>{translate("settings.text.022")}</span>
+          <strong>{hasKey === null ? translate("settings.text.023") : hasKey ? translate("settings.text.042") : translate("settings.text.043")}</strong>
           <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
             await store.testConnection(provider);
-            setMessage(`${meta.label} 연결에 성공했습니다.`);
-          })} type="button">연결 테스트</Button>
+            setMessage(translate("settings.text.044", { value1: meta.label }));
+          })} type="button">{translate("settings.text.027")}</Button>
           <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
             await store.deleteApiKey(provider);
             setHasKey(false);
-            setMessage("API 키를 삭제했습니다.");
-          })} type="button">삭제</Button>
+            setMessage(translate("settings.text.045"));
+          })} type="button">{translate("settings.text.029")}</Button>
         </div>
         {selectionError && <p className="settings-ai__error" role="alert">{selectionError}</p>}
         {message && <p className="settings-ai__message" role="status">{message}</p>}
@@ -821,16 +820,16 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
 }
 
 const SERVER_MODE_OPTIONS: { id: ServerMode; label: string; description: string }[] = [
-  { id: "embedded", label: "이 기기", description: "이 기기에서 API 서버를 직접 실행하고 데이터를 로컬에 저장합니다." },
-  { id: "remote", label: "원격 서버", description: "다른 기기의 mono 서버에 연결해 여러 기기가 같은 데이터를 봅니다." },
+  { id: "embedded", label: translate("settings.text.046"), description: translate("settings.text.047") },
+  { id: "remote", label: translate("settings.text.048"), description: translate("settings.text.049") },
 ];
 
 type CurrentConnectionStatus = { state: "checking" } | { state: "online" } | { state: "offline"; detail: string };
 
 function CurrentConnectionBadge({ status }: { status: CurrentConnectionStatus }) {
-  if (status.state === "online") return <StatusIndicator icon="check" label="연결됨" tone="success" />;
-  if (status.state === "offline") return <StatusIndicator icon="alert" label="응답 없음" tone="danger" />;
-  return <StatusIndicator icon="sync" label="확인 중" tone="neutral" />;
+  if (status.state === "online") return <StatusIndicator icon="check" label={translate("settings.text.050")} tone="success" />;
+  if (status.state === "offline") return <StatusIndicator icon="alert" label={translate("settings.text.051")} tone="danger" />;
+  return <StatusIndicator icon="sync" label={translate("settings.text.023")} tone="neutral" />;
 }
 
 /**
@@ -897,7 +896,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
       const next = await store.save({ mode: draftMode, remoteUrl: draftUrl, token: draftToken });
       applyConnection(next);
       setTestResult(null);
-      setMessage(next.restartRequired ? "저장했습니다. 아래에서 다시 시작하면 적용됩니다." : "저장했습니다. 이미 적용된 상태입니다.");
+      setMessage(next.restartRequired ? translate("settings.text.052") : translate("settings.text.053"));
     } catch (cause) {
       setError(messageOf(cause));
     } finally {
@@ -912,7 +911,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
     setTestResult(null);
     try {
       await store.probe(trimBaseUrl(draftUrl), draftToken.trim() || undefined);
-      setTestResult({ ok: true, text: "연결됨 — 이 주소에서 mono 서버가 응답합니다." });
+      setTestResult({ ok: true, text: translate("settings.text.054") });
     } catch (cause) {
       setTestResult({ ok: false, text: messageOf(cause) });
     } finally {
@@ -933,16 +932,16 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description="이 기기가 어느 mono API 서버와 데이터를 주고받을지 정합니다. 변경은 앱을 다시 시작한 뒤 적용됩니다." title="서버 연결" />
+      <SettingsHeading description={translate("settings.text.055")} title={translate("settings.text.056")} />
 
       {loadError && <p className="settings-ai__error" role="alert">{loadError}</p>}
 
       {connection && (
         <>
-          <section aria-label="서버 연결" className="settings-group">
+          <section aria-label={translate("settings.text.056")} className="settings-group">
             <div className="settings-server__status">
               <span className={`settings-server__tag ${connection.runningEmbedded ? "" : "settings-server__tag--remote"}`}>
-                {connection.runningEmbedded ? "이 기기" : "원격 서버"}
+                {connection.runningEmbedded ? translate("settings.text.046") : translate("settings.text.048")}
               </span>
               <CurrentConnectionBadge status={current} />
               {(connection.envOverride || connection.restartRequired) && (
@@ -952,11 +951,10 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
             {current.state === "offline" && <p className="settings-server__status-detail" role="alert">{current.detail}</p>}
             {connection.envOverride && (
               <p className="settings-server__status-detail">
-                환경 변수 <code>MONO_API_BASE_URL</code>이 이 값을 고정합니다. 아래 설정은 저장되지만 적용되지 않습니다.
-              </p>
+                {translate("settings.text.057")}<code>MONO_API_BASE_URL</code>{translate("settings.text.058")}</p>
             )}
 
-            <div aria-label="서버 연결 모드" className="settings-server__modes" role="radiogroup">
+            <div aria-label={translate("settings.text.059")} className="settings-server__modes" role="radiogroup">
               {SERVER_MODE_OPTIONS.map((option) => (
                 <button
                   aria-checked={draftMode === option.id}
@@ -979,7 +977,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
               <div className="settings-server__remote">
                 <form onSubmit={(event) => { event.preventDefault(); void testConnection(); }}>
                   <Input
-                    aria-label="원격 서버 주소"
+                    aria-label={translate("settings.text.060")}
                     autoComplete="off"
                     disabled={!connection.manageable}
                     invalid={draftUrl.trim().length > 0 && !draftUrlValid}
@@ -990,22 +988,20 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                     value={draftUrl}
                   />
                   <Button disabled={!looksLikeRemoteApiUrl(draftUrl) || pending !== null} loading={pending === "test"} type="submit">
-                    연결 테스트
-                  </Button>
+                    {translate("settings.text.027")}</Button>
                 </form>
                 <Input
-                  aria-label="API 토큰"
+                  aria-label={translate("settings.text.061")}
                   autoComplete="off"
                   disabled={!connection.manageable}
                   onChange={(event) => { setDraftToken(event.target.value); setTestResult(null); }}
-                  placeholder="API 토큰 (선택)"
+                  placeholder={translate("settings.text.062")}
                   spellCheck={false}
                   type="password"
                   value={draftToken}
                 />
                 <p className="settings-server__hint">
-                  HTTP는 4174, HTTPS는 443·4174 포트만 됩니다. 서버에 <code>MONO_API_TOKEN</code>이 설정돼 있으면 토큰란에 넣으세요.
-                </p>
+                  {translate("settings.text.063")}<code>MONO_API_TOKEN</code>{translate("settings.text.064")}</p>
                 {testResult && (
                   <p
                     className={testResult.ok ? "settings-ai__message" : "settings-ai__error"}
@@ -1018,7 +1014,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
             )}
 
             <div className="settings-server__actions">
-              <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">저장</Button>
+              <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">{translate("settings.text.021")}</Button>
             </div>
 
             {message && <p className="settings-ai__message" role="status">{message}</p>}
@@ -1026,12 +1022,12 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
           </section>
 
           {connection.restartRequired && (
-            <section aria-label="재시작 안내" className="settings-server__restart">
+            <section aria-label={translate("settings.text.065")} className="settings-server__restart">
               <div>
-                <strong>다시 시작하면 적용됩니다</strong>
-                <span>저장한 연결 설정은 앱을 다시 시작한 뒤부터 사용됩니다.</span>
+                <strong>{translate("settings.text.066")}</strong>
+                <span>{translate("settings.text.067")}</span>
               </div>
-              <Button loading={pending === "restart"} onClick={() => void restart()} type="button" variant="primary">지금 다시 시작</Button>
+              <Button loading={pending === "restart"} onClick={() => void restart()} type="button" variant="primary">{translate("settings.text.068")}</Button>
             </section>
           )}
         </>

@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import type { RoutineDefinition, RoutineOccurrence, RoutineSnapshot, RoutineWriteInput, TodoLabel } from "@mono/contracts";
 import { Button, DatePicker, Icon, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import type { TodoRepository } from "../todo/todo-repository";
 import type { RoutineRepository } from "./routine-repository";
 
 export const routineQueryKey = ["routine"] as const;
-const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+const dayNames = [translate("routine.text.001"), translate("routine.text.002"), translate("routine.text.003"), translate("routine.text.004"), translate("routine.text.005"), translate("routine.text.006"), translate("routine.text.007")];
 
 type Draft = {
   title: string;
@@ -29,7 +30,7 @@ function draftOf(routine: RoutineDefinition): Draft {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("scrap.text.010");
 }
 
 function parseDate(date: string) {
@@ -133,7 +134,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
   }, [searchParams, snapshotQuery.data]);
 
   if (snapshotQuery.isPending) return <RoutineLoading />;
-  if (snapshotQuery.isError) return <div className="routine-state" role="alert"><Icon name="alert" size={18} />루틴을 불러오지 못했습니다.</div>;
+  if (snapshotQuery.isError) return <div className="routine-state" role="alert"><Icon name="alert" size={18} />{translate("routine.text.008")}</div>;
   const snapshot = snapshotQuery.data;
   const editorBusy = createMutation.isPending || updateMutation.isPending;
 
@@ -176,10 +177,10 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
       days: draft.days,
       endDate: draft.endless ? null : draft.endDate || null,
     };
-    if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
-    if (input.days.length === 0) { setFormError("반복 요일을 하나 이상 골라야 합니다."); return; }
-    if (!input.labelId) { setFormError("라벨을 선택해야 합니다."); return; }
-    if (!draft.endless && !draft.endDate) { setFormError("종료일을 입력해야 합니다."); return; }
+    if (!input.title) { setFormError(translate("scrap.text.013")); return; }
+    if (input.days.length === 0) { setFormError(translate("routine.text.009")); return; }
+    if (!input.labelId) { setFormError(translate("scrap.text.014")); return; }
+    if (!draft.endless && !draft.endDate) { setFormError(translate("routine.text.010")); return; }
     if (editorItem === "new") createMutation.mutate(input);
     else if (editorItem) updateMutation.mutate({ routineId: editorItem.id, input, expectedVersion: editorItem.version ?? 1 });
   }
@@ -190,31 +191,31 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
     <div className="routine-page">
       <div className="routine-cards">
         {snapshot.items.map((routine) => <RoutineCard key={routine.id} onEdit={() => openEditor(routine)} repository={repository} routine={routine} snapshot={snapshot} />)}
-        {snapshot.items.length === 0 && <div className="routine-empty"><Icon name="routine" size={28} /><strong>아직 루틴이 없습니다</strong><span>반복할 일을 만들면 지정 요일의 할 일에 자동으로 나타납니다.</span><Button onClick={openCreate} variant="primary">새 루틴</Button></div>}
+        {snapshot.items.length === 0 && <div className="routine-empty"><Icon name="routine" size={28} /><strong>{translate("routine.text.011")}</strong><span>{translate("routine.text.012")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newRoutine")}</Button></div>}
       </div>
 
       <Modal
         className="routine-editor-modal"
-        footer={<><Button disabled={editorBusy} onClick={() => closeEditor()}>취소</Button><Button form="routine-editor-form" loading={editorBusy} type="submit" variant="primary">{editorItem === "new" ? "생성" : "저장"}</Button></>}
+        footer={<><Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("scrap.text.025")}</Button><Button form="routine-editor-form" loading={editorBusy} type="submit" variant="primary">{editorItem === "new" ? translate("routine.text.013") : translate("settings.text.021")}</Button></>}
         icon="routine"
         onClose={closeEditor}
         open={editorItem !== null}
-        title={editorItem === "new" ? "새 루틴" : "루틴 수정"}
+        title={editorItem === "new" ? translate("app.action.newRoutine") : translate("routine.text.014")}
       >
         <form className="routine-editor" id="routine-editor-form" onSubmit={submit}>
-          <label><span>제목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 비타민 먹기" value={draft.title} /></label>
+          <label><span>{translate("scrap.text.028")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("routine.text.015")} value={draft.title} /></label>
           <div className="routine-editor__group">
-            <div className="routine-editor__group-title">반복 요일 <small>{draft.days.length === 7 ? "매일" : selectedDays.join(" · ") || "요일을 고르세요"}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">매일</Button></div>
-            <div className="routine-editor__days" role="group" aria-label="반복 요일">{dayNames.map((name, day) => <button aria-pressed={draft.days.includes(day)} className={draft.days.includes(day) ? "routine-editor__day routine-editor__day--selected" : "routine-editor__day"} key={name} onClick={() => toggleDay(day)} type="button">{name}</button>)}</div>
+            <div className="routine-editor__group-title">{translate("routine.text.016")}<small>{draft.days.length === 7 ? translate("routine.text.017") : selectedDays.join(" · ") || translate("routine.text.018")}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">{translate("routine.text.017")}</Button></div>
+            <div className="routine-editor__days" role="group" aria-label={translate("routine.text.019")}>{dayNames.map((name, day) => <button aria-pressed={draft.days.includes(day)} className={draft.days.includes(day) ? "routine-editor__day routine-editor__day--selected" : "routine-editor__day"} key={name} onClick={() => toggleDay(day)} type="button">{name}</button>)}</div>
           </div>
           <div className="routine-editor__group">
-            <div className="routine-editor__group-title">기간</div>
-            <div className="routine-editor__period" role="radiogroup" aria-label="기간"><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">종료일 지정</button></div>
-            {draft.endless ? <p>끝을 정하지 않습니다. 언제든 루틴 화면에서 기간을 수정할 수 있습니다.</p> : <div className="routine-editor__end"><DatePicker align="end" label="종료일" min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>이 날짜까지만 지정 요일에 할 일이 생성됩니다. 이후에는 비활성 상태가 됩니다.</span></div>}
+            <div className="routine-editor__group-title">{translate("routine.text.020")}</div>
+            <div className="routine-editor__period" role="radiogroup" aria-label={translate("routine.text.020")}><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">{translate("routine.text.021")}</button></div>
+            {draft.endless ? <p>{translate("routine.text.022")}</p> : <div className="routine-editor__end"><DatePicker align="end" label={translate("routine.text.023")} min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>{translate("routine.text.024")}</span></div>}
           </div>
           <div className="routine-editor__label-field">
-            <div className="todo-editor__label-legend"><span>라벨</span><button onClick={() => setLabelManagerOpen(true)} type="button">관리</button></div>
-            <Select label="라벨" onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />
+            <div className="todo-editor__label-legend"><span>{translate("scrap.text.040")}</span><button onClick={() => setLabelManagerOpen(true)} type="button">{translate("scrap.text.041")}</button></div>
+            <Select label={translate("scrap.text.040")} onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />
           </div>
           {formError && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
@@ -257,21 +258,21 @@ function RoutineCard({ routine, snapshot, repository, onEdit }: { routine: Routi
   const totalDays = routine.endDate ? dayDifference(routine.startDate, routine.endDate) + 1 : 0;
   const elapsedDays = routine.endDate ? Math.min(totalDays, Math.max(0, dayDifference(routine.startDate, snapshot.today) + 1)) : 0;
   const progress = routine.endDate ? Math.round(elapsedDays / Math.max(1, totalDays) * 100) : 100;
-  const todayNote = expired ? "기간 만료" : startsLater ? "시작 전" : !availableToday ? "오늘은 해당 없음" : todayOccurrence?.done ? "오늘 완료" : "오늘 해야 함";
-  const progressNote = expired ? "기간 만료" : startsLater ? "시작 전" : routine.endDate ? `${dayDifference(snapshot.today, routine.endDate)}일 남음` : "종료일 없음";
+  const todayNote = expired ? translate("routine.text.025") : startsLater ? translate("routine.text.026") : !availableToday ? translate("routine.text.027") : todayOccurrence?.done ? translate("routine.text.028") : translate("routine.text.029");
+  const progressNote = expired ? translate("routine.text.025") : startsLater ? translate("routine.text.026") : routine.endDate ? translate("routine.text.030", { value1: dayDifference(snapshot.today, routine.endDate) }) : translate("routine.text.031");
 
   return (
     <article aria-busy={toggleMutation.isPending} className={`routine-card ${expired ? "routine-card--expired" : ""}`}>
-      <button aria-label={`${routine.title} ${todayOccurrence?.done ? "미완료" : "완료"} 처리`} aria-pressed={Boolean(todayOccurrence?.done)} className={todayOccurrence?.done ? "routine-card__check routine-card__check--done" : "routine-card__check"} disabled={!availableToday || toggleMutation.isPending} onClick={() => toggleMutation.mutate()} title={availableToday ? "오늘 완료" : todayNote} type="button"><Icon name="check" size={14} strokeWidth={3} /></button>
-      <div className="routine-card__identity"><strong title={routine.title}>{routine.title}</strong><span><i style={{ backgroundColor: label?.color }} />{label?.name ?? "미지정"} · {todayNote}</span></div>
-      <div className="routine-card__schedule"><span>반복 요일</span><div>{dayNames.map((name, day) => <i className={routine.days.includes(day) ? "routine-card__dow routine-card__dow--active" : "routine-card__dow"} key={name}>{name}</i>)}</div></div>
-      <div className="routine-card__activity"><div className="routine-card__period"><span>기간</span><strong>{routine.endDate ? `~ ${formatShortDate(routine.endDate)}` : "∞"}</strong><small>{progressNote}</small></div><div className="routine-card__progress"><span style={{ width: `${progress}%` }} /></div><div className="routine-card__history"><span>최근 2주</span>{historyDates.map((date) => { const occurrence = occurrenceByDate.get(date); const scheduled = isScheduled(routine, date); const className = occurrence?.done ? "routine-history routine-history--done" : scheduled ? "routine-history routine-history--missed" : "routine-history"; return <i aria-label={`${date} ${occurrence?.done ? "완료" : scheduled ? "미완료" : "비지정"}`} className={className} key={date} title={date} />; })}</div></div>
-      <Button disabled={toggleMutation.isPending} onClick={onEdit} size="small">수정</Button>
+      <button aria-label={translate("routine.text.032", { value1: routine.title, value2: todayOccurrence?.done ? translate("routine.text.038") : translate("todo.text.008") })} aria-pressed={Boolean(todayOccurrence?.done)} className={todayOccurrence?.done ? "routine-card__check routine-card__check--done" : "routine-card__check"} disabled={!availableToday || toggleMutation.isPending} onClick={() => toggleMutation.mutate()} title={availableToday ? translate("routine.text.028") : todayNote} type="button"><Icon name="check" size={14} strokeWidth={3} /></button>
+      <div className="routine-card__identity"><strong title={routine.title}>{routine.title}</strong><span><i style={{ backgroundColor: label?.color }} />{label?.name ?? translate("routine.text.033")} · {todayNote}</span></div>
+      <div className="routine-card__schedule"><span>{translate("routine.text.019")}</span><div>{dayNames.map((name, day) => <i className={routine.days.includes(day) ? "routine-card__dow routine-card__dow--active" : "routine-card__dow"} key={name}>{name}</i>)}</div></div>
+      <div className="routine-card__activity"><div className="routine-card__period"><span>{translate("routine.text.020")}</span><strong>{routine.endDate ? `~ ${formatShortDate(routine.endDate)}` : "∞"}</strong><small>{progressNote}</small></div><div className="routine-card__progress"><span style={{ width: `${progress}%` }} /></div><div className="routine-card__history"><span>{translate("routine.text.034")}</span>{historyDates.map((date) => { const occurrence = occurrenceByDate.get(date); const scheduled = isScheduled(routine, date); const className = occurrence?.done ? "routine-history routine-history--done" : scheduled ? "routine-history routine-history--missed" : "routine-history"; return <i aria-label={translate("routine.text.035", { value1: date, value2: occurrence?.done ? translate("todo.text.008") : scheduled ? translate("routine.text.038") : translate("routine.text.039") })} className={className} key={date} title={date} />; })}</div></div>
+      <Button disabled={toggleMutation.isPending} onClick={onEdit} size="small">{translate("routine.text.036")}</Button>
       {mutationError && <div className="routine-card__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
     </article>
   );
 }
 
 function RoutineLoading() {
-  return <div aria-label="루틴 불러오는 중" className="routine-page"><div className="routine-cards">{Array.from({ length: 3 }, (_, index) => <div className="routine-card routine-card--skeleton" key={index} />)}</div></div>;
+  return <div aria-label={translate("routine.text.037")} className="routine-page"><div className="routine-cards">{Array.from({ length: 3 }, (_, index) => <div className="routine-card routine-card--skeleton" key={index} />)}</div></div>;
 }

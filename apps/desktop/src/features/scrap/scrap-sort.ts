@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import type { ScrapItem } from "@mono/contracts";
 
 export type SortKey = "recent" | "oldest" | "title" | "comments";
@@ -5,10 +6,10 @@ export type SortKey = "recent" | "oldest" | "title" | "comments";
 export const sortKeys: SortKey[] = ["recent", "oldest", "title", "comments"];
 
 export const sortLabels: Record<SortKey, string> = {
-  recent: "최신순",
-  oldest: "오래된순",
-  title: "이름순",
-  comments: "댓글 많은순",
+  recent: translate("scrap.text.001"),
+  oldest: translate("scrap.text.002"),
+  title: translate("scrap.text.003"),
+  comments: translate("scrap.text.004"),
 };
 
 export const sortStorageKey = "mono:scrap-sort";

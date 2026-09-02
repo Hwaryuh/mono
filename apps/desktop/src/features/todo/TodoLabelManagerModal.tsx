@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { todoLabelWriteInputSchema, type TodoLabel, type TodoLabelWriteInput, type TodoSnapshot } from "@mono/contracts";
 import { Button, ColorPicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ interface TodoLabelManagerModalProps {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("scrap.text.010");
 }
 
 export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, repository, usageCountOf }: TodoLabelManagerModalProps) {
@@ -119,7 +120,7 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
     event.preventDefault();
     const parsed = todoLabelWriteInputSchema.safeParse(labelDraft);
     if (!parsed.success) {
-      setLabelError(parsed.error.issues[0]?.message ?? "라벨 입력값을 확인해야 합니다.");
+      setLabelError(parsed.error.issues[0]?.message ?? translate("todoLabels.text.001"));
       return;
     }
     if (editingLabelId) labelMutation.mutate({ type: "update", labelId: editingLabelId, input: parsed.data, expectedVersion: editingLabelVersion });
@@ -144,33 +145,33 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
 
   return (
     <>
-      <Modal className="todo-label-modal" icon="label" onClose={close} open={open} title="라벨 관리">
+      <Modal className="todo-label-modal" icon="label" onClose={close} open={open} title={translate("scrap.text.042")}>
         <div className="todo-label-manager">
-          <div aria-label="현재 라벨" className="todo-label-manager__list">
+          <div aria-label={translate("scrap.text.043")} className="todo-label-manager__list">
             {labels.map((label, index) => (
               <div className="todo-label-manager__row" key={label.id}>
                 <i style={{ backgroundColor: label.color }} />
                 <strong>{label.name}</strong>
-                <span>{usageCountOf?.(label.id) ?? 0}개</span>
+                <span>{usageCountOf?.(label.id) ?? 0}{translate("scrap.text.044")}</span>
                 <div>
-                  <IconButton aria-label={`${label.name} 위로 이동`} disabled={labelMutation.isPending || index === 0} onClick={() => moveLabel(index, -1)} size="small" title="위로 이동" type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                  <IconButton aria-label={`${label.name} 아래로 이동`} disabled={labelMutation.isPending || index === labels.length - 1} onClick={() => moveLabel(index, 1)} size="small" title="아래로 이동" type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                  <IconButton aria-label={`${label.name} 편집`} disabled={labelMutation.isPending} onClick={() => editLabel(label)} size="small" title="편집" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                  <IconButton aria-label={labels.length === 1 ? `${label.name} 삭제 불가` : `${label.name} 삭제`} disabled={labelMutation.isPending || labels.length === 1} onClick={() => openDeleteLabel(label.id)} size="small" title={labels.length === 1 ? "마지막 라벨은 삭제할 수 없습니다" : "삭제"} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
+                  <IconButton aria-label={translate("todoLabels.text.002", { value1: label.name })} disabled={labelMutation.isPending || index === 0} onClick={() => moveLabel(index, -1)} size="small" title={translate("todoLabels.text.003")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
+                  <IconButton aria-label={translate("todoLabels.text.004", { value1: label.name })} disabled={labelMutation.isPending || index === labels.length - 1} onClick={() => moveLabel(index, 1)} size="small" title={translate("todoLabels.text.005")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
+                  <IconButton aria-label={translate("scrap.text.045", { value1: label.name })} disabled={labelMutation.isPending} onClick={() => editLabel(label)} size="small" title={translate("scrap.text.046")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
+                  <IconButton aria-label={labels.length === 1 ? translate("scrap.text.048", { value1: label.name }) : translate("scrap.text.049", { value1: label.name })} disabled={labelMutation.isPending || labels.length === 1} onClick={() => openDeleteLabel(label.id)} size="small" title={labels.length === 1 ? translate("todoLabels.text.006") : translate("settings.text.029")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
                 </div>
               </div>
             ))}
-            {labels.length === 0 && <div className="todo-label-manager__empty">등록된 라벨이 없습니다.</div>}
+            {labels.length === 0 && <div className="todo-label-manager__empty">{translate("todoLabels.text.007")}</div>}
           </div>
           <form aria-busy={labelMutation.isPending} className="todo-label-create" id="todo-label-editor-form" onSubmit={submitLabel}>
             <div className="todo-label-create__header">
-              <strong>{editingLabelId ? "라벨 수정" : "새 라벨"}</strong>
-              {editingLabelId && <button disabled={labelMutation.isPending} onClick={() => { setEditingLabelId(null); setLabelDraft(blankLabelDraft); setLabelError(null); }} type="button">취소</button>}
+              <strong>{editingLabelId ? translate("scrap.text.051") : translate("scrap.text.052")}</strong>
+              {editingLabelId && <button disabled={labelMutation.isPending} onClick={() => { setEditingLabelId(null); setLabelDraft(blankLabelDraft); setLabelError(null); }} type="button">{translate("scrap.text.025")}</button>}
             </div>
             <div className="todo-label-create__controls">
-              <ColorPicker disabled={labelMutation.isPending} label="라벨 색상" onChange={(color) => setLabelDraft((current) => ({ ...current, color }))} selected value={labelDraft.color} />
-              <Input aria-label="라벨 이름" autoFocus disabled={labelMutation.isPending} maxLength={100} onChange={(event) => setLabelDraft((current) => ({ ...current, name: event.target.value }))} placeholder="라벨 이름" value={labelDraft.name} />
-              <Button loading={labelMutation.isPending} type="submit" variant="primary">{editingLabelId ? "저장" : "추가"}</Button>
+              <ColorPicker disabled={labelMutation.isPending} label={translate("todoLabels.text.008")} onChange={(color) => setLabelDraft((current) => ({ ...current, color }))} selected value={labelDraft.color} />
+              <Input aria-label={translate("scrap.text.053")} autoFocus disabled={labelMutation.isPending} maxLength={100} onChange={(event) => setLabelDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("scrap.text.053")} value={labelDraft.name} />
+              <Button loading={labelMutation.isPending} type="submit" variant="primary">{editingLabelId ? translate("settings.text.021") : translate("scrap.text.054")}</Button>
             </div>
             {labelError && <div className="todo-label-create__error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
           </form>
@@ -179,25 +180,25 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
 
       <Modal
         className="todo-label-delete-modal"
-        footer={<><Button disabled={labelMutation.isPending} onClick={() => setDeleteLabelId(null)}>취소</Button><Button loading={labelMutation.isPending} onClick={() => deleteLabelId && replacementLabelId && labelMutation.mutate({ type: "delete", labelId: deleteLabelId, replacementLabelId })} variant="danger">삭제</Button></>}
+        footer={<><Button disabled={labelMutation.isPending} onClick={() => setDeleteLabelId(null)}>{translate("scrap.text.025")}</Button><Button loading={labelMutation.isPending} onClick={() => deleteLabelId && replacementLabelId && labelMutation.mutate({ type: "delete", labelId: deleteLabelId, replacementLabelId })} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!labelMutation.isPending) setDeleteLabelId(null); }}
         open={deleteLabelId !== null}
-        title="라벨 삭제"
+        title={translate("scrap.text.055")}
       >
         <div className="todo-label-delete">
-          <p><strong>{labels.find((label) => label.id === deleteLabelId)?.name}</strong> 라벨을 삭제할까요?</p>
+          <p><strong>{labels.find((label) => label.id === deleteLabelId)?.name}</strong> {translate("scrap.text.056")}</p>
           <label>
-            <span>기존 할 일 이동</span>
+            <span>{translate("todoLabels.text.009")}</span>
             <Select
               disabled={labelMutation.isPending}
-              label="이동할 라벨"
+              label={translate("scrap.text.058")}
               onChange={setReplacementLabelId}
               options={labels.filter((label) => label.id !== deleteLabelId).map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))}
               value={replacementLabelId}
             />
           </label>
-          <small>일반 할 일과 반복 할 일 모두 선택한 라벨로 이동합니다.</small>
+          <small>{translate("todoLabels.text.010")}</small>
           {labelError && <div className="todo-label-create__error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
         </div>
       </Modal>

@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import type { ScrapComment, ScrapItem, ScrapKind, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
 import { formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
@@ -16,16 +17,16 @@ import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-st
 export const scrapQueryKey = ["scrap"] as const;
 
 const kindMeta: Record<ScrapKind, { icon: IconName; label: string }> = {
-  image: { icon: "image", label: "이미지" },
-  url: { icon: "layers", label: "링크 미리보기" },
-  text: { icon: "note", label: "메모" },
-  video: { icon: "video", label: "동영상" },
+  image: { icon: "image", label: translate("scrap.text.005") },
+  url: { icon: "layers", label: translate("scrap.text.006") },
+  text: { icon: "note", label: translate("scrap.text.007") },
+  video: { icon: "video", label: translate("scrap.text.008") },
 };
 
 type Draft = ScrapWriteInput;
 type PendingPhoto = { file: File; previewUrl: string };
 
-const blankDraft: Draft = { title: "", memo: "", url: "", tag: "수집" };
+const blankDraft: Draft = { title: "", memo: "", url: "", tag: translate("scrap.text.009") };
 const maxPhotoBytes = 10 * 1024 * 1024;
 const photoPickerDomId = "scrap-photo-picker";
 const photoReplaceDomId = "scrap-photo-replace";
@@ -36,7 +37,7 @@ const trailingUrlPunctuationPattern = /[),.!?;:\]}]+$/u;
 type CommentTextSegment = { text: string; externalUrl: string | null };
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "작업을 완료하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("scrap.text.010");
 }
 
 function commentTextSegmentsOf(text: string): CommentTextSegment[] {
@@ -68,7 +69,7 @@ function submitFormOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
 }
 
 function photoTitle(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, "").trim() || "사진";
+  return fileName.replace(/\.[^.]+$/, "").trim() || translate("scrap.text.011");
 }
 
 // 스크랩 부제목 저장 시각: "2026. 08. 31. 10:35". 파싱 불가한 값(mock의 "방금" 등)은 그대로.
@@ -167,7 +168,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     if (searchParams.get("modal") !== "new" || handledModalRef.current || !snapshotQuery.data) return;
     handledModalRef.current = true;
     replacePhoto();
-    setDraft({ ...blankDraft, tag: snapshotQuery.data.tags.includes("수집") ? "수집" : snapshotQuery.data.tags[0] ?? "수집" });
+    setDraft({ ...blankDraft, tag: snapshotQuery.data.tags.includes(translate("scrap.text.009")) ? translate("scrap.text.009") : snapshotQuery.data.tags[0] ?? translate("scrap.text.009") });
     setFormError(null);
   }, [searchParams, snapshotQuery.data]);
 
@@ -181,7 +182,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   }, [searchParams, snapshotQuery.data]);
 
   if (snapshotQuery.isPending) return <ScrapLoading />;
-  if (snapshotQuery.isError) return <div className="scrap-state" role="alert"><Icon name="alert" size={18} />스크랩을 불러오지 못했습니다.</div>;
+  if (snapshotQuery.isError) return <div className="scrap-state" role="alert"><Icon name="alert" size={18} />{translate("scrap.text.012")}</div>;
 
   const snapshot = snapshotQuery.data;
   const detail = snapshot.items.find((item) => item.id === detailId) ?? null;
@@ -196,7 +197,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   function openCreate() {
     handledModalRef.current = true;
     replacePhoto();
-    setDraft({ ...blankDraft, tag: snapshot.tags.includes("수집") ? "수집" : snapshot.tags[0] ?? "수집" });
+    setDraft({ ...blankDraft, tag: snapshot.tags.includes(translate("scrap.text.009")) ? translate("scrap.text.009") : snapshot.tags[0] ?? translate("scrap.text.009") });
     setFormError(null);
     setTagManagerOpen(false);
     setTagError(null);
@@ -217,8 +218,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   function submitCreate(event: FormEvent) {
     event.preventDefault();
     const input = { ...draft, title: draft.title.trim(), memo: draft.memo.trim(), url: draft.url.trim() };
-    if (!input.title) { setFormError("제목을 입력해야 합니다."); return; }
-    if (!input.tag) { setFormError("라벨을 선택해야 합니다."); return; }
+    if (!input.title) { setFormError(translate("scrap.text.013")); return; }
+    if (!input.tag) { setFormError(translate("scrap.text.014")); return; }
     createMutation.mutate({ input, photo: photoFileRef.current ?? pendingPhoto?.file ?? null });
   }
 
@@ -233,15 +234,15 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   function choosePhoto(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setFormError("사진 파일만 추가할 수 있습니다.");
+      setFormError(translate("scrap.text.015"));
       return;
     }
     if (file.size === 0) {
-      setFormError("사진 파일을 읽지 못했습니다. 다시 선택해 주세요.");
+      setFormError(translate("scrap.text.016"));
       return;
     }
     if (file.size > maxPhotoBytes) {
-      setFormError("사진은 10MB를 넘을 수 없습니다.");
+      setFormError(translate("scrap.text.017"));
       return;
     }
     replacePhoto({ file, previewUrl: URL.createObjectURL(file) });
@@ -325,7 +326,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   async function commitTag() {
     const tag = tagInput.trim();
     if (!tag) {
-      setTagError("라벨 이름을 입력해야 합니다.");
+      setTagError(translate("scrap.text.018"));
       return;
     }
     setTagError(null);
@@ -373,7 +374,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   return (
     <div className="scrap-page">
       <div className="scrap-toolbar">
-        <div aria-label="스크랩 라벨 필터" className="scrap-tags" role="toolbar">
+        <div aria-label={translate("scrap.text.019")} className="scrap-tags" role="toolbar">
           {snapshot.tags.map((tag, index) => (
             <button
               aria-pressed={activeTag === tag}
@@ -390,7 +391,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
           <div className="scrap-sort">
             <Select
               align="end"
-              label="스크랩 정렬"
+              label={translate("scrap.text.020")}
               onChange={changeSort}
               options={sortKeys.map((key) => ({ value: key, label: sortLabels[key] }))}
               value={sortKey}
@@ -407,44 +408,44 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
 
       <Drawer
         className="scrap-detail-drawer"
-        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}><TextArea aria-label="새 댓글" disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder="새 댓글… (Shift+Enter로 줄바꿈)" rows={1} value={commentText} /><Button aria-label="댓글" loading={commentBusyId === detail.id} title="댓글 등록" type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>{commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}</form> : undefined}
+        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}><TextArea aria-label={translate("scrap.text.021")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.text.022")} rows={1} value={commentText} /><Button aria-label={translate("scrap.text.023")} loading={commentBusyId === detail.id} title={translate("scrap.text.024")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>{commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}</form> : undefined}
         icon="scrap"
         onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
-        title={<span className="scrap-detail-title">스크랩{detail && <small>{formatSavedAt(detail.savedAt)}</small>}</span>}
+        title={<span className="scrap-detail-title">{translate("app.navigation.scrap")}{detail && <small>{formatSavedAt(detail.savedAt)}</small>}</span>}
       >
         {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
 
       <Modal
         className="scrap-delete-modal"
-        footer={<><Button disabled={deleteMutation.isPending} onClick={() => setConfirmDeleteId(null)}>취소</Button><Button loading={deleteMutation.isPending} onClick={() => confirmDeleteId && deleteMutation.mutate(confirmDeleteId)} variant="danger">삭제</Button></>}
+        footer={<><Button disabled={deleteMutation.isPending} onClick={() => setConfirmDeleteId(null)}>{translate("scrap.text.025")}</Button><Button loading={deleteMutation.isPending} onClick={() => confirmDeleteId && deleteMutation.mutate(confirmDeleteId)} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setConfirmDeleteId(null); }}
         open={confirmDeleteId !== null}
-        title="스크랩 삭제"
+        title={translate("scrap.text.026")}
       >
-        <p><strong>{snapshot.items.find((item) => item.id === confirmDeleteId)?.title}</strong> 스크랩을 삭제할까요? 댓글도 함께 사라지며 되돌릴 수 없습니다.</p>
+        <p><strong>{snapshot.items.find((item) => item.id === confirmDeleteId)?.title}</strong> {translate("scrap.text.027")}</p>
         {deleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{deleteError}</div>}
       </Modal>
 
       <Modal
         className="scrap-create-modal"
-        footer={<><Button disabled={createMutation.isPending} onClick={() => closeCreate()}>취소</Button><Button form="scrap-create-form" loading={createMutation.isPending} type="submit" variant="primary">저장</Button></>}
+        footer={<><Button disabled={createMutation.isPending} onClick={() => closeCreate()}>{translate("scrap.text.025")}</Button><Button form="scrap-create-form" loading={createMutation.isPending} type="submit" variant="primary">{translate("settings.text.021")}</Button></>}
         icon="scrap"
         onClose={closeCreate}
         open={createOpen}
-        title="스크랩 추가"
+        title={translate("app.action.newScrap")}
       >
         <form aria-busy={createMutation.isPending} className="scrap-create-form" id="scrap-create-form" onSubmit={submitCreate}>
-          <label><span>제목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 합주실 후보 정리" value={draft.title} /></label>
-          <label><span>메모</span><TextArea maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder="메모..." rows={3} value={draft.memo} /></label>
-          <label><span>링크 (선택)</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
+          <label><span>{translate("scrap.text.028")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("scrap.text.029")} value={draft.title} /></label>
+          <label><span>{translate("scrap.text.007")}</span><TextArea maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder={translate("scrap.text.030")} rows={3} value={draft.memo} /></label>
+          <label><span>{translate("scrap.text.031")}</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
           <fieldset className="scrap-create-form__photo-fieldset">
-            <legend>사진 (선택)</legend>
+            <legend>{translate("scrap.text.032")}</legend>
             <input
               accept="image/*"
-              aria-label="사진 파일 선택"
+              aria-label={translate("scrap.text.033")}
               className="capture-file-input"
               disabled={createMutation.isPending}
               onChange={(event) => choosePhoto(event.currentTarget.files?.[0])}
@@ -454,46 +455,46 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
             />
             {pendingPhoto ? (
               <div className="scrap-photo-preview">
-                <img alt={`${pendingPhoto.file.name} 미리보기`} src={pendingPhoto.previewUrl} />
+                <img alt={translate("scrap.text.034", { value1: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
                 <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
-                <Button disabled={createMutation.isPending} id={photoReplaceDomId} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
-                <IconButton aria-label={`${pendingPhoto.file.name} 사진 제거`} disabled={createMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+                <Button disabled={createMutation.isPending} id={photoReplaceDomId} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("scrap.text.035")}</Button>
+                <IconButton aria-label={translate("scrap.text.036", { value1: pendingPhoto.file.name })} disabled={createMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.text.037")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
               </div>
             ) : (
               <button className="scrap-photo-picker" disabled={createMutation.isPending} id={photoPickerDomId} onClick={() => photoInputRef.current?.click()} type="button">
                 <Icon name="image" size={17} strokeWidth={1.5} />
-                <span><strong>사진 선택</strong><small>JPG, PNG 등 · 최대 10MB</small></span>
+                <span><strong>{translate("scrap.text.038")}</strong><small>{translate("scrap.text.039")}</small></span>
               </button>
             )}
           </fieldset>
           <div className="scrap-create-form__label-field">
-            <div className="scrap-create-form__label-legend"><span>라벨</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">관리</button></div>
-            <Select disabled={createMutation.isPending} label="라벨" onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
+            <div className="scrap-create-form__label-legend"><span>{translate("scrap.text.040")}</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">{translate("scrap.text.041")}</button></div>
+            <Select disabled={createMutation.isPending} label={translate("scrap.text.040")} onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
           </div>
           {formError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
-      <Modal className="scrap-label-manager-modal" icon="label" onClose={closeTagManager} open={tagManagerOpen} title="라벨 관리">
+      <Modal className="scrap-label-manager-modal" icon="label" onClose={closeTagManager} open={tagManagerOpen} title={translate("scrap.text.042")}>
         <div className="scrap-label-manager">
-          <div aria-label="현재 라벨" className="scrap-label-manager__list">
+          <div aria-label={translate("scrap.text.043")} className="scrap-label-manager__list">
             {snapshot.tags.map((tag) => (
               <div className="scrap-label-manager__row" key={tag}>
                 <strong>{tag}</strong>
-                <span>{snapshot.items.filter((item) => item.tag === tag).length}개</span>
-                <IconButton aria-label={`${tag} 편집`} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title="편집" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                <IconButton aria-label={tag === "기타" ? `${tag} 삭제 불가` : `${tag} 삭제`} disabled={tagSaving || tag === "기타"} onClick={() => openDeleteTag(tag)} size="small" title={tag === "기타" ? "기타 라벨은 삭제할 수 없습니다" : "삭제"} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
+                <span>{snapshot.items.filter((item) => item.tag === tag).length}{translate("scrap.text.044")}</span>
+                <IconButton aria-label={translate("scrap.text.045", { value1: tag })} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title={translate("scrap.text.046")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
+                <IconButton aria-label={tag === translate("scrap.text.047") ? translate("scrap.text.048", { value1: tag }) : translate("scrap.text.049", { value1: tag })} disabled={tagSaving || tag === translate("scrap.text.047")} onClick={() => openDeleteTag(tag)} size="small" title={tag === translate("scrap.text.047") ? translate("scrap.text.050") : translate("settings.text.029")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
               </div>
             ))}
           </div>
           <form aria-busy={tagSaving} className="scrap-label-create" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
             <div className="scrap-label-create__header">
-              <strong>{editingTag ? "라벨 수정" : "새 라벨"}</strong>
-              {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">취소</button>}
+              <strong>{editingTag ? translate("scrap.text.051") : translate("scrap.text.052")}</strong>
+              {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">{translate("scrap.text.025")}</button>}
             </div>
             <div className="scrap-label-create__controls">
-              <Input aria-label="라벨 이름" autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder="라벨 이름" value={tagInput} />
-              <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? "저장" : "추가"}</Button>
+              <Input aria-label={translate("scrap.text.053")} autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder={translate("scrap.text.053")} value={tagInput} />
+              <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? translate("settings.text.021") : translate("scrap.text.054")}</Button>
             </div>
             {tagError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
           </form>
@@ -502,25 +503,25 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
 
       <Modal
         className="scrap-label-delete-modal"
-        footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>취소</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">삭제</Button></>}
+        footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>{translate("scrap.text.025")}</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!tagDeletePending) setDeleteTagName(null); }}
         open={deleteTagName !== null}
-        title="라벨 삭제"
+        title={translate("scrap.text.055")}
       >
         <div className="scrap-label-delete">
-          <p><strong>{deleteTagName}</strong> 라벨을 삭제할까요?</p>
+          <p><strong>{deleteTagName}</strong> {translate("scrap.text.056")}</p>
           <label>
-            <span>기존 스크랩 이동</span>
+            <span>{translate("scrap.text.057")}</span>
             <Select
               disabled={tagDeletePending}
-              label="이동할 라벨"
+              label={translate("scrap.text.058")}
               onChange={setReplacementTag}
               options={snapshot.tags.filter((tag) => tag !== deleteTagName).map((tag) => ({ value: tag, label: tag }))}
               value={replacementTag}
             />
           </label>
-          <small>기존 스크랩은 모두 선택한 라벨로 이동합니다.</small>
+          <small>{translate("scrap.text.059")}</small>
           {tagDeleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
         </div>
       </Modal>
@@ -574,7 +575,7 @@ function CommentLinkPreview({ externalUrl, onOpen }: { externalUrl: string; onOp
 
   const hostname = new URL(externalUrl).hostname.replace(/^www\./, "");
   return (
-    <a aria-label={`${hostname} 링크 미리보기 열기`} className="scrap-comment__link-preview" href={externalUrl} onClick={(event) => onOpen(event, externalUrl)} rel="noreferrer" target="_blank">
+    <a aria-label={translate("scrap.text.060", { value1: hostname })} className="scrap-comment__link-preview" href={externalUrl} onClick={(event) => onOpen(event, externalUrl)} rel="noreferrer" target="_blank">
       <img alt="" decoding="async" loading="lazy" src={previewSrc} />
       <span><strong>{hostname}</strong><small>{externalUrl}</small></span>
     </a>
@@ -647,9 +648,9 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
 
   function choosePhoto(file: File | undefined) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setEditError("사진 파일만 추가할 수 있습니다."); return; }
-    if (file.size === 0) { setEditError("사진 파일을 읽지 못했습니다. 다시 선택해 주세요."); return; }
-    if (file.size > maxPhotoBytes) { setEditError("사진은 10MB를 넘을 수 없습니다."); return; }
+    if (!file.type.startsWith("image/")) { setEditError(translate("scrap.text.015")); return; }
+    if (file.size === 0) { setEditError(translate("scrap.text.016")); return; }
+    if (file.size > maxPhotoBytes) { setEditError(translate("scrap.text.017")); return; }
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
     photoPreviewUrlRef.current = URL.createObjectURL(file);
     photoFileRef.current = file;
@@ -684,8 +685,8 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   function submitEdit(event: FormEvent) {
     event.preventDefault();
     const input = { ...editDraft, title: editDraft.title.trim(), memo: editDraft.memo.trim(), url: editDraft.url.trim() };
-    if (!input.title) { setEditError("제목을 입력해야 합니다."); return; }
-    if (!input.tag) { setEditError("라벨을 선택해야 합니다."); return; }
+    if (!input.title) { setEditError(translate("scrap.text.013")); return; }
+    if (!input.tag) { setEditError(translate("scrap.text.014")); return; }
     editMutation.mutate(input);
   }
 
@@ -697,42 +698,42 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
 
   return <div className="scrap-detail">{item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
     <form className="scrap-detail__editor" onSubmit={submitEdit}>
-      <label><span>제목</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
-      <label><span>메모</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
-      <label><span>링크 (선택)</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
-      <label><span>라벨</span><Select disabled={editMutation.isPending} label="라벨" onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
+      <label><span>{translate("scrap.text.028")}</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
+      <label><span>{translate("scrap.text.007")}</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
+      <label><span>{translate("scrap.text.031")}</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
+      <label><span>{translate("scrap.text.040")}</span><Select disabled={editMutation.isPending} label={translate("scrap.text.040")} onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
       <fieldset className="scrap-detail__editor-photo">
-        <legend>사진 (선택)</legend>
-        <input accept="image/*" aria-label="사진 파일 선택" className="capture-file-input" disabled={editMutation.isPending} onChange={(event) => choosePhoto(event.currentTarget.files?.[0])} ref={photoInputRef} tabIndex={-1} type="file" />
+        <legend>{translate("scrap.text.032")}</legend>
+        <input accept="image/*" aria-label={translate("scrap.text.033")} className="capture-file-input" disabled={editMutation.isPending} onChange={(event) => choosePhoto(event.currentTarget.files?.[0])} ref={photoInputRef} tabIndex={-1} type="file" />
         {pendingPhoto ? (
           <div className="scrap-photo-preview">
-            <img alt={`${pendingPhoto.file.name} 미리보기`} src={pendingPhoto.previewUrl} />
+            <img alt={translate("scrap.text.034", { value1: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
             <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
-            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
-            <IconButton aria-label="사진 제거" disabled={editMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("scrap.text.035")}</Button>
+            <IconButton aria-label={translate("scrap.text.037")} disabled={editMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.text.037")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
           </div>
         ) : item.mediaId && !photoRemoved ? (
           <div className="scrap-photo-preview">
-            {existingPhotoSrc && <img alt="현재 사진" src={existingPhotoSrc} />}
-            <span><strong>현재 사진</strong></span>
-            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">교체</Button>
-            <IconButton aria-label="사진 제거" disabled={editMutation.isPending} onClick={removePhoto} size="small" title="사진 제거" type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
+            {existingPhotoSrc && <img alt={translate("scrap.text.061")} src={existingPhotoSrc} />}
+            <span><strong>{translate("scrap.text.061")}</strong></span>
+            <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("scrap.text.035")}</Button>
+            <IconButton aria-label={translate("scrap.text.037")} disabled={editMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.text.037")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
           </div>
         ) : (
           <button className="scrap-photo-picker" disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} type="button">
             <Icon name="image" size={17} strokeWidth={1.5} />
-            <span><strong>사진 선택</strong><small>JPG, PNG 등 · 최대 10MB</small></span>
+            <span><strong>{translate("scrap.text.038")}</strong><small>{translate("scrap.text.039")}</small></span>
           </button>
         )}
       </fieldset>
       <div className="scrap-detail__editor-actions">
-        <Button disabled={editMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">취소</Button>
-        <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">저장</Button>
+        <Button disabled={editMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">{translate("scrap.text.025")}</Button>
+        <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">{translate("settings.text.021")}</Button>
       </div>
       {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
     </form>
   ) : (<>
-    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label="스크랩 수정" onClick={startEditing} size="small" title="스크랩 수정" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label="스크랩 삭제" onClick={onRequestDelete} size="small" title="스크랩 삭제" type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={`${item.url} 새 창에서 열기`}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>댓글</strong><span>{item.comments.length}개</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div></div>;
+    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label={translate("scrap.text.062")} onClick={startEditing} size="small" title={translate("scrap.text.062")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label={translate("scrap.text.026")} onClick={onRequestDelete} size="small" title={translate("scrap.text.026")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={translate("scrap.text.063", { value1: item.url })}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>{translate("scrap.text.023")}</strong><span>{item.comments.length}{translate("scrap.text.044")}</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div></div>;
 }
 
 function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string; urlOpener: ExternalUrlOpener }) {
@@ -792,7 +793,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
     event.preventDefault();
     const text = draft.trim();
     if (!text) {
-      setEditError("댓글 내용을 입력해야 합니다.");
+      setEditError(translate("scrap.text.064"));
       return;
     }
     if (text === comment.text) {
@@ -808,14 +809,14 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
         <time>{formatTimestamp(comment.createdAt)}</time>
         {!editing && !confirmingDelete && (
           <div className="scrap-comment__actions">
-            <IconButton aria-label={`${comment.text} 댓글 수정`} id={editButtonDomId} onClick={startEditing} size="small" title="댓글 수정" type="button" variant="ghost"><Icon name="edit" size={12} /></IconButton>
-            <IconButton aria-label={`${comment.text} 댓글 삭제`} id={deleteButtonDomId} onClick={() => { setDeleteError(null); setConfirmingDelete(true); }} size="small" title="댓글 삭제" type="button" variant="ghost"><Icon name="trash" size={12} /></IconButton>
+            <IconButton aria-label={translate("scrap.text.065", { value1: comment.text })} id={editButtonDomId} onClick={startEditing} size="small" title={translate("scrap.text.066")} type="button" variant="ghost"><Icon name="edit" size={12} /></IconButton>
+            <IconButton aria-label={translate("scrap.text.067", { value1: comment.text })} id={deleteButtonDomId} onClick={() => { setDeleteError(null); setConfirmingDelete(true); }} size="small" title={translate("scrap.text.068")} type="button" variant="ghost"><Icon name="trash" size={12} /></IconButton>
           </div>
         )}
         {confirmingDelete && (
-          <div aria-label="댓글 삭제 확인" className="scrap-comment__confirm" role="group">
-            <Button disabled={deleteMutation.isPending} onClick={() => { setConfirmingDelete(false); requestAnimationFrame(() => document.getElementById(deleteButtonDomId)?.focus()); }} size="small" type="button" variant="ghost">취소</Button>
-            <Button autoFocus loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()} size="small" type="button" variant="danger">삭제</Button>
+          <div aria-label={translate("scrap.text.069")} className="scrap-comment__confirm" role="group">
+            <Button disabled={deleteMutation.isPending} onClick={() => { setConfirmingDelete(false); requestAnimationFrame(() => document.getElementById(deleteButtonDomId)?.focus()); }} size="small" type="button" variant="ghost">{translate("scrap.text.025")}</Button>
+            <Button autoFocus loading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()} size="small" type="button" variant="danger">{translate("settings.text.029")}</Button>
           </div>
         )}
       </div>
@@ -823,7 +824,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
         <form className="scrap-comment__editor" onSubmit={submitEdit}>
           <TextArea
             aria-invalid={editError ? "true" : undefined}
-            aria-label="댓글 수정"
+            aria-label={translate("scrap.text.066")}
             autoFocus
             disabled={updateMutation.isPending}
             maxLength={2_000}
@@ -841,8 +842,8 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
             value={draft}
           />
           <div className="scrap-comment__editor-actions">
-            <Button disabled={updateMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">취소</Button>
-            <Button loading={updateMutation.isPending} size="small" type="submit" variant="primary">저장</Button>
+            <Button disabled={updateMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">{translate("scrap.text.025")}</Button>
+            <Button loading={updateMutation.isPending} size="small" type="submit" variant="primary">{translate("settings.text.021")}</Button>
           </div>
           {editError && <span className="scrap-comment__edit-error" role="alert">{editError}</span>}
         </form>
@@ -853,13 +854,13 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
 }
 
 function ScrapEmpty({ onCreate }: { onCreate: () => void }) {
-  return <div className="scrap-empty"><Icon name="scrap" size={28} /><strong>아직 스크랩이 없습니다</strong><span>기억해 둘 자료와 메모를 모아 두세요.</span><Button onClick={onCreate} variant="primary">스크랩 추가</Button></div>;
+  return <div className="scrap-empty"><Icon name="scrap" size={28} /><strong>{translate("scrap.text.070")}</strong><span>{translate("scrap.text.071")}</span><Button onClick={onCreate} variant="primary">{translate("app.action.newScrap")}</Button></div>;
 }
 
 function ScrapFilterEmpty({ onReset }: { onReset: () => void }) {
-  return <div className="scrap-empty"><Icon name="search" size={28} /><strong>이 라벨의 스크랩이 없습니다</strong><span>다른 라벨을 선택하거나 필터를 해제하세요.</span><Button onClick={onReset}>필터 해제</Button></div>;
+  return <div className="scrap-empty"><Icon name="search" size={28} /><strong>{translate("scrap.text.072")}</strong><span>{translate("scrap.text.073")}</span><Button onClick={onReset}>{translate("scrap.text.074")}</Button></div>;
 }
 
 function ScrapLoading() {
-  return <div aria-label="스크랩 불러오는 중" className="scrap-page scrap-page--loading"><div className="scrap-tags" /><div className="scrap-list">{Array.from({ length: 6 }, (_, index) => <div className="scrap-list-card scrap-list-card--skeleton" key={index} />)}</div></div>;
+  return <div aria-label={translate("scrap.text.075")} className="scrap-page scrap-page--loading"><div className="scrap-tags" /><div className="scrap-list">{Array.from({ length: 6 }, (_, index) => <div className="scrap-list-card scrap-list-card--skeleton" key={index} />)}</div></div>;
 }

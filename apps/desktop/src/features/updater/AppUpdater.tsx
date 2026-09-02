@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { Button, Modal } from "@mono/ui";
 import { useEffect, useState } from "react";
 import { checkForUpdate, type PendingUpdate } from "../../infrastructure/updater";
@@ -66,23 +67,23 @@ export function AppUpdater() {
   const dismissable = phase === "available" || phase === "uptodate" || phase === "error";
 
   return (
-    <Modal icon="sparkles" onClose={() => { if (dismissable) setPhase("idle"); }} open title="업데이트">
+    <Modal icon="sparkles" onClose={() => { if (dismissable) setPhase("idle"); }} open title={translate("settings.about.update")}>
       <div className="app-updater">
-        {phase === "checking" && <p role="status">업데이트를 확인하는 중…</p>}
-        {phase === "uptodate" && <p role="status">최신 버전입니다.</p>}
-        {phase === "error" && <p role="alert">업데이트에 실패했습니다. {error}</p>}
+        {phase === "checking" && <p role="status">{translate("updater.text.001")}</p>}
+        {phase === "uptodate" && <p role="status">{translate("updater.text.002")}</p>}
+        {phase === "error" && <p role="alert">{translate("updater.text.003", { error: error ?? "" })}</p>}
         {update && (phase === "available" || phase === "downloading" || phase === "ready") && (
           <>
             <p>
-              새 버전 <strong>{update.version}</strong>이 있습니다. 현재 버전 {update.currentVersion}.
+              {translate("updater.text.004", { version: update.version, currentVersion: update.currentVersion })}
             </p>
             {update.notes && <pre className="app-updater__notes">{update.notes}</pre>}
-            {phase === "downloading" && <p role="status">내려받는 중… {progress}%</p>}
-            {phase === "ready" && <p role="status">설치를 마쳤습니다. 앱을 다시 시작합니다…</p>}
+            {phase === "downloading" && <p role="status">{translate("updater.text.006", { progress })}</p>}
+            {phase === "ready" && <p role="status">{translate("updater.text.007")}</p>}
             {phase === "available" && (
               <div className="app-updater__actions">
-                <Button onClick={() => setPhase("idle")} type="button">나중에</Button>
-                <Button onClick={() => void install()} type="button" variant="primary">지금 업데이트</Button>
+                <Button onClick={() => setPhase("idle")} type="button">{translate("updater.text.008")}</Button>
+                <Button onClick={() => void install()} type="button" variant="primary">{translate("updater.text.009")}</Button>
               </div>
             )}
           </>

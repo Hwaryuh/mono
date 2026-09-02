@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Icon } from "./icons";
-
-const weekdayNames = ["일", "월", "화", "수", "목", "금", "토"];
+import { uiMessage, uiWeekdays } from "./i18n";
 
 export type DatePickerProps = {
   value: string;
@@ -58,12 +57,12 @@ function calendarDays(visibleMonth: string) {
 
 function monthLabel(value: string) {
   const [year, month] = value.split("-").map(Number);
-  return `${year}년 ${month}월`;
+  return uiMessage("dateMonth", { year, month });
 }
 
 function dayLabel(value: string, selected: boolean, today: boolean) {
   const [year, month, day] = value.split("-").map(Number);
-  return `${year}년 ${month}월 ${day}일${today ? ", 오늘" : ""}${selected ? ", 선택됨" : ""}`;
+  return `${uiMessage("dateDay", { year, month, day })}${today ? uiMessage("dateTodaySuffix") : ""}${selected ? uiMessage("dateSelectedSuffix") : ""}`;
 }
 
 export function DatePicker({ value, label, onChange, align = "start", min, max, disabled = false }: DatePickerProps) {
@@ -150,21 +149,21 @@ export function DatePicker({ value, label, onChange, align = "start", min, max, 
         ref={triggerRef}
         type="button"
       >
-        <span>{value || "날짜 선택"}</span>
+        <span>{value || uiMessage("dateSelect")}</span>
         <Icon name="calendar" size={13} />
       </button>
 
       {open && (
-        <div aria-label={`${label} 선택`} className={`ui-date-picker__popup ui-date-picker__popup--${align}`} id={dialogId} role="dialog">
+        <div aria-label={uiMessage("pickerSelect", { label })} className={`ui-date-picker__popup ui-date-picker__popup--${align}`} id={dialogId} role="dialog">
           <header className="ui-date-picker__header">
             <strong>{monthLabel(visibleMonth)}</strong>
             <div>
-              <button aria-label="이전 달" onClick={() => changeMonth(-1)} type="button"><Icon name="arrowLeft" size={13} /></button>
-              <button aria-label="다음 달" onClick={() => changeMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
+              <button aria-label={uiMessage("previousMonth")} onClick={() => changeMonth(-1)} type="button"><Icon name="arrowLeft" size={13} /></button>
+              <button aria-label={uiMessage("nextMonth")} onClick={() => changeMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
             </div>
           </header>
           <div aria-hidden="true" className="ui-date-picker__weekdays">
-            {weekdayNames.map((name) => <span key={name}>{name}</span>)}
+            {uiWeekdays().map((name) => <span key={name}>{name}</span>)}
           </div>
           <div aria-label={monthLabel(visibleMonth)} className="ui-date-picker__days" role="group">
             {days.map((date) => {
@@ -195,8 +194,8 @@ export function DatePicker({ value, label, onChange, align = "start", min, max, 
             })}
           </div>
           <footer className="ui-date-picker__footer">
-            <button onClick={() => select("")} type="button">삭제</button>
-            <button disabled={Boolean((min && currentToday < min) || (max && currentToday > max))} onClick={() => select(currentToday)} type="button">오늘</button>
+            <button onClick={() => select("")} type="button">{uiMessage("clear")}</button>
+            <button disabled={Boolean((min && currentToday < min) || (max && currentToday > max))} onClick={() => select(currentToday)} type="button">{uiMessage("today")}</button>
           </footer>
         </div>
       )}

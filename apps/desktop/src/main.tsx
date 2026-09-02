@@ -19,7 +19,7 @@ import { HttpR2SettingsStore } from "./infrastructure/http/http-r2-settings-stor
 import { TauriServerSettingsStore } from "./infrastructure/server/tauri-server-settings-store";
 import { MediaStoreProvider } from "./infrastructure/media/media-store-context";
 import { AppUpdater } from "./features/updater/AppUpdater";
-import { I18nProvider } from "./i18n/i18n";
+import { I18nProvider, translate } from "./i18n/i18n";
 import "@mono/ui/tokens.css";
 import "@mono/ui/styles.css";
 import "./styles/global.css";
@@ -81,6 +81,6 @@ async function start() {
 start().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   const root = document.getElementById("root");
-  if (root) root.textContent = `앱 데이터를 준비하지 못했습니다. ${message}`;
+  if (root) root.textContent = translate("app.text.001", { value1: message });
   console.error(error);
 });

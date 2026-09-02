@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 export type AiProviderId = "gemini" | "openai";
 
 export const AI_PROVIDER_IDS = ["gemini", "openai"] as const satisfies readonly AiProviderId[];
@@ -25,7 +26,7 @@ export class InMemoryAiSettingsStore implements AiSettingsStore {
   }
 
   async setApiKey(provider: AiProviderId, apiKey: string): Promise<void> {
-    if (!apiKey.trim()) throw new Error(`${PROVIDER_LABEL[provider]} API 키를 입력해야 합니다.`);
+    if (!apiKey.trim()) throw new Error(translate("ai.text.001", { value1: PROVIDER_LABEL[provider] }));
     this.keys[provider] = apiKey;
   }
 
@@ -34,7 +35,7 @@ export class InMemoryAiSettingsStore implements AiSettingsStore {
   }
 
   async testConnection(provider: AiProviderId): Promise<void> {
-    if (this.keys[provider] === null) throw new Error(`${PROVIDER_LABEL[provider]} API 키가 설정되지 않았습니다.`);
+    if (this.keys[provider] === null) throw new Error(translate("ai.text.002", { value1: PROVIDER_LABEL[provider] }));
   }
 
   async getActiveProvider(): Promise<AiProviderId> {

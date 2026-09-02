@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import type { TodoItem, TodoLabel } from "@mono/contracts";
 import { currentIsoDate } from "@mono/domain";
 import { Button, Icon, IconButton } from "@mono/ui";
@@ -163,7 +164,7 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
     finishPhase(false);
   }
 
-  const toggleLabel = running ? "일시정지" : remaining === total ? "시작" : "이어서";
+  const toggleLabel = running ? translate("timer.text.001") : remaining === total ? translate("calendar.text.027") : translate("timer.text.002");
 
   return (
     <div className="timer-page">
@@ -174,14 +175,14 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
         </div>
 
         <div className="timer-tally">
-          <span>오늘</span>
+          <span>{translate("todo.text.003")}</span>
           <div className="timer-pips">
             {Array.from({ length: DAILY_GOAL }, (_, index) => (
               <i className={index < sessions.length ? "timer-pip timer-pip--done" : "timer-pip"} key={index} />
             ))}
           </div>
           <span className="timer-tally__count">{sessions.length} / {DAILY_GOAL}</span>
-          {focusedMinutes > 0 && <span className="timer-tally__count">{Math.floor(focusedMinutes / 60)}시간 {focusedMinutes % 60}분</span>}
+          {focusedMinutes > 0 && <span className="timer-tally__count">{Math.floor(focusedMinutes / 60)}{translate("timer.text.003")}{focusedMinutes % 60}{translate("timer.text.004")}</span>}
         </div>
 
         <div className="timer-controls">
@@ -189,10 +190,10 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
             <Icon name={running ? "pause" : "play"} size={15} strokeWidth={1.8} />
             {toggleLabel}
           </Button>
-          <IconButton aria-label="세션 건너뛰기" onClick={skip} title="세션 건너뛰기" variant="secondary">
+          <IconButton aria-label={translate("timer.text.005")} onClick={skip} title={translate("timer.text.005")} variant="secondary">
             <Icon name="skip" size={15} />
           </IconButton>
-          <IconButton aria-label="타이머 되돌리기" onClick={reset} title="타이머 되돌리기" variant="secondary">
+          <IconButton aria-label={translate("timer.text.006")} onClick={reset} title={translate("timer.text.006")} variant="secondary">
             <Icon name="sync" size={15} />
           </IconButton>
         </div>
@@ -200,7 +201,7 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
 
       <aside className="timer-side">
         <div className="timer-side__title">
-          <span>할 일</span>
+          <span>{translate("app.navigation.todo")}</span>
           <span>{candidates.length}</span>
         </div>
 
@@ -220,8 +221,8 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
                 <span className="timer-task__copy">
                   <strong>{item.title}</strong>
                   <span>
-                    <span>{label?.name ?? "라벨 없음"}</span>
-                    <span className="timer-task__count">{count === 0 ? "세션 없음" : `${count}세션`}</span>
+                    <span>{label?.name ?? translate("timer.text.007")}</span>
+                    <span className="timer-task__count">{count === 0 ? translate("timer.text.008") : translate("timer.text.009", { value1: count })}</span>
                   </span>
                 </span>
                 {item.id === activeTodoId && <Icon name="clock" size={16} />}
@@ -231,19 +232,19 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
           {candidates.length === 0 && (
             <div className="timer-tasks__empty">
               <Icon name="todo" size={22} strokeWidth={1.4} />
-              <span>남은 할 일이 없습니다</span>
+              <span>{translate("timer.text.010")}</span>
             </div>
           )}
         </div>
 
         <div className="timer-log">
-          <div className="timer-side__title">기록</div>
-          {sessions.length === 0 && <p className="timer-log__empty">아직 마친 세션이 없습니다.</p>}
+          <div className="timer-side__title">{translate("timer.text.011")}</div>
+          {sessions.length === 0 && <p className="timer-log__empty">{translate("timer.text.012")}</p>}
           {sessions.map((session, index) => (
             <div className="timer-log__row" key={`${session.startedAt}-${index}`}>
               <span className="timer-log__time">{session.startedAt}</span>
-              <span className="timer-log__title">{session.todoId ? titles.get(session.todoId) ?? "삭제된 할 일" : "할 일 없음"}</span>
-              <span className="timer-log__minutes">{session.minutes}분</span>
+              <span className="timer-log__title">{session.todoId ? titles.get(session.todoId) ?? translate("timer.text.013") : translate("timer.text.014")}</span>
+              <span className="timer-log__minutes">{session.minutes}{translate("timer.text.004")}</span>
             </div>
           ))}
         </div>

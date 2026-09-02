@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 export interface R2Credentials {
   accountId: string;
   accessKeyId: string;
@@ -21,7 +22,7 @@ export class InMemoryR2SettingsStore implements R2SettingsStore {
 
   async setCredentials(credentials: R2Credentials): Promise<void> {
     if (!credentials.accountId.trim() || !credentials.accessKeyId.trim() || !credentials.secretAccessKey.trim() || !credentials.bucket.trim()) {
-      throw new Error("R2 자격증명을 모두 입력해야 합니다.");
+      throw new Error(translate("r2.text.001"));
     }
     this.credentials = credentials;
   }
@@ -31,6 +32,6 @@ export class InMemoryR2SettingsStore implements R2SettingsStore {
   }
 
   async testConnection(): Promise<void> {
-    if (this.credentials === null) throw new Error("R2 자격증명이 설정되지 않았습니다.");
+    if (this.credentials === null) throw new Error(translate("r2.text.002"));
   }
 }

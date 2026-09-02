@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerSnapshot, type LedgerWriteInput } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,7 +35,7 @@ function blankDraft(today: string, categories: LedgerCategory[]): Draft {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "지출을 저장하지 못했습니다.";
+  return error instanceof Error ? error.message : translate("ledger.text.001");
 }
 
 export function LedgerPage({ repository, viewStateStore }: { repository: LedgerRepository; viewStateStore?: LedgerViewStateStore }) {
@@ -141,7 +142,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   }, [open, searchParams, snapshotQuery.data]);
 
   if (snapshotQuery.isPending) return <LedgerLoading />;
-  if (snapshotQuery.isError) return <div className="ledger-state" role="alert"><Icon name="alert" size={18} />가계부를 불러오지 못했습니다.</div>;
+  if (snapshotQuery.isError) return <div className="ledger-state" role="alert"><Icon name="alert" size={18} />{translate("ledger.text.002")}</div>;
 
   const snapshot = snapshotQuery.data;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteExpenseMutation.isPending;
@@ -151,11 +152,11 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   const summary = summarizeLedgerMonth(snapshot, activeMonth);
   const listExpenses = summary.expenses;
   const [year, month] = activeMonth.split("-").map(Number);
-  const fallbackCategoryName = snapshot.categories.find((category) => category.id === "other")?.name ?? "기타";
+  const fallbackCategoryName = snapshot.categories.find((category) => category.id === "other")?.name ?? translate("scrap.text.047");
   // comparison은 서버가 이번 달 기준으로 선계산하므로 다른 달을 볼 때는 표시하지 않는다.
   const comparison = snapshot.comparison.direction === "same"
-    ? "지난달 같은 기간과 같음"
-    : `지난달 같은 기간보다 ${snapshot.comparison.percentage}% ${snapshot.comparison.direction === "less" ? "적게 씀" : "더 씀"}`;
+    ? translate("ledger.text.003")
+    : translate("ledger.text.004", { value1: snapshot.comparison.percentage, value2: snapshot.comparison.direction === "less" ? translate("ledger.text.029") : translate("ledger.text.030") });
 
   function stepMonth(offset: number) {
     const [y, m] = activeMonth.split("-").map(Number);
@@ -215,7 +216,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
     event.preventDefault();
     const parsed = ledgerCategoryWriteInputSchema.safeParse(categoryDraft);
     if (!parsed.success) {
-      setCategoryError(parsed.error.issues[0]?.message ?? "라벨 입력값을 확인해야 합니다.");
+      setCategoryError(parsed.error.issues[0]?.message ?? translate("todoLabels.text.001"));
       return;
     }
     if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
@@ -240,7 +241,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       note: draft.note,
     });
     if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "입력값을 확인해야 합니다.");
+      setFormError(parsed.error.issues[0]?.message ?? translate("ledger.text.005"));
       return;
     }
     if (editingExpenseId) updateMutation.mutate({ expenseId: editingExpenseId, input: parsed.data });
@@ -252,15 +253,15 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       <section className="ledger-overview">
         <article className="ledger-total-card">
           <div className="ledger-month-nav">
-            <IconButton aria-label="이전 월" onClick={() => stepMonth(-1)} size="small" type="button" variant="ghost"><Icon name="arrowLeft" size={15} /></IconButton>
-            <span className="ledger-month-nav__label">{year}년 {month}월 지출</span>
-            <IconButton aria-label="다음 월" disabled={isCurrentMonth} onClick={() => stepMonth(1)} size="small" type="button" variant="ghost"><Icon name="chevronRight" size={15} /></IconButton>
-            {!isCurrentMonth && <button className="ledger-month-nav__today" onClick={() => selectMonth(null)} type="button">이번 달</button>}
+            <IconButton aria-label={translate("ledger.text.006")} onClick={() => stepMonth(-1)} size="small" type="button" variant="ghost"><Icon name="arrowLeft" size={15} /></IconButton>
+            <span className="ledger-month-nav__label">{year}{translate("ledger.text.007")}{month}{translate("ledger.text.008")}</span>
+            <IconButton aria-label={translate("ledger.text.009")} disabled={isCurrentMonth} onClick={() => stepMonth(1)} size="small" type="button" variant="ghost"><Icon name="chevronRight" size={15} /></IconButton>
+            {!isCurrentMonth && <button className="ledger-month-nav__today" onClick={() => selectMonth(null)} type="button">{translate("ledger.text.010")}</button>}
           </div>
           <strong className={summary.totalWon >= 1_000_000_000 ? "ledger-total-card__amount--large" : undefined}>{formatWon(summary.totalWon)}</strong>
           {isCurrentMonth && <small>{comparison}</small>}
         </article>
-        <article aria-label="라벨별 지출" className="ledger-category-card">
+        <article aria-label={translate("ledger.text.011")} className="ledger-category-card">
           {summary.categories.map((category) => (
             <div className="ledger-category-row" key={category.id}>
               <i style={{ backgroundColor: category.color }} />
@@ -271,90 +272,90 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
               <strong>{formatWon(category.amountWon)}</strong>
             </div>
           ))}
-          {summary.categories.length === 0 && <div className="ledger-category-empty">이번 달 라벨별 지출이 없습니다.</div>}
+          {summary.categories.length === 0 && <div className="ledger-category-empty">{translate("ledger.text.012")}</div>}
         </article>
       </section>
 
-      <section aria-label="지출 목록" className="ledger-list-card">
+      <section aria-label={translate("ledger.text.013")} className="ledger-list-card">
         {listExpenses.map((expense) => {
           const category = snapshot.categories.find((candidate) => candidate.id === expense.categoryId);
           return (
-            <button aria-label={`${expense.title} 수정`} className="ledger-expense-row" key={expense.id} onClick={() => openEdit(expense)} type="button">
+            <button aria-label={translate("todo.text.030", { value1: expense.title })} className="ledger-expense-row" key={expense.id} onClick={() => openEdit(expense)} type="button">
               <time dateTime={expense.date}>{formatDate(expense.date)}</time>
               <i style={{ backgroundColor: category?.color ?? "oklch(0.645 0.009 106.643)" }} />
               <strong title={expense.title}>{expense.title}</strong>
-              <span>{category?.name ?? "기타"}</span>
+              <span>{category?.name ?? translate("scrap.text.047")}</span>
               <b>{formatWon(expense.amountWon)}</b>
             </button>
           );
         })}
         {listExpenses.length === 0 && (
-          <div className="ledger-empty"><Icon name="wallet" size={26} /><strong>{isCurrentMonth ? "이번 달 지출이 없습니다" : "이 달 지출이 없습니다"}</strong><span>{isCurrentMonth ? "지출 추가로 첫 내역을 기록하세요." : "다른 달을 살펴보세요."}</span></div>
+          <div className="ledger-empty"><Icon name="wallet" size={26} /><strong>{isCurrentMonth ? translate("dashboard.text.010") : translate("ledger.text.014")}</strong><span>{isCurrentMonth ? translate("ledger.text.015") : translate("ledger.text.016")}</span></div>
         )}
       </section>
 
       <Modal
         className="ledger-expense-modal"
         footer={<>
-          {editingExpenseId && <Button className="ledger-expense-modal__delete" disabled={editorBusy} onClick={() => setDeleteExpenseId(editingExpenseId)} variant="ghost">삭제</Button>}
-          <Button disabled={editorBusy} onClick={() => closeModal()}>취소</Button>
-          <Button form="ledger-expense-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">저장</Button>
+          {editingExpenseId && <Button className="ledger-expense-modal__delete" disabled={editorBusy} onClick={() => setDeleteExpenseId(editingExpenseId)} variant="ghost">{translate("settings.text.029")}</Button>}
+          <Button disabled={editorBusy} onClick={() => closeModal()}>{translate("scrap.text.025")}</Button>
+          <Button form="ledger-expense-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{translate("settings.text.021")}</Button>
         </>}
         icon="wallet"
         onClose={closeModal}
         open={open}
-        title={editingExpenseId ? "지출 수정" : "지출 추가"}
+        title={editingExpenseId ? translate("ledger.text.017") : translate("app.action.newLedger")}
       >
         <form aria-busy={editorBusy} className="ledger-expense-form" id="ledger-expense-form" onSubmit={submit}>
-          <label><span>항목</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="예: 점심값" value={draft.title} /></label>
+          <label><span>{translate("inbox.text.009")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("ledger.text.018")} value={draft.title} /></label>
           <div className="ledger-expense-form__pair">
-            <label><span>금액</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
-            <label><span>날짜</span><DatePicker align="end" label="날짜" onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
+            <label><span>{translate("inbox.text.010")}</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
+            <label><span>{translate("inbox.text.011")}</span><DatePicker align="end" label={translate("inbox.text.011")} onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
           </div>
           <div className="ledger-expense-form__field">
-            <div className="ledger-expense-form__category-legend"><span>라벨</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">관리</button></div>
+            <div className="ledger-expense-form__category-legend"><span>{translate("scrap.text.040")}</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("scrap.text.041")}</button></div>
             <Select
               align="end"
               disabled={editorBusy}
-              label="라벨"
+              label={translate("scrap.text.040")}
               onChange={(categoryId) => setDraft((current) => ({ ...current, categoryId }))}
               options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))}
               value={draft.categoryId}
             />
           </div>
-          <label><span>메모 <small>(선택)</small></span><Input maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} value={draft.note} /></label>
-          {(createMutation.isPending || updateMutation.isPending) && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />지출을 저장하고 있습니다.</div>}
+          <label><span>{translate("ledger.text.019")}<small>{translate("ledger.text.020")}</small></span><Input maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} value={draft.note} /></label>
+          {(createMutation.isPending || updateMutation.isPending) && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />{translate("ledger.text.021")}</div>}
           {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
       <Modal
         className="ledger-category-delete-modal"
-        footer={<><Button disabled={deleteExpenseMutation.isPending} onClick={() => setDeleteExpenseId(null)}>취소</Button><Button loading={deleteExpenseMutation.isPending} onClick={() => deleteExpenseId && deleteExpenseMutation.mutate(deleteExpenseId)} variant="danger">삭제</Button></>}
+        footer={<><Button disabled={deleteExpenseMutation.isPending} onClick={() => setDeleteExpenseId(null)}>{translate("scrap.text.025")}</Button><Button loading={deleteExpenseMutation.isPending} onClick={() => deleteExpenseId && deleteExpenseMutation.mutate(deleteExpenseId)} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteExpenseMutation.isPending) setDeleteExpenseId(null); }}
         open={deleteExpenseId !== null}
-        title="지출 삭제"
+        title={translate("ledger.text.022")}
       >
-        <p><strong>{snapshot.expenses.find((expense) => expense.id === deleteExpenseId)?.title}</strong> 지출을 삭제할까요? 되돌릴 수 없습니다.</p>
+        <p><strong>{snapshot.expenses.find((expense) => expense.id === deleteExpenseId)?.title}</strong> {translate("ledger.text.023")}</p>
         {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
-      <Modal className="ledger-category-manager-modal" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title="라벨 관리">
+      <Modal className="ledger-category-manager-modal" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("scrap.text.042")}>
         <div className="ledger-category-manager">
-          <div aria-label="가계부 라벨" className="ledger-category-manager__list">
+          <div aria-label={translate("inbox.text.018")} className="ledger-category-manager__list">
             {snapshot.categories.map((category, index) => {
               const usageCount = snapshot.expenses.filter((expense) => expense.categoryId === category.id).length;
               return (
                 <div className="ledger-category-manager__row" key={category.id}>
                   <i style={{ backgroundColor: category.color }} />
                   <strong>{category.name}</strong>
-                  <span>{usageCount}건</span>
+                  <span>{usageCount}{translate("ledger.text.024")}</span>
                   <div>
-                    <IconButton aria-label={`${category.name} 위로 이동`} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title="위로 이동" type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                    <IconButton aria-label={`${category.name} 아래로 이동`} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title="아래로 이동" type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                    <IconButton aria-label={`${category.name} 편집`} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title="편집" type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                    <IconButton aria-label={category.id === "other" ? `${category.name} 삭제 불가` : `${category.name} 삭제`} disabled={categoryMutation.isPending || category.id === "other"} onClick={() => setDeleteCategoryId(category.id)} size="small" title={category.id === "other" ? "기타 라벨은 삭제할 수 없습니다" : "삭제"} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
+                    <IconButton aria-label={translate("todoLabels.text.002", { value1: category.name })} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title={translate("todoLabels.text.003")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
+                    <IconButton aria-label={translate("todoLabels.text.004", { value1: category.name })} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title={translate("todoLabels.text.005")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
+                    <IconButton aria-label={translate("scrap.text.045", { value1: category.name })} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title={translate("scrap.text.046")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
+                    <IconButton aria-label={category.id === "other" ? translate("scrap.text.048", { value1: category.name }) : translate("scrap.text.049", { value1: category.name })} disabled={categoryMutation.isPending || category.id === "other"} onClick={() => setDeleteCategoryId(category.id)} size="small" title={category.id === "other" ? translate("scrap.text.050") : translate("settings.text.029")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
                   </div>
                 </div>
               );
@@ -363,13 +364,13 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
 
           <form aria-busy={categoryMutation.isPending} className="ledger-category-editor" onSubmit={submitCategory}>
             <div className="ledger-category-editor__header">
-              <strong>{editingCategoryId ? "라벨 수정" : "새 라벨"}</strong>
-              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">취소</button>}
+              <strong>{editingCategoryId ? translate("scrap.text.051") : translate("scrap.text.052")}</strong>
+              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("scrap.text.025")}</button>}
             </div>
             <div className="ledger-category-editor__controls">
-              <ColorPicker disabled={categoryMutation.isPending} label="라벨 색상" onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
-              <Input aria-label="라벨 이름" disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder="라벨 이름" value={categoryDraft.name} />
-              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? "저장" : "추가"}</Button>
+              <ColorPicker disabled={categoryMutation.isPending} label={translate("todoLabels.text.008")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
+              <Input aria-label={translate("scrap.text.053")} disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("scrap.text.053")} value={categoryDraft.name} />
+              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("settings.text.021") : translate("scrap.text.054")}</Button>
             </div>
             {categoryError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
           </form>
@@ -378,15 +379,14 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
 
       <Modal
         className="ledger-category-delete-modal"
-        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>취소</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId })} variant="danger">삭제</Button></>}
+        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("scrap.text.025")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId })} variant="danger">{translate("settings.text.029")}</Button></>}
         icon="alert"
         onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
         open={deleteCategoryId !== null}
-        title="라벨 삭제"
+        title={translate("scrap.text.055")}
       >
         <p>
-          <strong>{snapshot.categories.find((category) => category.id === deleteCategoryId)?.name}</strong> 라벨을 삭제할까요?
-          {snapshot.expenses.some((expense) => expense.categoryId === deleteCategoryId) && <> 이 라벨의 기존 지출은 모두 <strong>{fallbackCategoryName}</strong>로 이동합니다.</>}
+          <strong>{snapshot.categories.find((category) => category.id === deleteCategoryId)?.name}</strong> {translate("ledger.text.025")}{snapshot.expenses.some((expense) => expense.categoryId === deleteCategoryId) && <> {translate("ledger.text.026")}<strong>{fallbackCategoryName}</strong>{translate("ledger.text.027")}</>}
         </p>
         {categoryError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
       </Modal>
@@ -404,5 +404,5 @@ function formatDate(date: string) {
 }
 
 function LedgerLoading() {
-  return <div aria-label="가계부 불러오는 중" className="ledger-page"><section className="ledger-overview"><div className="ledger-total-card ledger-skeleton" /><div className="ledger-category-card ledger-skeleton" /></section><div className="ledger-list-card ledger-skeleton" /></div>;
+  return <div aria-label={translate("ledger.text.028")} className="ledger-page"><section className="ledger-overview"><div className="ledger-total-card ledger-skeleton" /><div className="ledger-category-card ledger-skeleton" /></section><div className="ledger-list-card ledger-skeleton" /></div>;
 }

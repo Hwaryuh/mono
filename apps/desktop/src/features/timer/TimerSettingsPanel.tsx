@@ -49,7 +49,6 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
     <>
       <div className="settings-heading">
         <strong>{t("settings.section.timer")}</strong>
-        <p>{t("settings.timer.description")}</p>
       </div>
 
       <section className="settings-group">

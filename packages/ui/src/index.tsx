@@ -12,6 +12,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { Icon, type IconName } from "./icons";
+import { uiMessage } from "./i18n";
 
 function classes(...values: Array<string | false | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -127,7 +128,7 @@ export type ConfidenceIndicatorProps = {
   className?: string;
 };
 
-export function ConfidenceIndicator({ value, variant = "ring", label = "확신도", className }: ConfidenceIndicatorProps) {
+export function ConfidenceIndicator({ value, variant = "ring", label = uiMessage("confidence"), className }: ConfidenceIndicatorProps) {
   const percent = Math.max(0, Math.min(100, Math.round(value * 100)));
   const low = percent < 75;
 
@@ -329,7 +330,7 @@ function OverlayHeader({ title, titleId, icon, onClose }: { title: ReactNode; ti
     <header className="ui-overlay__header">
       {icon && <Icon name={icon} size={16} />}
       <strong id={titleId}>{title}</strong>
-      <IconButton aria-label="닫기" onClick={onClose} size="small" variant="ghost">
+      <IconButton aria-label={uiMessage("close")} onClick={onClose} size="small" variant="ghost">
         <Icon name="close" size={15} />
       </IconButton>
     </header>
@@ -341,4 +342,5 @@ export { DatePicker, type DatePickerProps } from "./DatePicker";
 export { TimePicker, type TimePickerProps } from "./TimePicker";
 export { Select, type SelectOption, type SelectProps } from "./Select";
 export { ColorPicker, type ColorPickerProps } from "./ColorPicker";
+export { configureUiMessages, type UiMessages } from "./i18n";
 export { MorphingIcon, type MorphingIconName, type MorphingIconProps } from "./MorphingIcon";

@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
   type SaveServerConnectionInput,
@@ -30,7 +31,7 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
   }
 
   async save({ mode, remoteUrl, token }: SaveServerConnectionInput): Promise<ServerConnection> {
-    if (!isTauri()) throw new Error("웹 미리보기에서는 서버 설정을 바꿀 수 없습니다.");
+    if (!isTauri()) throw new Error(translate("server.text.006"));
     return invoke<ServerConnection>("save_server_connection", {
       mode,
       apiBaseUrl: mode === "remote" ? trimBaseUrl(remoteUrl ?? "") : null,
@@ -44,9 +45,9 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
 
     // 1. 도달 가능성 + mono 서버인지 — /health는 인증 없음.
     const health = await this.fetchWithTimeout(`${base}/health`);
-    if (!health.ok) throw new Error(`서버가 오류를 반환했습니다. (HTTP ${health.status})`);
+    if (!health.ok) throw new Error(translate("server.text.007", { value1: health.status }));
     if ((await health.text()).trim() !== "ok") {
-      throw new Error("이 주소는 mono API 서버가 아닌 것 같습니다.");
+      throw new Error(translate("server.text.008"));
     }
 
     // 2. 토큰 유효성 — 인증 걸린 엔드포인트가 401이면 토큰이 없거나 틀린 것.
@@ -55,7 +56,7 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
       bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : {},
     );
     if (authed.status === 401) {
-      throw new Error(bearer ? "API 토큰이 올바르지 않습니다." : "이 서버는 API 토큰이 필요합니다.");
+      throw new Error(bearer ? translate("server.text.004") : translate("server.text.005"));
     }
   }
 
@@ -65,14 +66,14 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
     try {
       return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
     } catch {
-      throw new Error("서버에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요.");
+      throw new Error(translate("server.text.003"));
     } finally {
       clearTimeout(timer);
     }
   }
 
   async restart(): Promise<void> {
-    if (!isTauri()) throw new Error("웹 미리보기에서는 앱을 다시 시작할 수 없습니다.");
+    if (!isTauri()) throw new Error(translate("server.text.009"));
     await invoke("restart_app");
   }
 }

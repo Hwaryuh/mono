@@ -1,6 +1,7 @@
 import { hexToOklch, oklchToHex, relativeLuminanceOfColor } from "@mono/domain";
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from "react";
 import { Icon, type IconName } from "./icons";
+import { uiMessage } from "./i18n";
 
 type HsvColor = { hue: number; saturation: number; value: number };
 
@@ -145,10 +146,10 @@ export function ColorPicker({ value, label, onChange, align = "start", disabled 
       </button>
 
       {open && (
-        <div aria-label={`${label} 선택`} className={`ui-color-picker__popup ui-color-picker__popup--${align}`} role="dialog">
+        <div aria-label={uiMessage("pickerSelect", { label })} className={`ui-color-picker__popup ui-color-picker__popup--${align}`} role="dialog">
           <header>
-            <strong>색 선택</strong>
-            <button aria-label="색 선택 닫기" onClick={() => setOpen(false)} type="button"><Icon name="close" size={12} /></button>
+            <strong>{uiMessage("colorSelect")}</strong>
+            <button aria-label={uiMessage("colorSelectClose")} onClick={() => setOpen(false)} type="button"><Icon name="close" size={12} /></button>
           </header>
           <div
             aria-hidden="true"
@@ -159,10 +160,10 @@ export function ColorPicker({ value, label, onChange, align = "start", disabled 
           >
             <span style={{ left: `${hsv.saturation * 100}%`, top: `${(1 - hsv.value) * 100}%` }} />
           </div>
-          <input aria-label="색조" className="ui-color-picker__hue" max={359} min={0} onChange={updateHue} type="range" value={Math.round(hsv.hue)} />
+          <input aria-label={uiMessage("hue")} className="ui-color-picker__hue" max={359} min={0} onChange={updateHue} type="range" value={Math.round(hsv.hue)} />
           <div className="ui-color-picker__values">
             <span aria-hidden="true" style={{ backgroundColor: value }} />
-            <input aria-label="HEX 색상" maxLength={7} onBlur={() => setHexDraft(editableHex.toUpperCase())} onChange={updateHex} spellCheck={false} value={hexDraft} />
+            <input aria-label={uiMessage("hexColor")} maxLength={7} onBlur={() => setHexDraft(editableHex.toUpperCase())} onChange={updateHex} spellCheck={false} value={hexDraft} />
             <small>{red}, {green}, {blue}</small>
           </div>
         </div>

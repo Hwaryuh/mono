@@ -1,3 +1,4 @@
+import { translate } from "../../i18n/i18n";
 export type ServerMode = "embedded" | "remote";
 
 /**
@@ -83,9 +84,9 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
   async save({ mode, remoteUrl, token }: SaveServerConnectionInput): Promise<ServerConnection> {
     if (mode === "remote") {
       const next = trimBaseUrl(remoteUrl ?? "");
-      if (!next) throw new Error("원격 서버 주소를 입력해야 합니다.");
+      if (!next) throw new Error(translate("server.text.001"));
       if (!looksLikeRemoteApiUrl(next)) {
-        throw new Error("원격 API는 HTTP 4174 또는 HTTPS 443/4174 포트를 사용해야 합니다.");
+        throw new Error(translate("server.text.002"));
       }
       this.remoteUrl = next;
       this.remoteToken = (token ?? "").trim();
@@ -99,10 +100,10 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
 
   async probe(baseUrl: string, token?: string): Promise<void> {
     if (!this.reachable.has(trimBaseUrl(baseUrl))) {
-      throw new Error("서버에 연결할 수 없습니다. 주소와 네트워크 상태를 확인하세요.");
+      throw new Error(translate("server.text.003"));
     }
     if (this.requiredToken && (token ?? "").trim() !== this.requiredToken) {
-      throw new Error((token ?? "").trim() ? "API 토큰이 올바르지 않습니다." : "이 서버는 API 토큰이 필요합니다.");
+      throw new Error((token ?? "").trim() ? translate("server.text.004") : translate("server.text.005"));
     }
   }
 

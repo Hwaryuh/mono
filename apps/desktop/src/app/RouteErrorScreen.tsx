@@ -1,10 +1,11 @@
+import { translate } from "../i18n/i18n";
 import { StatusIndicator } from "@mono/ui";
 import { useRouteError } from "react-router";
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "알 수 없는 오류가 발생했습니다.";
+  return translate("routeError.text.001");
 }
 
 export function RouteErrorScreen() {
@@ -14,9 +15,9 @@ export function RouteErrorScreen() {
 
   return (
     <div className="route-error" role="alert">
-      <StatusIndicator icon="alert" label="화면을 표시하지 못했습니다" tone="danger" />
+      <StatusIndicator icon="alert" label={translate("routeError.text.002")} tone="danger" />
       <p>{errorMessage(error)}</p>
-      <button onClick={() => window.location.reload()} type="button">다시 시도</button>
+      <button onClick={() => window.location.reload()} type="button">{translate("routeError.text.003")}</button>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type UIEvent, type WheelEvent } from "react";
 import { Icon } from "./icons";
+import { uiMessage } from "./i18n";
 
 export type TimePickerProps = {
   value: string;
@@ -68,10 +69,10 @@ function available(value: string, min?: string, max?: string) {
 }
 
 function timeLabel(value: string) {
-  if (!isTime(value)) return "시간 선택";
+  if (!isTime(value)) return uiMessage("timeSelect");
   const hour = Number(value.slice(0, 2));
   const minute = Number(value.slice(3));
-  const period = hour < 12 ? "오전" : "오후";
+  const period = hour < 12 ? uiMessage("am") : uiMessage("pm");
   const displayHour = hour % 12 || 12;
   return `${period} ${displayHour}:${String(minute).padStart(2, "0")}`;
 }
@@ -322,7 +323,7 @@ export function TimePicker({ value, label, onChange, align = "start", minuteStep
           aria-controls={open ? dialogId : undefined}
           aria-expanded={open}
           aria-haspopup="dialog"
-          aria-label={`${label} 다이얼 열기`}
+          aria-label={uiMessage("timeDialogOpen", { label })}
           className="ui-time-picker__dial-trigger"
           disabled={disabled}
           onClick={() => open ? close() : openPicker()}
@@ -334,18 +335,18 @@ export function TimePicker({ value, label, onChange, align = "start", minuteStep
       </div>
 
       {open && (
-        <div aria-label={`${label} 선택`} className={`ui-time-picker__popup ui-time-picker__popup--${align}`} id={dialogId} role="dialog">
+        <div aria-label={uiMessage("pickerSelect", { label })} className={`ui-time-picker__popup ui-time-picker__popup--${align}`} id={dialogId} role="dialog">
           <header className="ui-time-picker__header">
-            <strong>시간 선택</strong>
+            <strong>{uiMessage("timeSelect")}</strong>
             <span aria-live="polite">{timeLabel(draft)}</span>
           </header>
           <div className="ui-time-picker__columns">
-            <TimeWheel autoFocus disabled={(nextHour) => enabledMinutes(nextHour).length === 0} label="시" onChange={selectHour} unit="시" value={hour} values={hourValues} />
-            <TimeWheel disabled={(nextMinute) => !available(`${hour}:${nextMinute}`, min, max)} label="분" onChange={selectMinute} unit="분" value={minute} values={minutes} />
+            <TimeWheel autoFocus disabled={(nextHour) => enabledMinutes(nextHour).length === 0} label={uiMessage("hour")} onChange={selectHour} unit={uiMessage("hour")} value={hour} values={hourValues} />
+            <TimeWheel disabled={(nextMinute) => !available(`${hour}:${nextMinute}`, min, max)} label={uiMessage("minute")} onChange={selectMinute} unit={uiMessage("minute")} value={minute} values={minutes} />
           </div>
           <footer className="ui-time-picker__footer">
-            <button onClick={() => { setInputValue(""); onChange(""); close(); }} type="button">삭제</button>
-            <button disabled={!available(draft, min, max)} onClick={confirm} type="button">완료</button>
+            <button onClick={() => { setInputValue(""); onChange(""); close(); }} type="button">{uiMessage("clear")}</button>
+            <button disabled={!available(draft, min, max)} onClick={confirm} type="button">{uiMessage("done")}</button>
           </footer>
         </div>
       )}
