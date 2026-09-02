@@ -162,9 +162,8 @@
 .scrap-detail__editor { display: flex; flex-direction: column; gap: 9px; }
 .scrap-detail__editor > label { display: flex; flex-direction: column; gap: 4px; }
 .scrap-detail__editor > label > span,
-.scrap-detail__editor legend { color: var(--color-text-faint); font-size: 10.5px; }
-.scrap-detail__editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.scrap-detail__editor legend { margin-bottom: 5px; }
+.scrap-detail__editor-photo-legend { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-detail__editor-photo { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .scrap-detail__editor .ui-textarea { height: auto; min-height: 66px; resize: none; }
 .scrap-detail__editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .scrap-detail__copy > div { padding-top: 3px; display: flex; align-items: center; gap: 7px; min-width: 0; }
@@ -215,11 +214,10 @@
 .scrap-create-form { display: flex; flex-direction: column; gap: 12px; }
 .scrap-create-form > label { display: flex; flex-direction: column; gap: 5px; }
 .scrap-create-form label > span,
-.scrap-create-form legend { color: var(--color-text-faint); font-size: 10.5px; }
+.scrap-create-form__photo-legend { color: var(--color-text-faint); font-size: 10.5px; }
 .scrap-create-form .ui-input { height: 34px; }
 .scrap-create-form .ui-textarea { height: auto; min-height: 72px; resize: none; }
-.scrap-create-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.scrap-create-form legend { margin-bottom: 6px; }
+.scrap-create-form__photo-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .scrap-photo-picker {
   width: 100%;
   min-height: 58px;

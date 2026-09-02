@@ -432,8 +432,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
           <label><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("scrap.editor.titlePlaceholder")} value={draft.title} /></label>
           <label><span>{translate("common.field.note")}</span><TextArea maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder={translate("common.field.notePlaceholder")} rows={3} value={draft.memo} /></label>
           <label><span>{translate("scrap.field.optionalLink")}</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
-          <fieldset className="scrap-create-form__photo-fieldset">
-            <legend>{translate("scrap.field.optionalPhoto")}</legend>
+          <div className="scrap-create-form__photo-field">
+            <span className="scrap-create-form__photo-legend">{translate("scrap.field.optionalPhoto")}</span>
             <input
               accept="image/*"
               aria-label={translate("scrap.photo.filePicker")}
@@ -457,7 +457,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
                 <span><strong>{translate("scrap.photo.select")}</strong><small>{translate("scrap.photo.requirements")}</small></span>
               </button>
             )}
-          </fieldset>
+          </div>
           <div className="scrap-create-form__label-field">
             <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">{translate("common.action.manage")}</button></div>
             <Select disabled={createMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
@@ -693,8 +693,8 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
       <label><span>{translate("common.field.note")}</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
       <label><span>{translate("scrap.field.optionalLink")}</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
       <label><span>{translate("common.field.label")}</span><Select disabled={editMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
-      <fieldset className="scrap-detail__editor-photo">
-        <legend>{translate("scrap.field.optionalPhoto")}</legend>
+      <div className="scrap-detail__editor-photo">
+        <span className="scrap-detail__editor-photo-legend">{translate("scrap.field.optionalPhoto")}</span>
         <input accept="image/*" aria-label={translate("scrap.photo.filePicker")} className="capture-file-input" disabled={editMutation.isPending} onChange={(event) => choosePhoto(event.currentTarget.files?.[0])} ref={photoInputRef} tabIndex={-1} type="file" />
         {pendingPhoto ? (
           <div className="scrap-photo-preview">
@@ -716,7 +716,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
             <span><strong>{translate("scrap.photo.select")}</strong><small>{translate("scrap.photo.requirements")}</small></span>
           </button>
         )}
-      </fieldset>
+      </div>
       <div className="scrap-detail__editor-actions">
         <Button disabled={editMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">{translate("common.action.cancel")}</Button>
         <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">{translate("common.action.save")}</Button>
