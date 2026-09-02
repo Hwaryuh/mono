@@ -223,7 +223,9 @@ describe("LedgerPage", () => {
     expect(await within(manager).findByText("교통")).toBeInTheDocument();
     expect((await repository.getSnapshot()).categories).toContainEqual(expect.objectContaining({ name: "교통", color: "oklch(0.319 0.072 251.168)" }));
     fireEvent.click(within(manager).getByRole("button", { name: "닫기" }));
-    fireEvent.click(within(expenseModal).getByRole("combobox", { name: "라벨" }));
+    const labelSelect = within(expenseModal).getByRole("combobox", { name: "라벨" });
+    await waitFor(() => expect(labelSelect).toHaveTextContent("교통"));
+    fireEvent.click(labelSelect);
     expect(await screen.findByRole("option", { name: "교통" })).toBeInTheDocument();
   });
 

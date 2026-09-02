@@ -360,6 +360,13 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
         setDraft((current) => current.categoryId === command.categoryId ? { ...current, categoryId: command.replacementCategoryId } : current);
       }
       await invalidateSnapshots();
+      if (command.type === "create") {
+        // ponytail: createCategory returns void; name is unique (dupes rejected), so match by name after the refetch above.
+        const created = queryClient.getQueriesData<CalendarSnapshot>({ queryKey: calendarQueryKey })
+          .map(([, snapshot]) => snapshot?.categories.find((category) => category.name === command.input.name))
+          .find(Boolean);
+        if (created) setDraft((current) => ({ ...current, categoryId: created.id }));
+      }
       requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#calendar-category-editor input")?.focus());
     },
     onError: async (error) => {

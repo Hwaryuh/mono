@@ -360,6 +360,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
       <TodoLabelManagerModal
         labels={snapshot.labels}
         onClose={closeLabelManager}
+        onLabelCreated={(labelId) => setDraft((current) => ({ ...current, labelId }))}
         onLabelDeleted={(labelId, replacementLabelId) => {
           setViewState((current) => {
             const next = { ...current, labelIds: current.labelIds.filter((candidate) => candidate !== labelId) };

@@ -18,6 +18,7 @@ const blankLabelDraft: TodoLabelWriteInput = { name: "", color: "oklch(0.539 0.0
 interface TodoLabelManagerModalProps {
   labels: TodoLabel[];
   onClose: () => void;
+  onLabelCreated?: (labelId: string) => void;
   onLabelDeleted?: (labelId: string, replacementLabelId: string) => void;
   open: boolean;
   repository: TodoLabelRepository;
@@ -28,7 +29,7 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
-export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, repository, usageCountOf }: TodoLabelManagerModalProps) {
+export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabelDeleted, open, repository, usageCountOf }: TodoLabelManagerModalProps) {
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editingLabelVersion, setEditingLabelVersion] = useState(1);
   const [labelDraft, setLabelDraft] = useState<TodoLabelWriteInput>(blankLabelDraft);
@@ -65,6 +66,11 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelDeleted, open, r
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["routine"] }),
       ]);
+      if (command.type === "create") {
+        // ponytail: createLabel returns void; name is unique (dupes rejected), so match by name after the refetch above.
+        const created = queryClient.getQueryData<TodoSnapshot>(["todo"])?.labels.find((label) => label.name === command.input.name);
+        if (created) onLabelCreated?.(created.id);
+      }
     },
     onError: async (error) => {
       setLabelError(errorMessage(error));

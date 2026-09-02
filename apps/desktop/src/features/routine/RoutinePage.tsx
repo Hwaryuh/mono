@@ -224,6 +224,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
       <TodoLabelManagerModal
         labels={snapshot.labels}
         onClose={() => setLabelManagerOpen(false)}
+        onLabelCreated={(labelId) => setDraft((current) => ({ ...current, labelId }))}
         onLabelDeleted={(labelId, replacementLabelId) => setDraft((current) => current.labelId === labelId ? { ...current, labelId: replacementLabelId } : current)}
         open={labelManagerOpen}
         repository={todoRepository}

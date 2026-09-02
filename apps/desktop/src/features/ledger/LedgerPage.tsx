@@ -113,6 +113,11 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
         setDraft((current) => current.categoryId === command.categoryId ? { ...current, categoryId: "other" } : current);
       }
       await invalidateSnapshots();
+      if (command.type === "create") {
+        // ponytail: createCategory returns void; name is unique (dupes rejected), so match by name after the refetch above.
+        const created = queryClient.getQueryData<LedgerSnapshot>(ledgerQueryKey)?.categories.find((category) => category.name === command.input.name);
+        if (created) setDraft((current) => ({ ...current, categoryId: created.id }));
+      }
     },
     onError: async (error) => {
       setCategoryError(errorMessage(error));
