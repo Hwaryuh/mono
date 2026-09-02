@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { currentIsoDate } from "@mono/domain";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
@@ -44,14 +45,14 @@ describe("TimerPage", () => {
 
     expect(screen.getByText("03:00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^시작$/ })).toBeInTheDocument();
-    expect(sessionStore.read(new Date().toISOString().slice(0, 10))).toHaveLength(1);
+    expect(sessionStore.read(currentIsoDate())).toHaveLength(1);
   });
 
   it("건너뛰기는 세션을 기록하지 않는다", () => {
     const { sessionStore } = renderTimer({ focusMinutes: 1 });
     fireEvent.click(screen.getByRole("button", { name: "세션 건너뛰기" }));
 
-    expect(sessionStore.read(new Date().toISOString().slice(0, 10))).toHaveLength(0);
+    expect(sessionStore.read(currentIsoDate())).toHaveLength(0);
   });
 
   it("고른 할 일에 세션이 붙는다", async () => {
@@ -62,7 +63,7 @@ describe("TimerPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
 
-    const [session] = sessionStore.read(new Date().toISOString().slice(0, 10));
+    const [session] = sessionStore.read(currentIsoDate());
     expect(session.todoId).not.toBeNull();
     expect(within(target).getByText("1세션")).toBeInTheDocument();
   });
