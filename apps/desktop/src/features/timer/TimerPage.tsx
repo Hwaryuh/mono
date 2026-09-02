@@ -10,21 +10,22 @@ import {
   type TimerSession,
   type TimerSessionStore,
 } from "./timer-session-store";
+import {
+  LocalStorageTimerSettingsStore,
+  TIMER_SETTINGS_EVENT,
+  type TimerSettings,
+  type TimerSettingsStore,
+} from "./timer-settings-store";
 
-const FOCUS_MINUTES = 25;
-const SHORT_BREAK_MINUTES = 5;
-const LONG_BREAK_MINUTES = 15;
-const LONG_BREAK_EVERY = 4;
 const DAILY_GOAL = 8;
 const TICK_MS = 250;
 
 type Phase = "focus" | "shortBreak" | "longBreak";
 
-const phaseMinutes: Record<Phase, number> = {
-  focus: FOCUS_MINUTES,
-  shortBreak: SHORT_BREAK_MINUTES,
-  longBreak: LONG_BREAK_MINUTES,
-};
+function minutesOf(settings: TimerSettings, phase: Phase): number {
+  if (phase === "focus") return settings.focusMinutes;
+  return phase === "longBreak" ? settings.longBreakMinutes : settings.shortBreakMinutes;
+}
 
 function formatClock(seconds: number) {
   const safe = Math.max(0, seconds);
@@ -43,30 +44,37 @@ function dueOrder(item: TodoItem) {
 interface TimerPageProps {
   repository: TodoRepository;
   sessionStore?: TimerSessionStore;
+  settingsStore?: TimerSettingsStore;
 }
 
-export function TimerPage({ repository, sessionStore }: TimerPageProps) {
+export function TimerPage({ repository, sessionStore, settingsStore }: TimerPageProps) {
   const store = useMemo(
     () => sessionStore ?? LocalStorageTimerSessionStore.of(window.localStorage),
     [sessionStore],
   );
+  const preferences = useMemo(
+    () => settingsStore ?? LocalStorageTimerSettingsStore.of(window.localStorage),
+    [settingsStore],
+  );
   const today = currentIsoDate();
   const snapshotQuery = useQuery({ queryKey: ["todo"], queryFn: () => repository.getSnapshot() });
 
+  const [settings, setSettings] = useState<TimerSettings>(() => preferences.read());
   const [phase, setPhase] = useState<Phase>("focus");
-  const [remaining, setRemaining] = useState(FOCUS_MINUTES * 60);
+  const [remaining, setRemaining] = useState(() => preferences.read().focusMinutes * 60);
   // 실행 중이면 끝나는 시각(epoch ms). 남은 초를 매 틱 다시 계산해야 setInterval 오차가 쌓이지 않는다.
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const selectedTodoIdRef = useRef<string | null>(null);
 
-  const total = phaseMinutes[phase] * 60;
+  const total = minutesOf(settings, phase) * 60;
   const running = endsAt !== null;
 
   const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
   const candidates = [...(snapshotQuery.data?.items ?? [])]
     .filter((item) => !item.done)
+    .filter((item) => settings.todoScope === "all" || (item.dueDate !== null && item.dueDate <= today))
     .sort((first, second) => dueOrder(first).localeCompare(dueOrder(second)));
   const activeTodoId = selectedTodoId ?? candidates[0]?.id ?? null;
   selectedTodoIdRef.current = activeTodoId;
@@ -90,27 +98,47 @@ export function TimerPage({ repository, sessionStore }: TimerPageProps) {
     const timer = window.setInterval(tick, TICK_MS);
     tick();
     return () => window.clearInterval(timer);
-    // finishPhase 는 phase/sessions 를 함수형 갱신으로만 읽으므로 endsAt 만 의존한다.
+    // finishPhase 는 렌더마다 새로 만들어지므로 의존성에 넣지 않는다 — 값은 phase/settings 로 들어온다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endsAt]);
+  }, [endsAt, phase, settings]);
+
+  // 설정 모달은 같은 창에 있어서 storage 이벤트가 오지 않는다. 저장 시 발행되는 이벤트를 듣는다.
+  useEffect(() => {
+    const reload = () => {
+      const next = preferences.read();
+      setSettings(next);
+      // 돌고 있는 세션은 건드리지 않는다. 멈춰 있을 때만 새 길이로 맞춘다.
+      setEndsAt((current) => {
+        if (current === null) setRemaining(minutesOf(next, phase) * 60);
+        return current;
+      });
+    };
+    window.addEventListener(TIMER_SETTINGS_EVENT, reload);
+    return () => window.removeEventListener(TIMER_SETTINGS_EVENT, reload);
+  }, [preferences, phase]);
+
+  function startPhase(next: Phase, autoStart: boolean) {
+    const seconds = minutesOf(settings, next) * 60;
+    setPhase(next);
+    setRemaining(seconds);
+    setEndsAt(autoStart ? Date.now() + seconds * 1000 : null);
+  }
 
   function finishPhase(record: boolean) {
     if (phase !== "focus") {
-      setPhase("focus");
-      setRemaining(FOCUS_MINUTES * 60);
+      startPhase("focus", record && settings.autoStartFocus);
       return;
     }
     const done = record
       ? store.append(today, {
-        startedAt: startedAtOf(new Date(Date.now() - FOCUS_MINUTES * 60_000)),
+        startedAt: startedAtOf(new Date(Date.now() - settings.focusMinutes * 60_000)),
         todoId: selectedTodoIdRef.current,
-        minutes: FOCUS_MINUTES,
+        minutes: settings.focusMinutes,
       })
       : sessions;
     if (record) setSessions(done);
-    const nextPhase: Phase = done.length % LONG_BREAK_EVERY === 0 && done.length > 0 ? "longBreak" : "shortBreak";
-    setPhase(nextPhase);
-    setRemaining(phaseMinutes[nextPhase] * 60);
+    const nextPhase: Phase = done.length > 0 && done.length % settings.longBreakEvery === 0 ? "longBreak" : "shortBreak";
+    startPhase(nextPhase, record && settings.autoStartBreak);
   }
 
   function toggle() {

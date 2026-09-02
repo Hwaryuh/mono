@@ -24,6 +24,8 @@ import {
 import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-settings-store";
 import { checkServerCompatibility, serverBehindOf } from "../infrastructure/server/server-compatibility";
 import { CHECK_UPDATE_EVENT } from "../features/updater/AppUpdater";
+import { TimerSettingsPanel } from "../features/timer/TimerSettingsPanel";
+import { LocalStorageTimerSettingsStore } from "../features/timer/timer-settings-store";
 import { localeOptions, useI18n, type Locale } from "../i18n/i18n";
 import type { TranslationKey } from "../i18n/messages.ko";
 
@@ -73,7 +75,7 @@ function writeSidebarWidth(width: number): void {
 }
 
 type Theme = "light" | "dark";
-type SettingsSectionId = "appearance" | "server" | "ai" | "storage" | "about";
+type SettingsSectionId = "appearance" | "timer" | "server" | "ai" | "storage" | "about";
 
 interface SettingsSectionDefinition {
   id: SettingsSectionId;
@@ -83,6 +85,7 @@ interface SettingsSectionDefinition {
 
 const settingsSections: SettingsSectionDefinition[] = [
   { id: "appearance", labelKey: "settings.section.appearance", icon: "sun" },
+  { id: "timer", labelKey: "settings.section.timer", icon: "clock" },
   { id: "server", labelKey: "settings.section.server", icon: "server" },
   { id: "ai", labelKey: "settings.section.ai", icon: "sparkles" },
   { id: "storage", labelKey: "settings.section.storage", icon: "layers" },
@@ -90,6 +93,7 @@ const settingsSections: SettingsSectionDefinition[] = [
 ];
 
 const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(window.localStorage);
+const timerSettingsStore = LocalStorageTimerSettingsStore.of(window.localStorage);
 const defaultAiSettingsStore = new InMemoryAiSettingsStore();
 const defaultMediaMaintenance = new InMemoryMediaMaintenance();
 const defaultR2SettingsStore = new InMemoryR2SettingsStore();
@@ -497,6 +501,8 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
               </section>
             </>
           )}
+
+          {activeSection === "timer" && <TimerSettingsPanel store={timerSettingsStore} />}
 
           {activeSection === "server" && <ServerSettingsPanel store={serverSettingsStore} />}
 
