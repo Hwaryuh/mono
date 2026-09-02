@@ -6,6 +6,7 @@
 @import "../features/inbox/inbox.css";
 @import "../features/todo/todo.css";
 @import "../features/routine/routine.css";
+@import "../features/timer/timer.css";
 @import "../features/calendar/calendar.css";
 @import "../features/scrap/scrap.css";
 @import "../features/ledger/ledger.css";

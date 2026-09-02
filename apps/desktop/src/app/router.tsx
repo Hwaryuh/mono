@@ -15,6 +15,7 @@ import type { RoutineRepository } from "../features/routine/routine-repository";
 import { ScrapPage } from "../features/scrap/ScrapPage";
 import type { ScrapRepository } from "../features/scrap/scrap-repository";
 import { scrapViewStateStoreOf } from "../features/scrap/scrap-view-state-store";
+import { TimerPage } from "../features/timer/TimerPage";
 import { TodoPage } from "../features/todo/TodoPage";
 import type { TodoRepository } from "../features/todo/todo-repository";
 import { todoViewStateStoreOf } from "../features/todo/todo-view-state-store";
@@ -50,6 +51,7 @@ export function createAppRouter(
         { path: "inbox", element: <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={inboxRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} viewStateStore={inboxViewStateStore} /> },
         { path: "todo", element: <TodoPage repository={todoRepository} viewStateStore={todoViewStateStore} /> },
         { path: "routine", element: <RoutinePage repository={routineRepository} todoRepository={todoRepository} /> },
+        { path: "timer", element: <TimerPage repository={todoRepository} /> },
         { path: "calendar", element: <CalendarPage repository={calendarRepository} viewStateStore={calendarViewStateStore} /> },
         { path: "scrap", element: <ScrapPage repository={scrapRepository} viewStateStore={scrapViewStateStore} /> },
         { path: "ledger", element: <LedgerPage repository={ledgerRepository} viewStateStore={ledgerViewStateStore} /> },

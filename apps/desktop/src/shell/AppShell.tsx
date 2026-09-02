@@ -100,6 +100,7 @@ const routeMeta: Record<string, { titleKey: TranslationKey; icon: IconName; acti
   "/inbox": { titleKey: "app.navigation.inbox", icon: "inbox" },
   "/todo": { titleKey: "app.navigation.todo", icon: "todo", actionKey: "app.action.newTodo" },
   "/routine": { titleKey: "app.navigation.routine", icon: "routine", actionKey: "app.action.newRoutine" },
+  "/timer": { titleKey: "app.navigation.timer", icon: "clock" },
   "/calendar": { titleKey: "app.navigation.calendar", icon: "calendar", actionKey: "app.action.newCalendar" },
   "/scrap": { titleKey: "app.navigation.scrap", icon: "scrap", actionKey: "app.action.newScrap" },
   "/ledger": { titleKey: "app.navigation.ledger", icon: "wallet", actionKey: "app.action.newLedger" },
@@ -174,6 +175,7 @@ export function AppShell({
     items: [
       { to: "/todo", label: t("app.navigation.todo"), icon: "todo", badge: String(todoCount) },
       { to: "/routine", label: t("app.navigation.routine"), icon: "routine", badge: String(routineCount), nested: true },
+      { to: "/timer", label: t("app.navigation.timer"), icon: "clock" },
       { to: "/calendar", label: t("app.navigation.calendar"), icon: "calendar", badge: String(todayEventCount) },
       { to: "/scrap", label: t("app.navigation.scrap"), icon: "scrap" },
       { to: "/ledger", label: t("app.navigation.ledger"), icon: "wallet" },

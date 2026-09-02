@@ -1,0 +1,145 @@
+.timer-page {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  overflow: hidden;
+}
+
+.timer-stage {
+  min-width: 0;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+}
+
+.timer-digits {
+  font: 108px/0.92 var(--font-code);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.timer-digits--break { color: var(--color-text-muted); }
+
+.timer-bar {
+  width: 420px;
+  height: 5px;
+  margin-top: -6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-hover);
+}
+.timer-bar > span {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 240ms linear;
+}
+
+.timer-tally {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-faint);
+  font-size: 10.5px;
+}
+.timer-tally__count { font-variant-numeric: tabular-nums; }
+.timer-pips { display: flex; align-items: center; gap: 4px; }
+.timer-pip {
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  font-style: normal;
+}
+.timer-pip--done { border-color: var(--color-accent); background: var(--color-accent); }
+
+.timer-controls { display: flex; align-items: center; gap: 8px; }
+.timer-controls .ui-button { min-width: 132px; min-height: 40px; padding-inline: 18px; font-size: 12.5px; }
+.timer-controls .ui-icon-button { width: 40px; height: 40px; }
+
+.timer-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.timer-side__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 6px;
+  color: var(--color-text-faint);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.timer-tasks {
+  min-height: 0;
+  flex: 1;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.timer-task {
+  appearance: none;
+  min-height: 58px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 180ms ease-out, border-color 180ms ease-out;
+}
+.timer-task:hover { border-color: var(--color-border-strong); }
+.timer-task--active { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.timer-task--active > svg { color: var(--color-accent); }
+.timer-task > i { width: 6px; height: 6px; flex: none; border-radius: 50%; }
+.timer-task > svg { flex: none; }
+.timer-task__copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.timer-task__copy > strong { overflow: hidden; font-size: 12.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.timer-task__copy > span { display: flex; align-items: center; gap: 8px; color: var(--color-text-faint); font-size: 10px; }
+.timer-task__count { font-variant-numeric: tabular-nums; }
+.timer-tasks__empty {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-faint);
+  font-size: 10.5px;
+}
+.timer-tasks__empty > svg { color: var(--color-border-strong); }
+
+.timer-log {
+  flex: none;
+  max-height: 40%;
+  padding-bottom: 12px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+.timer-log__empty { margin: 0; padding: 0 12px; color: var(--color-text-faint); font-size: 10.5px; }
+.timer-log__row { padding: 0 12px 7px; display: flex; align-items: center; gap: 8px; font-size: 10.5px; }
+.timer-log__time { color: var(--color-text-muted); font-family: var(--font-code); font-variant-numeric: tabular-nums; }
+.timer-log__title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-log__minutes { color: var(--color-text-faint); font-variant-numeric: tabular-nums; }

@@ -5,6 +5,7 @@ export const koMessages = {
   "app.navigation.inbox": "수집함",
   "app.navigation.todo": "할 일",
   "app.navigation.routine": "루틴",
+  "app.navigation.timer": "타이머",
   "app.navigation.calendar": "일정",
   "app.navigation.scrap": "스크랩",
   "app.navigation.ledger": "가계부",
