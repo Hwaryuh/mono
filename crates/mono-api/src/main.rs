@@ -18,6 +18,9 @@ enum Command {
         destination: PathBuf,
         keep: Option<usize>,
     },
+    MirrorMedia {
+        destination: PathBuf,
+    },
     Help,
 }
 
@@ -53,13 +56,23 @@ where
             }
             Ok(Command::Backup { destination, keep })
         }
+        Some("mirror-media") => {
+            let destination = arguments
+                .next()
+                .map(PathBuf::from)
+                .ok_or_else(|| "mirror-media 대상 디렉터리가 필요합니다.".to_string())?;
+            if arguments.next().is_some() {
+                return Err("mirror-media 인수가 너무 많습니다.".into());
+            }
+            Ok(Command::MirrorMedia { destination })
+        }
         Some(command) => Err(format!("알 수 없는 명령입니다: {command}")),
     }
 }
 
 fn print_help() {
     println!(
-        "mono-api\n\nUSAGE:\n  mono-api [serve]\n  mono-api backup <directory> [--keep <count>]\n\nENV:\n  MONO_BIND_ADDR\n  MONO_DB_PATH\n  MONO_SECRET_KEY_PATH\n  MONO_CORS_ORIGINS"
+        "mono-api\n\nUSAGE:\n  mono-api [serve]\n  mono-api backup <directory> [--keep <count>]\n  mono-api mirror-media <directory>\n\nENV:\n  MONO_BIND_ADDR\n  MONO_DB_PATH\n  MONO_SECRET_KEY_PATH\n  MONO_CORS_ORIGINS"
     );
 }
 
@@ -115,6 +128,24 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Ok(Command::MirrorMedia { destination }) => {
+            let database_path = PathBuf::from(env_or("MONO_DB_PATH", "mono.sqlite"));
+            let secret_key_path = PathBuf::from(env_or("MONO_SECRET_KEY_PATH", "mono.secret.key"));
+            match mono_api::mirror_media(&database_path, &secret_key_path, &destination) {
+                Ok(mono_api::MediaMirrorOutcome::Skipped) => {
+                    println!("mirror-media: R2 자격증명 미설정 — 건너뜀");
+                    ExitCode::SUCCESS
+                }
+                Ok(mono_api::MediaMirrorOutcome::Mirrored { downloaded, skipped }) => {
+                    println!("mirror-media: 받음 {downloaded} · 유지 {skipped}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("mirror-media failed: {error}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Ok(Command::Help) => {
             print_help();
             ExitCode::SUCCESS
@@ -145,6 +176,22 @@ mod tests {
                 assert_eq!(keep, Some(14));
             }
             _ => panic!("backup 명령이 아님"),
+        }
+    }
+
+    #[test]
+    fn parses_mirror_media_destination() {
+        let command = parse_command(
+            ["mirror-media", "/var/backups/mono/media"]
+                .into_iter()
+                .map(String::from),
+        )
+        .unwrap();
+        match command {
+            Command::MirrorMedia { destination } => {
+                assert_eq!(destination, PathBuf::from("/var/backups/mono/media"));
+            }
+            _ => panic!("mirror-media 명령이 아님"),
         }
     }
 

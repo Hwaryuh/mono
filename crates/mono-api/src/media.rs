@@ -334,6 +334,57 @@ fn tag_text<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
     Some(&xml[start..start + rel_end])
 }
 
+// ---------- 오프사이트 백업용 미러 ----------
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct MediaMirror {
+    pub(crate) downloaded: usize,
+    pub(crate) skipped: usize,
+}
+
+// R2 미디어 버킷을 로컬 디렉터리로 증분 미러링한다. DB 백업 번들 옆에 두면
+// systemd의 rclone copy가 그대로 오프사이트로 쓸어담는다.
+// ponytail: copy-only, prune 없음 — list_all은 1000개에서 잘리므로 삭제를 넣으면
+//           1000번째 이후 로컬 사본을 날릴 수 있다. 고아 미러 파일은 무해한 용량일 뿐,
+//           원본 정리는 앱의 미디어 GC가 R2에서 한다.
+pub(crate) async fn mirror_bucket(
+    config: &R2Config,
+    dir: &std::path::Path,
+) -> ApiResult<MediaMirror> {
+    let client = R2Client::from_config(config);
+    let remote = client.list_all().await?;
+    std::fs::create_dir_all(dir).map_err(mirror_io_err)?;
+
+    let mut result = MediaMirror::default();
+    for (key, size) in &remote {
+        if require_media_id(key).is_err() {
+            continue; // probe 객체 등 uuid 아닌 키는 건너뛴다
+        }
+        let path = dir.join(key);
+        if mirror_is_current(&path, *size) {
+            result.skipped += 1;
+            continue;
+        }
+        let Some((bytes, _)) = client.get(key).await? else {
+            continue;
+        };
+        std::fs::write(&path, &bytes).map_err(mirror_io_err)?;
+        result.downloaded += 1;
+    }
+    Ok(result)
+}
+
+// 로컬 파일이 있고 크기가 R2와 같으면 이미 받은 것으로 본다(R2 객체는 불변).
+fn mirror_is_current(path: &std::path::Path, remote_size: i64) -> bool {
+    std::fs::metadata(path)
+        .map(|meta| meta.len() as i64 == remote_size)
+        .unwrap_or(false)
+}
+
+fn mirror_io_err(error: std::io::Error) -> ApiError {
+    ApiError::BadRequest(format!("미디어 미러 파일 오류: {error}"))
+}
+
 // ---------- 미디어 참조 (media-reference-repository.ts) ----------
 
 fn referenced_media_ids(conn: &Connection) -> ApiResult<HashSet<String>> {
@@ -614,5 +665,19 @@ mod tests {
             client_from(&state),
             Err(ApiError::BadRequest(m)) if m.contains("R2 자격증명이 설정되지 않았습니다")
         ));
+    }
+
+    #[test]
+    fn mirror_skips_only_when_local_size_matches() {
+        let dir = std::env::temp_dir().join(format!("mono-mirror-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("obj");
+        std::fs::write(&path, b"abc").unwrap();
+
+        assert!(mirror_is_current(&path, 3));
+        assert!(!mirror_is_current(&path, 4));
+        assert!(!mirror_is_current(&dir.join("missing"), 3));
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

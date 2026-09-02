@@ -137,6 +137,43 @@ pub fn serve(config: Config) -> Result<(), ServeError> {
     })
 }
 
+/// 미디어 미러 결과. R2 자격증명이 없으면 `Skipped`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MediaMirrorOutcome {
+    Skipped,
+    Mirrored { downloaded: usize, skipped: usize },
+}
+
+/// 오프사이트 백업용 — R2 미디어 버킷을 `dir`로 증분 미러링한다.
+/// DB 백업 번들 옆(`<backup-root>/media`)에 두면 systemd의 rclone copy가 함께 올린다.
+/// R2 자격증명이 없으면 아무것도 하지 않고 `Skipped`를 돌려준다(로컬 전용 배포).
+pub fn mirror_media(
+    db_path: &std::path::Path,
+    secret_key_path: &std::path::Path,
+    dir: &std::path::Path,
+) -> Result<MediaMirrorOutcome, String> {
+    let crypto = SecretCrypto::load_or_create(secret_key_path).map_err(|e| e.to_string())?;
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .map_err(|e| format!("DB 열기 실패: {e}"))?;
+    let Some(config) = secret::get_r2_config(&conn, &crypto).map_err(|e| e.to_string())? else {
+        return Ok(MediaMirrorOutcome::Skipped);
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("런타임 생성 실패: {e}"))?;
+    let mirror = runtime
+        .block_on(media::mirror_bucket(&config, dir))
+        .map_err(|e| e.to_string())?;
+    Ok(MediaMirrorOutcome::Mirrored {
+        downloaded: mirror.downloaded,
+        skipped: mirror.skipped,
+    })
+}
+
 fn build_router(
     database: db::Db,
     crypto: Arc<SecretCrypto>,

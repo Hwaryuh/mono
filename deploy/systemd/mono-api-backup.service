@@ -9,8 +9,13 @@ Group=mono
 Environment=HOME=/tmp
 EnvironmentFile=/etc/mono/mono.env
 ExecStart=/opt/mono/mono-api backup /var/backups/mono --keep 14
+# R2 미디어 미러: 앱에 R2 자격증명이 설정돼 있으면 사진·영상 원본을 번들 옆
+# /var/backups/mono/media 로 증분 복사한다(R2 객체는 불변 — 크기가 같으면 재다운로드 없음).
+# DB 백업만으로는 R2 버킷 손실 시 죽은 mediaId만 남으므로 이걸로 구멍을 메운다.
+# 자격증명 미설정이면 건너뛰고 성공 처리. copy-only라 prune 없음.
+ExecStartPost=/opt/mono/mono-api mirror-media /var/backups/mono/media
 # 오프사이트 복제: MONO_BACKUP_REMOTE(rclone 원격 경로, 예 "r2:my-bucket/mono")가 설정돼
-# 있으면 방금 만든 번들 디렉터리를 원격으로 올린다. 미설정이면 조용히 건너뛴다.
+# 있으면 방금 만든 번들 디렉터리(+media/)를 원격으로 올린다. 미설정이면 조용히 건너뛴다.
 # 원격 자격증명은 /etc/mono/rclone.conf(0600, owner mono). 예시는 deploy/rclone.conf.example.
 # ponytail: copy(=업로드만, 삭제 없음). 로컬 prune 버그가 원격을 지우지 못한다.
 #           원격 보존은 버킷의 Object Lifecycle Rule로 서버 측에서 처리(예: 30일 후 만료).
