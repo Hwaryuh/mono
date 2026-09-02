@@ -85,12 +85,18 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
 
   useEffect(() => {
     if (endsAt === null) return;
+    // setEndsAt(null) 만으로는 이 effect 가 정리되기 전에 다음 틱이 또 돌아 세션이 여러 번 기록된다.
+    // 끝나는 순간 이 interval 을 직접 멈추고 플래그로 재진입을 막는다.
+    let finished = false;
     const tick = () => {
+      if (finished) return;
       const left = Math.ceil((endsAt - Date.now()) / 1000);
       if (left > 0) {
         setRemaining(left);
         return;
       }
+      finished = true;
+      window.clearInterval(timer);
       setEndsAt(null);
       setRemaining(0);
       finishPhase(true);
