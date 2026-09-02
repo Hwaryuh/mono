@@ -31,7 +31,7 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
   }
 
   async save({ mode, remoteUrl, token }: SaveServerConnectionInput): Promise<ServerConnection> {
-    if (!isTauri()) throw new Error(translate("server.text.006"));
+    if (!isTauri()) throw new Error(translate("server.preview.settingsUnsupported"));
     return invoke<ServerConnection>("save_server_connection", {
       mode,
       apiBaseUrl: mode === "remote" ? trimBaseUrl(remoteUrl ?? "") : null,
@@ -45,9 +45,9 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
 
     // 1. 도달 가능성 + mono 서버인지 — /health는 인증 없음.
     const health = await this.fetchWithTimeout(`${base}/health`);
-    if (!health.ok) throw new Error(translate("server.text.007", { value1: health.status }));
+    if (!health.ok) throw new Error(translate("server.error.httpStatus", { status: health.status }));
     if ((await health.text()).trim() !== "ok") {
-      throw new Error(translate("server.text.008"));
+      throw new Error(translate("server.validation.notMonoApi"));
     }
 
     // 2. 토큰 유효성 — 인증 걸린 엔드포인트가 401이면 토큰이 없거나 틀린 것.
@@ -56,7 +56,7 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
       bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : {},
     );
     if (authed.status === 401) {
-      throw new Error(bearer ? translate("server.text.004") : translate("server.text.005"));
+      throw new Error(bearer ? translate("server.auth.invalidToken") : translate("server.auth.tokenRequired"));
     }
   }
 
@@ -66,14 +66,14 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
     try {
       return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
     } catch {
-      throw new Error(translate("server.text.003"));
+      throw new Error(translate("server.error.unreachable"));
     } finally {
       clearTimeout(timer);
     }
   }
 
   async restart(): Promise<void> {
-    if (!isTauri()) throw new Error(translate("server.text.009"));
+    if (!isTauri()) throw new Error(translate("server.preview.restartUnsupported"));
     await invoke("restart_app");
   }
 }

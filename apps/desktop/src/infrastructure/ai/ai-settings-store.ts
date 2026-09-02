@@ -26,7 +26,7 @@ export class InMemoryAiSettingsStore implements AiSettingsStore {
   }
 
   async setApiKey(provider: AiProviderId, apiKey: string): Promise<void> {
-    if (!apiKey.trim()) throw new Error(translate("ai.text.001", { value1: PROVIDER_LABEL[provider] }));
+    if (!apiKey.trim()) throw new Error(translate("ai.validation.apiKeyRequired", { provider: PROVIDER_LABEL[provider] }));
     this.keys[provider] = apiKey;
   }
 
@@ -35,7 +35,7 @@ export class InMemoryAiSettingsStore implements AiSettingsStore {
   }
 
   async testConnection(provider: AiProviderId): Promise<void> {
-    if (this.keys[provider] === null) throw new Error(translate("ai.text.002", { value1: PROVIDER_LABEL[provider] }));
+    if (this.keys[provider] === null) throw new Error(translate("ai.error.apiKeyNotConfigured", { provider: PROVIDER_LABEL[provider] }));
   }
 
   async getActiveProvider(): Promise<AiProviderId> {

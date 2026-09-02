@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { I18nProvider, LOCALE_STORAGE_KEY, readLocale, useI18n } from "./i18n";
+import { koMessages } from "./messages.ko";
 
 describe("i18n", () => {
   it("지원하지 않는 저장값은 한국어로 복구한다", () => {
@@ -19,5 +20,13 @@ describe("i18n", () => {
     act(() => result.current.setLocale("ko"));
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("ko");
     expect(document.documentElement).toHaveAttribute("lang", "ko-KR");
+  });
+
+  it("의미가 드러나는 키와 독립된 메시지를 유지한다", () => {
+    for (const [key, message] of Object.entries(koMessages)) {
+      expect(key).not.toMatch(/\.text\.\d+$/);
+      expect(message).not.toMatch(/\{value\d+\}/);
+      expect(message).toBe(message.trim());
+    }
   });
 });

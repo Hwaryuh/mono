@@ -6,10 +6,10 @@ export type SortKey = "recent" | "oldest" | "title" | "comments";
 export const sortKeys: SortKey[] = ["recent", "oldest", "title", "comments"];
 
 export const sortLabels: Record<SortKey, string> = {
-  recent: translate("scrap.text.001"),
-  oldest: translate("scrap.text.002"),
-  title: translate("scrap.text.003"),
-  comments: translate("scrap.text.004"),
+  recent: translate("scrap.sort.newest"),
+  oldest: translate("scrap.sort.oldest"),
+  title: translate("scrap.sort.name"),
+  comments: translate("scrap.sort.mostComments"),
 };
 
 export const sortStorageKey = "mono:scrap-sort";

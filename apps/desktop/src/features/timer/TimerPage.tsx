@@ -164,7 +164,7 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
     finishPhase(false);
   }
 
-  const toggleLabel = running ? translate("timer.text.001") : remaining === total ? translate("calendar.text.027") : translate("timer.text.002");
+  const toggleLabel = running ? translate("timer.action.pause") : remaining === total ? translate("timer.action.start") : translate("timer.action.resume");
 
   return (
     <div className="timer-page">
@@ -175,14 +175,14 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
         </div>
 
         <div className="timer-tally">
-          <span>{translate("todo.text.003")}</span>
+          <span>{translate("todo.filter.today")}</span>
           <div className="timer-pips">
             {Array.from({ length: DAILY_GOAL }, (_, index) => (
               <i className={index < sessions.length ? "timer-pip timer-pip--done" : "timer-pip"} key={index} />
             ))}
           </div>
           <span className="timer-tally__count">{sessions.length} / {DAILY_GOAL}</span>
-          {focusedMinutes > 0 && <span className="timer-tally__count">{Math.floor(focusedMinutes / 60)}{translate("timer.text.003")}{focusedMinutes % 60}{translate("timer.text.004")}</span>}
+          {focusedMinutes > 0 && <span className="timer-tally__count">{translate("timer.duration.hoursMinutes", { hours: Math.floor(focusedMinutes / 60), minutes: focusedMinutes % 60 })}</span>}
         </div>
 
         <div className="timer-controls">
@@ -190,10 +190,10 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
             <Icon name={running ? "pause" : "play"} size={15} strokeWidth={1.8} />
             {toggleLabel}
           </Button>
-          <IconButton aria-label={translate("timer.text.005")} onClick={skip} title={translate("timer.text.005")} variant="secondary">
+          <IconButton aria-label={translate("timer.action.skipSession")} onClick={skip} title={translate("timer.action.skipSession")} variant="secondary">
             <Icon name="skip" size={15} />
           </IconButton>
-          <IconButton aria-label={translate("timer.text.006")} onClick={reset} title={translate("timer.text.006")} variant="secondary">
+          <IconButton aria-label={translate("timer.action.reset")} onClick={reset} title={translate("timer.action.reset")} variant="secondary">
             <Icon name="sync" size={15} />
           </IconButton>
         </div>
@@ -221,8 +221,8 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
                 <span className="timer-task__copy">
                   <strong>{item.title}</strong>
                   <span>
-                    <span>{label?.name ?? translate("timer.text.007")}</span>
-                    <span className="timer-task__count">{count === 0 ? translate("timer.text.008") : translate("timer.text.009", { value1: count })}</span>
+                    <span>{label?.name ?? translate("timer.todo.noLabel")}</span>
+                    <span className="timer-task__count">{count === 0 ? translate("timer.todo.noSessions") : translate("timer.todo.sessionCount", { count })}</span>
                   </span>
                 </span>
                 {item.id === activeTodoId && <Icon name="clock" size={16} />}
@@ -232,19 +232,19 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
           {candidates.length === 0 && (
             <div className="timer-tasks__empty">
               <Icon name="todo" size={22} strokeWidth={1.4} />
-              <span>{translate("timer.text.010")}</span>
+              <span>{translate("timer.todo.empty")}</span>
             </div>
           )}
         </div>
 
         <div className="timer-log">
-          <div className="timer-side__title">{translate("timer.text.011")}</div>
-          {sessions.length === 0 && <p className="timer-log__empty">{translate("timer.text.012")}</p>}
+          <div className="timer-side__title">{translate("timer.history.title")}</div>
+          {sessions.length === 0 && <p className="timer-log__empty">{translate("timer.history.empty")}</p>}
           {sessions.map((session, index) => (
             <div className="timer-log__row" key={`${session.startedAt}-${index}`}>
               <span className="timer-log__time">{session.startedAt}</span>
-              <span className="timer-log__title">{session.todoId ? titles.get(session.todoId) ?? translate("timer.text.013") : translate("timer.text.014")}</span>
-              <span className="timer-log__minutes">{session.minutes}{translate("timer.text.004")}</span>
+              <span className="timer-log__title">{session.todoId ? titles.get(session.todoId) ?? translate("timer.history.deletedTodo") : translate("timer.history.noTodo")}</span>
+              <span className="timer-log__minutes">{translate("timer.duration.minutes", { minutes: session.minutes })}</span>
             </div>
           ))}
         </div>

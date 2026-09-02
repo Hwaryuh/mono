@@ -69,21 +69,21 @@ export function AppUpdater() {
   return (
     <Modal icon="sparkles" onClose={() => { if (dismissable) setPhase("idle"); }} open title={translate("settings.about.update")}>
       <div className="app-updater">
-        {phase === "checking" && <p role="status">{translate("updater.text.001")}</p>}
-        {phase === "uptodate" && <p role="status">{translate("updater.text.002")}</p>}
-        {phase === "error" && <p role="alert">{translate("updater.text.003", { error: error ?? "" })}</p>}
+        {phase === "checking" && <p role="status">{translate("updater.status.checking")}</p>}
+        {phase === "uptodate" && <p role="status">{translate("updater.status.upToDate")}</p>}
+        {phase === "error" && <p role="alert">{translate("updater.status.failed", { error: error ?? "" })}</p>}
         {update && (phase === "available" || phase === "downloading" || phase === "ready") && (
           <>
             <p>
-              {translate("updater.text.004", { version: update.version, currentVersion: update.currentVersion })}
+              {translate("updater.status.available", { version: update.version, currentVersion: update.currentVersion })}
             </p>
             {update.notes && <pre className="app-updater__notes">{update.notes}</pre>}
-            {phase === "downloading" && <p role="status">{translate("updater.text.006", { progress })}</p>}
-            {phase === "ready" && <p role="status">{translate("updater.text.007")}</p>}
+            {phase === "downloading" && <p role="status">{translate("updater.status.downloading", { progress })}</p>}
+            {phase === "ready" && <p role="status">{translate("updater.status.restarting")}</p>}
             {phase === "available" && (
               <div className="app-updater__actions">
-                <Button onClick={() => setPhase("idle")} type="button">{translate("updater.text.008")}</Button>
-                <Button onClick={() => void install()} type="button" variant="primary">{translate("updater.text.009")}</Button>
+                <Button onClick={() => setPhase("idle")} type="button">{translate("updater.action.later")}</Button>
+                <Button onClick={() => void install()} type="button" variant="primary">{translate("updater.action.install")}</Button>
               </div>
             )}
           </>

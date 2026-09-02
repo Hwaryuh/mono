@@ -26,11 +26,11 @@ type Draft = {
 };
 
 const statusMeta: Record<TodoStatus, { name: string; title: string; icon: IconName }> = {
-  all: { name: translate("todo.text.001"), title: translate("todo.text.002"), icon: "layers" },
-  today: { name: translate("todo.text.003"), title: translate("dashboard.text.005"), icon: "clock" },
-  upcoming: { name: translate("todo.text.004"), title: translate("todo.text.005"), icon: "calendar" },
-  overdue: { name: translate("todo.text.006"), title: translate("todo.text.007"), icon: "alert" },
-  done: { name: translate("todo.text.008"), title: translate("todo.text.009"), icon: "check" },
+  all: { name: translate("todo.filter.all"), title: translate("todo.filter.allLabel"), icon: "layers" },
+  today: { name: translate("todo.filter.today"), title: translate("dashboard.todayTodos.title"), icon: "clock" },
+  upcoming: { name: translate("todo.filter.upcoming"), title: translate("todo.filter.upcomingLabel"), icon: "calendar" },
+  overdue: { name: translate("todo.filter.overdue"), title: translate("todo.filter.overdueLabel"), icon: "alert" },
+  done: { name: translate("todo.filter.completed"), title: translate("todo.filter.completedLabel"), icon: "check" },
 };
 
 function statusOf(item: TodoItem, today: string): TodoStatus {
@@ -62,7 +62,7 @@ function draftOf(item: TodoItem): Draft {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("scrap.text.010");
+  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 export function TodoPage({ repository, viewStateStore }: { repository: TodoRepository; viewStateStore?: TodoViewStateStore }) {
@@ -140,7 +140,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   }, [deleteOpen, editorItem, snapshotQuery.data, status]);
 
   if (snapshotQuery.isPending) return <TodoLoading />;
-  if (snapshotQuery.isError) return <div className="todo-state" role="alert"><Icon name="alert" size={18} />{translate("todo.text.010")}</div>;
+  if (snapshotQuery.isError) return <div className="todo-state" role="alert"><Icon name="alert" size={18} />{translate("todo.error.load")}</div>;
   const snapshot = snapshotQuery.data;
 
   const now = Date.now();
@@ -157,7 +157,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   const visibleItems = status === "all"
     ? [...filteredItems].sort((left, right) => Number(left.done) - Number(right.done))
     : filteredItems;
-  const title = labelIds.length > 0 ? translate("todo.text.011") : statusMeta[status].title;
+  const title = labelIds.length > 0 ? translate("todo.list.filteredLabel") : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
@@ -244,17 +244,17 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
       dueTime: draft.dueDate && draft.dueTime ? draft.dueTime : null,
       note: draft.note.trim(),
     };
-    if (!input.title) { setFormError(translate("scrap.text.013")); return; }
-    if (!input.labelId) { setFormError(translate("scrap.text.014")); return; }
+    if (!input.title) { setFormError(translate("common.validation.titleRequired")); return; }
+    if (!input.labelId) { setFormError(translate("common.validation.labelRequired")); return; }
     if (editorItem === "new") createMutation.mutate(input);
     else if (editorItem) updateMutation.mutate({ itemId: editorItem.id, input, expectedVersion: editorItem.version ?? 1 });
   }
 
   return (
     <div className="todo-page">
-      <aside aria-label={translate("todo.text.012")} className="todo-filters">
+      <aside aria-label={translate("todo.filter.statusLabel")} className="todo-filters">
         <fieldset className="todo-filter-group">
-          <legend>{translate("settings.text.022")}</legend>
+          <legend>{translate("common.status.label")}</legend>
           {todoStatusOrder.map((statusId) => {
             const meta = statusMeta[statusId];
             return (
@@ -274,10 +274,10 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
             );
           })}
         </fieldset>
-        <div aria-label={translate("todo.text.013")} className="todo-filter-group todo-filter-group--labels" role="group">
+        <div aria-label={translate("todo.filter.labelLabel")} className="todo-filter-group todo-filter-group--labels" role="group">
           <div className="todo-filter-group__title">
-            <span>{translate("scrap.text.040")}</span>
-            <button aria-label={translate("scrap.text.042")} className="todo-label-manage-trigger" onClick={openLabelManager} type="button">{translate("scrap.text.041")}</button>
+            <span>{translate("common.field.label")}</span>
+            <button aria-label={translate("common.labels.manage")} className="todo-label-manage-trigger" onClick={openLabelManager} type="button">{translate("common.action.manage")}</button>
           </div>
           {snapshot.labels.map((label) => {
             const selected = labelIds.includes(label.id);
@@ -301,11 +301,11 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
 
       <section className="todo-content">
         <header className="todo-list-header">
-          <strong>{title}</strong><span>{visibleItems.length}{translate("scrap.text.044")}</span>
+          <strong>{title}</strong><span>{visibleItems.length}{translate("common.unit.items")}</span>
           {labelIds.map((labelId) => {
             const label = snapshot.labels.find((candidate) => candidate.id === labelId);
             return label && (
-              <button aria-label={translate("todo.text.014", { value1: label.name })} className="todo-active-filter" key={label.id} onClick={() => toggleLabel(label.id)} type="button">
+              <button aria-label={translate("todo.filter.clearLabel", { label: label.name })} className="todo-active-filter" key={label.id} onClick={() => toggleLabel(label.id)} type="button">
                 <span style={{ backgroundColor: label.color }} />{label.name}<Icon name="close" size={10} strokeWidth={2.6} />
               </button>
             );
@@ -317,10 +317,10 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
             return <TodoRow item={item} key={item.id} label={label} onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)} repository={repository} snapshot={snapshot} />;
           })}
           {visibleItems.length === 0 && snapshot.items.length > 0 && (
-            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.text.015")}</strong><span>{translate("todo.text.016")}</span></div>
+            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.filteredTitle")}</strong><span>{translate("todo.empty.filteredDescription")}</span></div>
           )}
           {snapshot.items.length === 0 && (
-            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.text.017")}</strong><span>{translate("todo.text.018")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newTodo")}</Button></div>
+            <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.title")}</strong><span>{translate("todo.empty.description")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newTodo")}</Button></div>
           )}
         </div>
       </section>
@@ -328,31 +328,31 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
       <Modal
         className="todo-editor-modal"
         footer={<>
-          {activeEditorItem && <Button className="todo-editor__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("settings.text.029")}</Button>}
-          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("scrap.text.025")}</Button>
-          <Button form="todo-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.text.013") : translate("settings.text.021")}</Button>
+          {activeEditorItem && <Button className="todo-editor__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
+          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
+          <Button form="todo-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
         </>}
         icon="todo"
         onClose={closeEditor}
         open={editorItem !== null}
-        title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.text.019")}
+        title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.action.edit")}
       >
         <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
-          <label><span>{translate("todo.text.020")}<b>{translate("todo.text.021")}</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
+          <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
           <div className="todo-editor__field">
-            <div className="todo-editor__label-legend"><span>{translate("scrap.text.040")}</span><button onClick={openLabelManager} type="button">{translate("scrap.text.041")}</button></div>
+            <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={openLabelManager} type="button">{translate("common.action.manage")}</button></div>
             <Select
-              label={translate("scrap.text.040")}
+              label={translate("common.field.label")}
               onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))}
               options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))}
               value={draft.labelId}
             />
           </div>
           <div className="todo-editor__due">
-            <fieldset><legend>{translate("inbox.text.032")}</legend><DatePicker label={translate("inbox.text.032")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
-            <label><span>{translate("todo.text.022")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.text.023")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
+            <fieldset><legend>{translate("todo.field.dueDate")}</legend><DatePicker label={translate("todo.field.dueDate")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
+            <label><span>{translate("todo.field.time")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.field.dueTime")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
           </div>
-          <label><span>{translate("scrap.text.007")}</span><TextArea onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={4} value={draft.note} /></label>
+          <label><span>{translate("common.field.note")}</span><TextArea onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={4} value={draft.note} /></label>
           {formError && !deleteOpen && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
@@ -375,13 +375,13 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
 
       <Modal
         className="todo-delete-modal"
-        footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("scrap.text.025")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeEditorItem && deleteMutation.mutate(activeEditorItem.id)} variant="danger">{translate("settings.text.029")}</Button></>}
+        footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeEditorItem && deleteMutation.mutate(activeEditorItem.id)} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteOpen(false); }}
         open={deleteOpen}
-        title={translate("todo.text.024")}
+        title={translate("todo.delete.question")}
       >
-        <p>{translate("todo.text.025")}</p>
+        <p>{translate("todo.delete.warning")}</p>
         <blockquote>{activeEditorItem?.title}</blockquote>
         {formError && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
@@ -411,14 +411,14 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
   const status = statusOf(item, snapshot.today);
   const justCompleted = item.done && !previousDoneRef.current;
   const dueText = item.done
-    ? translate("todo.text.026", { value1: item.completedAt ? formatCompletedAt(item.completedAt) : translate("todo.text.033") })
+    ? translate("todo.status.completedAt", { time: item.completedAt ? formatCompletedAt(item.completedAt) : translate("todo.time.justNow") })
     : !item.dueDate
-      ? translate("inbox.text.022")
+      ? translate("common.date.noDueDate")
       : item.dueDate === snapshot.today
-        ? item.dueTime ? translate("todo.text.027", { value1: item.dueTime }) : translate("todo.text.003")
+        ? item.dueTime ? translate("todo.status.dueTodayAt", { time: item.dueTime }) : translate("todo.filter.today")
         : status === "overdue"
-          ? translate("todo.text.028", { value1: daysBetween(item.dueDate, snapshot.today) })
-          : translate("todo.text.029", { value1: formatDate(item.dueDate), value2: item.dueTime ? ` ${item.dueTime}` : "" });
+          ? translate("todo.status.overdueByDays", { days: daysBetween(item.dueDate, snapshot.today) })
+          : translate("todo.status.dueAt", { date: formatDate(item.dueDate), time: item.dueTime ? ` ${item.dueTime}` : "" });
 
   useLayoutEffect(() => {
     const row = rowRef.current;
@@ -443,9 +443,9 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
       className={`todo-item ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
       ref={rowRef}
     >
-      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.text.032", { value1: item.title, value2: item.done ? translate("routine.text.038") : translate("todo.text.008") })} onCheckedChange={() => toggleMutation.mutate()} />
-      <button aria-label={translate("todo.text.030", { value1: item.title })} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
-        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.text.031")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
+      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: item.title, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
+      <button aria-label={translate("todo.action.editLabel", { title: item.title })} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
+        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
         <Icon name="chevronRight" size={13} />
       </button>
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
@@ -471,5 +471,5 @@ function daysBetween(from: string, to: string) {
 }
 
 function TodoLoading() {
-  return <div aria-label={translate("todo.text.032")} className="todo-page todo-page--loading"><aside className="todo-filters" /><div className="todo-list">{Array.from({ length: 5 }, (_, index) => <div className="todo-item todo-item--skeleton" key={index} />)}</div></div>;
+  return <div aria-label={translate("todo.loading")} className="todo-page todo-page--loading"><aside className="todo-filters" /><div className="todo-list">{Array.from({ length: 5 }, (_, index) => <div className="todo-item todo-item--skeleton" key={index} />)}</div></div>;
 }

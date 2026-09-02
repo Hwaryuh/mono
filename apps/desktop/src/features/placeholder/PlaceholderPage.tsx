@@ -6,12 +6,12 @@ export function PlaceholderPage({ name }: { name: string }) {
   return (
     <div className="placeholder-page">
       <Card className="placeholder-page__card">
-        <span className="placeholder-page__eyebrow">{translate("placeholder.text.001")}</span>
+        <span className="placeholder-page__eyebrow">{translate("placeholder.scope.title")}</span>
         <h1>{name}</h1>
-        <p>{translate("placeholder.text.002")}</p>
+        <p>{translate("placeholder.scope.description")}</p>
         <Link to="/dashboard">
           <Icon name="arrowLeft" size={13} />
-          {translate("placeholder.text.003")}</Link>
+          {translate("placeholder.action.dashboard")}</Link>
       </Card>
     </div>
   );

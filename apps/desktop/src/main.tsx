@@ -81,6 +81,6 @@ async function start() {
 start().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   const root = document.getElementById("root");
-  if (root) root.textContent = translate("app.text.001", { value1: message });
+  if (root) root.textContent = translate("app.error.bootstrap", { message });
   console.error(error);
 });

@@ -555,38 +555,38 @@ function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMai
 
   return (
     <>
-      <SettingsHeading description={translate("settings.text.001")} title={translate("settings.section.storage")} />
-      <section aria-label={translate("settings.text.002")} className="settings-group settings-ai">
+      <SettingsHeading description={translate("settings.storage.description")} title={translate("settings.section.storage")} />
+      <section aria-label={translate("settings.storage.cleanupTitle")} className="settings-group settings-ai">
         <header>
-          <strong>{translate("settings.text.003")}</strong>
-          <span>{translate("settings.text.004")}</span>
+          <strong>{translate("settings.storage.unusedMedia")}</strong>
+          <span>{translate("settings.storage.unusedMediaDescription")}</span>
         </header>
         <div className="settings-ai__status">
-          <span>{translate("settings.text.005")}</span>
+          <span>{translate("settings.storage.cleanupTarget")}</span>
           <strong>
-            {usage === null ? translate("settings.text.006") : usage.count === 0 ? translate("settings.text.007") : translate("settings.text.008", { value1: usage.count, value2: formatMediaSize(usage.bytes) })}
+            {usage === null ? translate("common.status.needsCheck") : usage.count === 0 ? translate("common.none") : translate("settings.storage.usageSummary", { count: usage.count, size: formatMediaSize(usage.bytes) })}
           </strong>
           <Button loading={pending === "scan"} onClick={() => void run("scan", async () => {
             const scanned = await mediaMaintenance.orphanUsage();
             setUsage(scanned);
-            if (scanned.count === 0) setMessage(translate("settings.text.009"));
-          })} type="button">{translate("settings.text.010")}</Button>
+            if (scanned.count === 0) setMessage(translate("settings.storage.cleanupEmpty"));
+          })} type="button">{translate("common.action.check")}</Button>
           <Button
             disabled={!usage || usage.count === 0}
             loading={pending === "clean"}
             onClick={() => void run("clean", async () => {
               const deleted = await mediaMaintenance.gc();
               setUsage({ count: 0, bytes: 0 });
-              setMessage(translate("settings.text.011", { value1: deleted }));
+              setMessage(translate("settings.storage.cleanupResult", { count: deleted }));
             })}
             type="button"
             variant="danger"
           >
-            {translate("settings.text.012")}</Button>
+            {translate("common.action.clean")}</Button>
         </div>
         {message && <p className="settings-ai__message" role="status">{message}</p>}
         {error && <p className="settings-ai__error" role="alert">{error}</p>}
-        <p className="settings-ai__notice-text">{translate("settings.text.013")}</p>
+        <p className="settings-ai__notice-text">{translate("common.warning.irreversibleDelete")}</p>
       </section>
     </>
   );
@@ -626,10 +626,10 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
   const canSave = accountId.trim().length > 0 && accessKeyId.trim().length > 0 && secretAccessKey.trim().length > 0 && bucket.trim().length > 0;
 
   return (
-    <section aria-label={translate("settings.text.014")} className="settings-group settings-ai">
+    <section aria-label={translate("settings.r2.title")} className="settings-group settings-ai">
       <header>
         <strong>Cloudflare R2</strong>
-        <span>{translate("settings.text.015")}</span>
+        <span>{translate("settings.r2.description")}</span>
       </header>
       <form onSubmit={(event) => {
         event.preventDefault();
@@ -640,27 +640,27 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
           setSecretAccessKey("");
           setBucket("");
           setHasCredentials(true);
-          setMessage(translate("settings.text.016"));
+          setMessage(translate("settings.r2.saved"));
         });
       }}>
-        <Input aria-label={translate("settings.text.017")} autoComplete="off" onChange={(event) => setAccountId(event.target.value)} placeholder={translate("settings.text.017")} value={accountId} />
-        <Input aria-label={translate("settings.text.018")} autoComplete="off" onChange={(event) => setAccessKeyId(event.target.value)} placeholder={translate("settings.text.018")} type="password" value={accessKeyId} />
-        <Input aria-label={translate("settings.text.019")} autoComplete="off" onChange={(event) => setSecretAccessKey(event.target.value)} placeholder={translate("settings.text.019")} type="password" value={secretAccessKey} />
-        <Input aria-label={translate("settings.text.020")} autoComplete="off" onChange={(event) => setBucket(event.target.value)} placeholder={translate("settings.text.020")} value={bucket} />
-        <Button disabled={!canSave} loading={pending === "save"} type="submit" variant="primary">{translate("settings.text.021")}</Button>
+        <Input aria-label={translate("settings.r2.accountId")} autoComplete="off" onChange={(event) => setAccountId(event.target.value)} placeholder={translate("settings.r2.accountId")} value={accountId} />
+        <Input aria-label={translate("settings.r2.accessKeyId")} autoComplete="off" onChange={(event) => setAccessKeyId(event.target.value)} placeholder={translate("settings.r2.accessKeyId")} type="password" value={accessKeyId} />
+        <Input aria-label={translate("settings.r2.secretAccessKey")} autoComplete="off" onChange={(event) => setSecretAccessKey(event.target.value)} placeholder={translate("settings.r2.secretAccessKey")} type="password" value={secretAccessKey} />
+        <Input aria-label={translate("settings.r2.bucketName")} autoComplete="off" onChange={(event) => setBucket(event.target.value)} placeholder={translate("settings.r2.bucketName")} value={bucket} />
+        <Button disabled={!canSave} loading={pending === "save"} type="submit" variant="primary">{translate("common.action.save")}</Button>
       </form>
       <div className="settings-ai__status">
-        <span>{translate("settings.text.022")}</span>
-        <strong>{hasCredentials === null ? translate("settings.text.023") : hasCredentials ? translate("settings.text.024") : translate("settings.text.025")}</strong>
+        <span>{translate("common.status.label")}</span>
+        <strong>{hasCredentials === null ? translate("common.status.checking") : hasCredentials ? translate("common.status.configured") : translate("common.status.notConfigured")}</strong>
         <Button disabled={!hasCredentials} loading={pending === "test"} onClick={() => void run("test", async () => {
           await store.testConnection();
-          setMessage(translate("settings.text.026"));
-        })} type="button">{translate("settings.text.027")}</Button>
+          setMessage(translate("settings.r2.connectionSuccess"));
+        })} type="button">{translate("common.action.testConnection")}</Button>
         <Button disabled={!hasCredentials} loading={pending === "delete"} onClick={() => void run("delete", async () => {
           await store.deleteCredentials();
           setHasCredentials(false);
-          setMessage(translate("settings.text.028"));
-        })} type="button">{translate("settings.text.029")}</Button>
+          setMessage(translate("settings.r2.deleted"));
+        })} type="button">{translate("common.action.delete")}</Button>
       </div>
       {message && <p className="settings-ai__message" role="status">{message}</p>}
       {error && <p className="settings-ai__error" role="alert">{error}</p>}
@@ -671,16 +671,16 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
 const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string; keySource: string; dataNotice: string; model: string }> = {
   gemini: {
     label: "Gemini",
-    keyPlaceholder: translate("settings.text.030"),
+    keyPlaceholder: translate("settings.ai.geminiTitle"),
     keySource: "Google AI Studio",
-    dataNotice: translate("settings.text.031"),
+    dataNotice: translate("settings.ai.geminiDescription"),
     model: "gemini-2.5-flash-lite",
   },
   openai: {
     label: "OpenAI",
-    keyPlaceholder: translate("settings.text.032"),
+    keyPlaceholder: translate("settings.ai.openaiTitle"),
     keySource: "OpenAI Platform",
-    dataNotice: translate("settings.text.033"),
+    dataNotice: translate("settings.ai.openaiDescription"),
     model: "gpt-5-nano",
   },
 };
@@ -713,9 +713,9 @@ function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description={translate("settings.text.034")} title="AI" />
+      <SettingsHeading description={translate("settings.ai.description")} title="AI" />
       {providerError?.provider === null && <p className="settings-ai__error settings-ai__provider-error" role="alert">{providerError.message}</p>}
-      <div aria-label={translate("settings.text.035")} className="settings-ai-providers" role="radiogroup">
+      <div aria-label={translate("settings.ai.providerLabel")} className="settings-ai-providers" role="radiogroup">
         {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
           <ApiKeySection
             active={activeProvider === provider}
@@ -769,13 +769,13 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
   }
 
   return (
-    <section aria-label={translate("settings.text.036", { value1: meta.label })} className={`settings-group settings-ai settings-ai--provider ${active ? "settings-ai--active" : "settings-ai--inactive"}`}>
+    <section aria-label={translate("settings.ai.keySectionLabel", { provider: meta.label })} className={`settings-group settings-ai settings-ai--provider ${active ? "settings-ai--active" : "settings-ai--inactive"}`}>
       <header className="settings-ai__provider-header">
         <label>
           <input checked={active} disabled={providerPending} name="active-ai-provider" onChange={onSelect} type="radio" />
-          <span className="settings-ai__provider-title"><strong>{meta.label} {translate("settings.text.037")}</strong><small>{meta.model}</small></span>
+          <span className="settings-ai__provider-title"><strong>{translate("settings.ai.keyTitle", { provider: meta.label })}</strong><small>{meta.model}</small></span>
         </label>
-        <span>{translate("settings.text.038")}</span>
+        <span>{translate("settings.ai.keySecurityDescription")}</span>
       </header>
       <div className="settings-ai__body">
         <form onSubmit={(event) => {
@@ -784,31 +784,31 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
             await store.setApiKey(provider, apiKey);
             setApiKey("");
             setHasKey(true);
-            setMessage(translate("settings.text.039"));
+            setMessage(translate("settings.ai.keySaved"));
           });
         }}>
           <Input
-            aria-label={translate("settings.text.040", { value1: meta.label })}
+            aria-label={translate("settings.ai.keyLabel", { provider: meta.label })}
             autoComplete="off"
             onChange={(event) => setApiKey(event.target.value)}
-            placeholder={hasKey ? translate("settings.text.041") : meta.keyPlaceholder}
+            placeholder={hasKey ? translate("settings.ai.replaceKey") : meta.keyPlaceholder}
             type="password"
             value={apiKey}
           />
-          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">{translate("settings.text.021")}</Button>
+          <Button disabled={!apiKey.trim()} loading={pending === "save"} type="submit" variant="primary">{translate("common.action.save")}</Button>
         </form>
         <div className="settings-ai__status">
-          <span>{translate("settings.text.022")}</span>
-          <strong>{hasKey === null ? translate("settings.text.023") : hasKey ? translate("settings.text.042") : translate("settings.text.043")}</strong>
+          <span>{translate("common.status.label")}</span>
+          <strong>{hasKey === null ? translate("common.status.checking") : hasKey ? translate("settings.ai.keyConfigured") : translate("settings.ai.keyMissing")}</strong>
           <Button disabled={!hasKey} loading={pending === "test"} onClick={() => void run("test", async () => {
             await store.testConnection(provider);
-            setMessage(translate("settings.text.044", { value1: meta.label }));
-          })} type="button">{translate("settings.text.027")}</Button>
+            setMessage(translate("settings.ai.connectionSuccess", { provider: meta.label }));
+          })} type="button">{translate("common.action.testConnection")}</Button>
           <Button disabled={!hasKey} loading={pending === "delete"} onClick={() => void run("delete", async () => {
             await store.deleteApiKey(provider);
             setHasKey(false);
-            setMessage(translate("settings.text.045"));
-          })} type="button">{translate("settings.text.029")}</Button>
+            setMessage(translate("settings.ai.keyDeleted"));
+          })} type="button">{translate("common.action.delete")}</Button>
         </div>
         {selectionError && <p className="settings-ai__error" role="alert">{selectionError}</p>}
         {message && <p className="settings-ai__message" role="status">{message}</p>}
@@ -820,16 +820,16 @@ function ApiKeySection({ active, onSelect, provider, providerPending, selectionE
 }
 
 const SERVER_MODE_OPTIONS: { id: ServerMode; label: string; description: string }[] = [
-  { id: "embedded", label: translate("settings.text.046"), description: translate("settings.text.047") },
-  { id: "remote", label: translate("settings.text.048"), description: translate("settings.text.049") },
+  { id: "embedded", label: translate("settings.server.localMode"), description: translate("settings.server.localModeDescription") },
+  { id: "remote", label: translate("settings.server.remoteMode"), description: translate("settings.server.remoteModeDescription") },
 ];
 
 type CurrentConnectionStatus = { state: "checking" } | { state: "online" } | { state: "offline"; detail: string };
 
 function CurrentConnectionBadge({ status }: { status: CurrentConnectionStatus }) {
-  if (status.state === "online") return <StatusIndicator icon="check" label={translate("settings.text.050")} tone="success" />;
-  if (status.state === "offline") return <StatusIndicator icon="alert" label={translate("settings.text.051")} tone="danger" />;
-  return <StatusIndicator icon="sync" label={translate("settings.text.023")} tone="neutral" />;
+  if (status.state === "online") return <StatusIndicator icon="check" label={translate("settings.server.connected")} tone="success" />;
+  if (status.state === "offline") return <StatusIndicator icon="alert" label={translate("settings.server.unreachable")} tone="danger" />;
+  return <StatusIndicator icon="sync" label={translate("common.status.checking")} tone="neutral" />;
 }
 
 /**
@@ -896,7 +896,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
       const next = await store.save({ mode: draftMode, remoteUrl: draftUrl, token: draftToken });
       applyConnection(next);
       setTestResult(null);
-      setMessage(next.restartRequired ? translate("settings.text.052") : translate("settings.text.053"));
+      setMessage(next.restartRequired ? translate("settings.server.savedRestartRequired") : translate("settings.server.savedApplied"));
     } catch (cause) {
       setError(messageOf(cause));
     } finally {
@@ -911,7 +911,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
     setTestResult(null);
     try {
       await store.probe(trimBaseUrl(draftUrl), draftToken.trim() || undefined);
-      setTestResult({ ok: true, text: translate("settings.text.054") });
+      setTestResult({ ok: true, text: translate("settings.server.connectionSuccess") });
     } catch (cause) {
       setTestResult({ ok: false, text: messageOf(cause) });
     } finally {
@@ -932,16 +932,16 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
 
   return (
     <>
-      <SettingsHeading description={translate("settings.text.055")} title={translate("settings.text.056")} />
+      <SettingsHeading description={translate("settings.server.description")} title={translate("settings.server.title")} />
 
       {loadError && <p className="settings-ai__error" role="alert">{loadError}</p>}
 
       {connection && (
         <>
-          <section aria-label={translate("settings.text.056")} className="settings-group">
+          <section aria-label={translate("settings.server.title")} className="settings-group">
             <div className="settings-server__status">
               <span className={`settings-server__tag ${connection.runningEmbedded ? "" : "settings-server__tag--remote"}`}>
-                {connection.runningEmbedded ? translate("settings.text.046") : translate("settings.text.048")}
+                {connection.runningEmbedded ? translate("settings.server.localMode") : translate("settings.server.remoteMode")}
               </span>
               <CurrentConnectionBadge status={current} />
               {(connection.envOverride || connection.restartRequired) && (
@@ -951,10 +951,10 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
             {current.state === "offline" && <p className="settings-server__status-detail" role="alert">{current.detail}</p>}
             {connection.envOverride && (
               <p className="settings-server__status-detail">
-                {translate("settings.text.057")}<code>MONO_API_BASE_URL</code>{translate("settings.text.058")}</p>
+                {translate("settings.server.environmentOverride", { variable: "MONO_API_BASE_URL" })}</p>
             )}
 
-            <div aria-label={translate("settings.text.059")} className="settings-server__modes" role="radiogroup">
+            <div aria-label={translate("settings.server.modeLabel")} className="settings-server__modes" role="radiogroup">
               {SERVER_MODE_OPTIONS.map((option) => (
                 <button
                   aria-checked={draftMode === option.id}
@@ -977,7 +977,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
               <div className="settings-server__remote">
                 <form onSubmit={(event) => { event.preventDefault(); void testConnection(); }}>
                   <Input
-                    aria-label={translate("settings.text.060")}
+                    aria-label={translate("settings.server.remoteUrl")}
                     autoComplete="off"
                     disabled={!connection.manageable}
                     invalid={draftUrl.trim().length > 0 && !draftUrlValid}
@@ -988,20 +988,20 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
                     value={draftUrl}
                   />
                   <Button disabled={!looksLikeRemoteApiUrl(draftUrl) || pending !== null} loading={pending === "test"} type="submit">
-                    {translate("settings.text.027")}</Button>
+                    {translate("common.action.testConnection")}</Button>
                 </form>
                 <Input
-                  aria-label={translate("settings.text.061")}
+                  aria-label={translate("settings.server.apiToken")}
                   autoComplete="off"
                   disabled={!connection.manageable}
                   onChange={(event) => { setDraftToken(event.target.value); setTestResult(null); }}
-                  placeholder={translate("settings.text.062")}
+                  placeholder={translate("settings.server.apiTokenOptional")}
                   spellCheck={false}
                   type="password"
                   value={draftToken}
                 />
                 <p className="settings-server__hint">
-                  {translate("settings.text.063")}<code>MONO_API_TOKEN</code>{translate("settings.text.064")}</p>
+                  {translate("settings.server.connectionHint", { variable: "MONO_API_TOKEN" })}</p>
                 {testResult && (
                   <p
                     className={testResult.ok ? "settings-ai__message" : "settings-ai__error"}
@@ -1014,7 +1014,7 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
             )}
 
             <div className="settings-server__actions">
-              <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">{translate("settings.text.021")}</Button>
+              <Button disabled={!canSave} loading={pending === "save"} onClick={() => void save()} type="button" variant="primary">{translate("common.action.save")}</Button>
             </div>
 
             {message && <p className="settings-ai__message" role="status">{message}</p>}
@@ -1022,12 +1022,12 @@ function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
           </section>
 
           {connection.restartRequired && (
-            <section aria-label={translate("settings.text.065")} className="settings-server__restart">
+            <section aria-label={translate("settings.server.restartNotice")} className="settings-server__restart">
               <div>
-                <strong>{translate("settings.text.066")}</strong>
-                <span>{translate("settings.text.067")}</span>
+                <strong>{translate("settings.server.restartRequired")}</strong>
+                <span>{translate("settings.server.restartDescription")}</span>
               </div>
-              <Button loading={pending === "restart"} onClick={() => void restart()} type="button" variant="primary">{translate("settings.text.068")}</Button>
+              <Button loading={pending === "restart"} onClick={() => void restart()} type="button" variant="primary">{translate("settings.server.restartNow")}</Button>
             </section>
           )}
         </>

@@ -44,17 +44,17 @@ const moduleMeta: Record<InboxTargetModuleId, { name: string; color: string; ico
 };
 
 const sourceMeta: Record<InboxItem["source"], { name: string; icon: IconName }> = {
-  text: { name: translate("inbox.text.001"), icon: "note" },
-  url: { name: translate("inbox.text.002"), icon: "scrap" },
-  image: { name: translate("inbox.text.003"), icon: "image" },
-  video: { name: translate("inbox.text.004"), icon: "video" },
+  text: { name: translate("inbox.source.text"), icon: "note" },
+  url: { name: translate("inbox.source.link"), icon: "scrap" },
+  image: { name: translate("inbox.source.file"), icon: "image" },
+  video: { name: translate("inbox.source.video"), icon: "video" },
 };
 
 const fieldLabels: Record<InboxTargetModuleId, string[]> = {
-  todo: [translate("scrap.text.028"), translate("scrap.text.040"), translate("inbox.text.005"), translate("scrap.text.007")],
-  calendar: [translate("scrap.text.028"), translate("inbox.text.006"), translate("inbox.text.007"), translate("scrap.text.040")],
-  scrap: [translate("scrap.text.028"), translate("scrap.text.007"), translate("inbox.text.008"), translate("scrap.text.040")],
-  ledger: [translate("inbox.text.009"), translate("inbox.text.010"), translate("inbox.text.011"), translate("scrap.text.040")],
+  todo: [translate("common.field.title"), translate("common.field.label"), translate("inbox.field.due"), translate("common.field.note")],
+  calendar: [translate("common.field.title"), translate("inbox.field.schedule"), translate("common.field.location"), translate("common.field.label")],
+  scrap: [translate("common.field.title"), translate("common.field.note"), translate("inbox.field.original"), translate("common.field.label")],
+  ledger: [translate("ledger.field.item"), translate("ledger.field.amount"), translate("common.field.date"), translate("common.field.label")],
 };
 
 type InboxLabelCatalog = Record<InboxTargetModuleId, {
@@ -71,41 +71,41 @@ function labelCatalogOf(
 ): InboxLabelCatalog {
   return {
     todo: {
-      inputLabel: translate("inbox.text.012"),
-      emptyMessage: translate("inbox.text.013"),
+      inputLabel: translate("inbox.labels.todo"),
+      emptyMessage: translate("inbox.labels.todoLoadError"),
       options: todoLabels.map((label) => ({ value: label.name, label: label.name, dotColor: label.color })),
     },
     calendar: {
-      inputLabel: translate("inbox.text.014"),
-      emptyMessage: translate("inbox.text.015"),
+      inputLabel: translate("inbox.labels.calendar"),
+      emptyMessage: translate("inbox.labels.calendarLoadError"),
       options: calendarCategories.map((category) => ({ value: category.name, label: category.name, dotColor: category.color })),
     },
     scrap: {
-      inputLabel: translate("inbox.text.016"),
-      emptyMessage: translate("inbox.text.017"),
+      inputLabel: translate("inbox.labels.scrap"),
+      emptyMessage: translate("inbox.labels.scrapLoadError"),
       options: scrapLabels.map((label) => ({ value: label, label })),
     },
     ledger: {
-      inputLabel: translate("inbox.text.018"),
-      emptyMessage: translate("inbox.text.019"),
+      inputLabel: translate("inbox.labels.ledger"),
+      emptyMessage: translate("inbox.labels.ledgerLoadError"),
       options: ledgerCategories.map((category) => ({ value: category.name, label: category.name, dotColor: category.color })),
     },
   };
 }
 
 function unifiedFieldLabel(label: string) {
-  return label === translate("inbox.text.020") || label === translate("inbox.text.021") ? translate("scrap.text.040") : label;
+  return label === translate("inbox.field.category") || label === translate("inbox.field.tag") ? translate("common.field.label") : label;
 }
 
 function defaultFields(target: InboxTargetModuleId, raw: string): InboxField[] {
   return fieldLabels[target].map((label, index) => ({
     label,
-    value: index === 0 ? raw : label === translate("scrap.text.007") || label === translate("inbox.text.008") ? raw : label === translate("inbox.text.005") ? translate("inbox.text.022") : translate("routine.text.033"),
+    value: index === 0 ? raw : label === translate("common.field.note") || label === translate("inbox.field.original") ? raw : label === translate("inbox.field.due") ? translate("common.date.noDueDate") : translate("routine.label.unassigned"),
   }));
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("scrap.text.010");
+  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 type ModuleTargetPickerProps = {
@@ -176,11 +176,11 @@ function ModuleTargetPicker({ value, onChange }: ModuleTargetPickerProps) {
 
   return (
     <fieldset className="inbox-editor__targets" ref={rootRef}>
-      <legend>{translate("inbox.text.023")}</legend>
+      <legend>{translate("inbox.target.title")}</legend>
       <button
         aria-controls={listId}
         aria-expanded={open}
-        aria-label={translate("inbox.text.024", { value1: selectedMeta.name })}
+        aria-label={translate("inbox.target.currentLabel", { target: selectedMeta.name })}
         className="inbox-editor__target-trigger"
         onClick={() => open ? setOpen(false) : openList()}
         ref={triggerRef}
@@ -188,11 +188,11 @@ function ModuleTargetPicker({ value, onChange }: ModuleTargetPickerProps) {
       >
         <Icon name={selectedMeta.icon} size={15} style={{ color: selectedMeta.color }} />
         <span>{selectedMeta.name}</span>
-        <small>{translate("inbox.text.025")}</small>
+        <small>{translate("common.action.change")}</small>
         <Icon className="inbox-editor__target-chevron" name="chevronDown" size={12} />
       </button>
       {open && (
-        <div aria-label={translate("inbox.text.026")} className="inbox-editor__target-list" id={listId} role="radiogroup">
+        <div aria-label={translate("inbox.target.optionsLabel")} className="inbox-editor__target-list" id={listId} role="radiogroup">
           {inboxTargetModuleIds.map((moduleId) => {
             const meta = moduleMeta[moduleId];
             const selected = value === moduleId;
@@ -263,28 +263,28 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
   return (
     <fieldset className="inbox-editor__schedule">
       <legend>
-        {translate("inbox.text.006")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}
+        {translate("inbox.field.schedule")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}
       </legend>
       <div className="inbox-editor__schedule-grid">
         <label>
-          <span>{translate("inbox.text.028")}</span>
+          <span>{translate("inbox.schedule.startDate")}</span>
           <DatePicker
-            label={translate("inbox.text.028")}
+            label={translate("inbox.schedule.startDate")}
             onChange={(startDate) => update({ startDate, endDate: draft.endDate && draft.endDate >= startDate ? draft.endDate : startDate })}
             value={draft.startDate}
           />
         </label>
         <label>
-          <span>{translate("inbox.text.029")}</span>
-          <DatePicker align="end" label={translate("inbox.text.029")} min={draft.startDate} onChange={(endDate) => update({ endDate })} value={draft.endDate} />
+          <span>{translate("inbox.schedule.endDate")}</span>
+          <DatePicker align="end" label={translate("inbox.schedule.endDate")} min={draft.startDate} onChange={(endDate) => update({ endDate })} value={draft.endDate} />
         </label>
         <label>
-          <span>{translate("inbox.text.030")}</span>
-          <TimePicker label={translate("inbox.text.030")} onChange={(startTime) => update({ startTime })} value={draft.startTime} />
+          <span>{translate("inbox.schedule.startTime")}</span>
+          <TimePicker label={translate("inbox.schedule.startTime")} onChange={(startTime) => update({ startTime })} value={draft.startTime} />
         </label>
         <label>
-          <span>{translate("inbox.text.031")}</span>
-          <TimePicker align="end" label={translate("inbox.text.031")} onChange={(endTime) => update({ endTime })} value={draft.endTime} />
+          <span>{translate("inbox.schedule.endTime")}</span>
+          <TimePicker align="end" label={translate("inbox.schedule.endTime")} onChange={(endTime) => update({ endTime })} value={draft.endTime} />
         </label>
       </div>
     </fieldset>
@@ -294,7 +294,7 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
 function InboxLabelField({ field, source, onChange }: { field: InboxField; source: InboxLabelCatalog[InboxTargetModuleId]; onChange: (value: string) => void }) {
   return (
     <label>
-      <span>{translate("scrap.text.040")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
+      <span>{translate("common.field.label")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
       <Select
         disabled={source.options.length === 0}
         label={source.inputLabel}
@@ -321,12 +321,12 @@ function InboxLedgerAmountDateFields({
   return (
     <div className="ledger-expense-form__pair">
       <label>
-        <span>{translate("inbox.text.010")}{amountField.confidence !== undefined && <small className={amountField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(amountField.confidence * 100)}%</small>}</span>
+        <span>{translate("ledger.field.amount")}{amountField.confidence !== undefined && <small className={amountField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(amountField.confidence * 100) })}</small>}</span>
         <LedgerAmountInput onChange={(value) => onAmountChange(value ? `₩ ${value}` : "")} value={amountField.value} />
       </label>
       <label>
-        <span>{translate("inbox.text.011")}{dateField.confidence !== undefined && <small className={dateField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(dateField.confidence * 100)}%</small>}</span>
-        <DatePicker align="end" label={translate("inbox.text.011")} onChange={onDateChange} value={dateField.value} />
+        <span>{translate("common.field.date")}{dateField.confidence !== undefined && <small className={dateField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(dateField.confidence * 100) })}</small>}</span>
+        <DatePicker align="end" label={translate("common.field.date")} onChange={onDateChange} value={dateField.value} />
       </label>
     </div>
   );
@@ -336,8 +336,8 @@ function InboxTodoDueField({ field, onChange }: { field: InboxField; onChange: (
   const dueDate = field.value.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "";
   return (
     <label>
-      <span>{translate("inbox.text.005")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
-      <DatePicker label={translate("inbox.text.032")} onChange={(value) => onChange(value || translate("inbox.text.022"))} value={dueDate} />
+      <span>{translate("inbox.field.due")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
+      <DatePicker label={translate("todo.field.dueDate")} onChange={(value) => onChange(value || translate("common.date.noDueDate"))} value={dueDate} />
     </label>
   );
 }
@@ -377,7 +377,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
 
   if (snapshotQuery.isPending) return <InboxLoading />;
   if (snapshotQuery.isError) {
-    return <div className="inbox-state" role="alert"><StatusIndicator icon="alert" label={translate("inbox.text.033")} tone="danger" /></div>;
+    return <div className="inbox-state" role="alert"><StatusIndicator icon="alert" label={translate("inbox.error.load")} tone="danger" /></div>;
   }
 
   const items = snapshotQuery.data.items;
@@ -390,9 +390,9 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
     todoQuery.data?.labels ?? [],
   );
   const tabs: Array<{ id: InboxTab; label: string; count: number }> = [
-    { id: "pending", label: translate("inbox.text.034"), count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
-    { id: "approved", label: translate("inbox.text.035"), count: items.filter((item) => item.status === "approved").length },
-    { id: "failed", label: translate("inbox.text.036"), count: items.filter((item) => item.status === "failed").length },
+    { id: "pending", label: translate("inbox.status.pending"), count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
+    { id: "approved", label: translate("inbox.status.approved"), count: items.filter((item) => item.status === "approved").length },
+    { id: "failed", label: translate("inbox.status.failed"), count: items.filter((item) => item.status === "failed").length },
   ];
 
   function selectTab(nextTab: InboxTab) {
@@ -420,7 +420,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
 
   return (
     <div className="inbox-page">
-      <div aria-label={translate("inbox.text.037")} className="inbox-tabs" role="tablist">
+      <div aria-label={translate("inbox.status.tabsLabel")} className="inbox-tabs" role="tablist">
         {tabs.map((item) => (
           <button
             aria-controls={`inbox-panel-${item.id}`}
@@ -439,7 +439,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
           </button>
         ))}
         <Button disabled={highConfidenceCount === 0} loading={approveAllMutation.isPending} onClick={() => approveAllMutation.mutate()} size="small">
-          {translate("inbox.text.038", { count: highConfidenceCount })}</Button>
+          {translate("inbox.action.approveHighConfidence", { count: highConfidenceCount })}</Button>
       </div>
 
       {approveAllMutation.isError && <div className="inbox-bulk-error" role="alert">{errorMessage(approveAllMutation.error)}</div>}
@@ -455,7 +455,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
           />
         ))}
         {visible.length === 0 && (
-          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>{translate("inbox.text.040")}</strong></div>
+          <div className="inbox-empty"><Icon name="inbox" size={28} /><strong>{translate("inbox.empty.title")}</strong></div>
         )}
       </div>
     </div>
@@ -485,8 +485,8 @@ function InboxRow({
   const source = sourceMeta[item.source];
   const targetMeta = item.target ? moduleMeta[item.target] : null;
   const videoRoutingLocked = item.source === "video";
-  const ledgerAmountFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("inbox.text.010")) : -1;
-  const ledgerDateFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("inbox.text.011")) : -1;
+  const ledgerAmountFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("ledger.field.amount")) : -1;
+  const ledgerDateFieldIndex = target === "ledger" ? fields.findIndex((field) => field.label === translate("common.field.date")) : -1;
 
   async function invalidateSnapshots() {
     await Promise.all([
@@ -549,9 +549,9 @@ function InboxRow({
     setTarget(nextTarget);
     setFields(defaultFields(nextTarget, item.raw).map((field) => {
       if (nextTarget === "calendar") {
-        if (field.label === translate("inbox.text.006")) return { ...field, value: calendarToday };
+        if (field.label === translate("inbox.field.schedule")) return { ...field, value: calendarToday };
       }
-      if (field.label === translate("scrap.text.040")) return { ...field, value: labelCatalog[nextTarget].options[0]?.value ?? "" };
+      if (field.label === translate("common.field.label")) return { ...field, value: labelCatalog[nextTarget].options[0]?.value ?? "" };
       return field;
     }));
   }
@@ -563,19 +563,19 @@ function InboxRow({
   function submitUpdate(event: FormEvent) {
     event.preventDefault();
     const normalizedFields = fields.map((field) => ({ ...field, value: field.value.trim() }));
-    const label = normalizedFields.find((field) => field.label === translate("scrap.text.040"))?.value;
+    const label = normalizedFields.find((field) => field.label === translate("common.field.label"))?.value;
     if (label !== undefined && !labelCatalog[target].options.some((option) => option.value === label)) {
-      setActionError(translate("inbox.text.041", { value1: moduleMeta[target].name }));
+      setActionError(translate("inbox.validation.labelRequired", { target: moduleMeta[target].name }));
       return;
     }
     if (normalizedFields.some((field) => !field.value)) {
-      setActionError(translate("inbox.text.042"));
+      setActionError(translate("inbox.validation.fieldsRequired"));
       return;
     }
     if (target === "calendar") {
-      const schedule = normalizedFields.find((field) => field.label === translate("inbox.text.006"))?.value ?? "";
+      const schedule = normalizedFields.find((field) => field.label === translate("inbox.field.schedule"))?.value ?? "";
       if (!/\d{4}-\d{2}-\d{2}/.test(schedule)) {
-        setActionError(translate("inbox.text.043"));
+        setActionError(translate("inbox.validation.calendarDateRequired"));
         return;
       }
     }
@@ -590,29 +590,29 @@ function InboxRow({
         {item.source === "image" && (item.images?.length
           ? <div className="inbox-item__thumbnails">{item.images.map((image, index) => <InboxMediaThumbnail key={`${image.mediaId}-${index}`} mediaId={image.mediaId} name={image.name} />)}</div>
           : <div className="inbox-item__thumbnail"><Icon name="image" size={18} /></div>)}
-        {item.source === "video" && <div aria-label={translate("inbox.text.044")} className="inbox-item__thumbnail" role="img"><Icon name="video" size={18} /></div>}
+        {item.source === "video" && <div aria-label={translate("common.media.video")} className="inbox-item__thumbnail" role="img"><Icon name="video" size={18} /></div>}
       </div>
 
       <div className="inbox-item__result">
         {item.status === "failed" ? (
-          <div className="inbox-item__failure"><StatusIndicator icon="alert" label={translate("inbox.text.045")} tone="warning" /><span>{translate("inbox.text.046")}</span></div>
+          <div className="inbox-item__failure"><StatusIndicator icon="alert" label={translate("inbox.classification.failed")} tone="warning" /><span>{translate("inbox.classification.manualHint")}</span></div>
         ) : item.status === "approved" ? (
-          <div className="inbox-item__approved"><StatusIndicator icon="check" label={translate("inbox.text.047", { value1: targetMeta?.name ?? translate("inbox.text.069") })} tone="success" /><span>{translate("inbox.text.048")}{Math.round(item.confidence * 100)}%</span></div>
+          <div className="inbox-item__approved"><StatusIndicator icon="check" label={translate("inbox.status.savedTo", { target: targetMeta?.name ?? translate("common.target") })} tone="success" /><span>{translate("inbox.confidence.label", { percent: Math.round(item.confidence * 100) })}</span></div>
         ) : item.status === "processing" ? (
-          <div className="inbox-item__processing"><StatusIndicator icon="sync" label={translate("inbox.text.049")} tone="accent" /></div>
+          <div className="inbox-item__processing"><StatusIndicator icon="sync" label={translate("inbox.classification.processing")} tone="accent" /></div>
         ) : (
           <>
             <div className="inbox-item__classification">
               <ConfidenceIndicator value={item.confidence} />
-              <div><span className="inbox-item__confidence-label">{videoRoutingLocked ? translate("inbox.text.050") : item.pinned ? translate("inbox.text.051") : translate("inbox.text.052")}</span>
+              <div><span className="inbox-item__confidence-label">{videoRoutingLocked ? translate("inbox.classification.videoRule") : item.pinned ? translate("inbox.classification.pinnedTarget") : translate("inbox.classification.aiResult")}</span>
                 <div className="inbox-item__target">
                   {targetMeta && (
-                    <Button aria-label={videoRoutingLocked ? translate("inbox.text.053") : translate("inbox.text.054", { value1: targetMeta.name })} disabled={busy} onClick={openEditor} size="small" style={{ backgroundColor: `color-mix(in srgb, ${targetMeta.color} 13%, var(--color-surface))` }}>
+                    <Button aria-label={videoRoutingLocked ? translate("inbox.action.editScrapFields") : translate("inbox.action.changeTargetLabel", { target: targetMeta.name })} disabled={busy} onClick={openEditor} size="small" style={{ backgroundColor: `color-mix(in srgb, ${targetMeta.color} 13%, var(--color-surface))` }}>
                       <Icon name={targetMeta.icon} size={13} style={{ color: targetMeta.color }} />{targetMeta.name}{!videoRoutingLocked && <Icon name="chevronDown" size={11} />}
                     </Button>
                   )}
-                  {item.confidence < 0.75 && <Badge tone="warning">{translate("inbox.text.055")}</Badge>}
-                  {videoRoutingLocked && <Badge>{translate("inbox.text.056")}</Badge>}
+                  {item.confidence < 0.75 && <Badge tone="warning">{translate("inbox.classification.reviewRecommended")}</Badge>}
+                  {videoRoutingLocked && <Badge>{translate("inbox.classification.videoLocked")}</Badge>}
                 </div>
               </div>
             </div>
@@ -620,7 +620,7 @@ function InboxRow({
               {item.fields.map((field, index) => {
                 const fieldLabel = unifiedFieldLabel(field.label);
                 return (
-                <button aria-label={translate("inbox.text.057", { value1: fieldLabel })} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
+                <button aria-label={translate("inbox.action.editFieldLabel", { field: fieldLabel })} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
                   <span>{fieldLabel}</span><strong>{field.value}</strong>{field.confidence !== undefined && <small className={field.confidence < 0.6 ? "inbox-field--low" : ""}>{Math.round(field.confidence * 100)}%</small>}
                   <Icon name="edit" size={12} />
                 </button>
@@ -634,34 +634,34 @@ function InboxRow({
 
       {(item.status === "pending" || item.status === "failed") && (
         <div className="inbox-item__actions">
-          {item.status === "pending" && <Button loading={approveMutation.isPending} onClick={() => approveMutation.mutate()} variant="primary">{translate("inbox.text.058")}</Button>}
-          <Button disabled={busy} onClick={openEditor}>{item.status === "failed" ? translate("inbox.text.059") : translate("inbox.text.060")}</Button>
-          <Button disabled={busy} onClick={() => { setActionError(null); setDiscardOpen(true); }} variant="ghost">{translate("inbox.text.061")}</Button>
+          {item.status === "pending" && <Button loading={approveMutation.isPending} onClick={() => approveMutation.mutate()} variant="primary">{translate("inbox.action.approve")}</Button>}
+          <Button disabled={busy} onClick={openEditor}>{item.status === "failed" ? translate("inbox.action.classifyManually") : translate("inbox.action.editFields")}</Button>
+          <Button disabled={busy} onClick={() => { setActionError(null); setDiscardOpen(true); }} variant="ghost">{translate("inbox.action.discard")}</Button>
         </div>
       )}
 
       <Modal
         className="inbox-editor"
-        footer={<><Button disabled={updateMutation.isPending} onClick={() => setEditorOpen(false)}>{translate("scrap.text.025")}</Button><Button form={`inbox-editor-${item.id}`} loading={updateMutation.isPending} type="submit" variant="primary">{translate("settings.text.021")}</Button></>}
+        footer={<><Button disabled={updateMutation.isPending} onClick={() => setEditorOpen(false)}>{translate("common.action.cancel")}</Button><Button form={`inbox-editor-${item.id}`} loading={updateMutation.isPending} type="submit" variant="primary">{translate("common.action.save")}</Button></>}
         icon={moduleMeta[target].icon}
         onClose={() => { if (!updateMutation.isPending) setEditorOpen(false); }}
         open={editorOpen}
-        title={item.status === "failed" ? translate("inbox.text.059") : translate("inbox.text.060")}
+        title={item.status === "failed" ? translate("inbox.action.classifyManually") : translate("inbox.action.editFields")}
       >
         <form id={`inbox-editor-${item.id}`} onSubmit={submitUpdate}>
-          <div className="inbox-editor__source"><span>{source.name} {translate("inbox.text.062")}</span><p>{item.raw}</p></div>
+          <div className="inbox-editor__source"><span>{translate("inbox.source.originalLabel", { source: source.name })}</span><p>{item.raw}</p></div>
           {videoRoutingLocked
-            ? <div className="inbox-editor__fixed-target"><span>{translate("inbox.text.063")}</span><strong><Icon name="scrap" size={13} />{translate("app.navigation.scrap")}</strong><small>{translate("inbox.text.064")}</small></div>
+            ? <div className="inbox-editor__fixed-target"><span>{translate("inbox.target.savedModule")}</span><strong><Icon name="scrap" size={13} />{translate("app.navigation.scrap")}</strong><small>{translate("inbox.classification.videoLockedDescription")}</small></div>
             : <ModuleTargetPicker onChange={changeTarget} value={target} />}
           <div className="inbox-editor__fields">
             {fields.map((field, index) => {
-              if (target === "calendar" && field.label === translate("inbox.text.006")) {
+              if (target === "calendar" && field.label === translate("inbox.field.schedule")) {
                 return <InboxScheduleField fallbackDate={calendarToday} field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
               }
-              if (field.label === translate("scrap.text.040")) {
+              if (field.label === translate("common.field.label")) {
                 return <InboxLabelField field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} source={labelCatalog[target]} />;
               }
-              if (target === "todo" && field.label === translate("inbox.text.005")) {
+              if (target === "todo" && field.label === translate("inbox.field.due")) {
                 return <InboxTodoDueField field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
               }
               if (index === ledgerAmountFieldIndex && ledgerDateFieldIndex >= 0) {
@@ -676,10 +676,10 @@ function InboxRow({
                 );
               }
               if (index === ledgerDateFieldIndex && ledgerAmountFieldIndex >= 0) return null;
-              const multiline = field.label === translate("scrap.text.007") || field.label === translate("inbox.text.008") || field.label === translate("inbox.text.065");
+              const multiline = field.label === translate("common.field.note") || field.label === translate("inbox.field.original") || field.label === translate("common.field.reason");
               return (
                 <label key={`${field.label}-${index}`}>
-                  <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.text.027")}{Math.round(field.confidence * 100)}%</small>}</span>
+                  <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
                   {multiline
                     ? <TextArea autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} rows={3} value={field.value} />
                     : <Input autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} value={field.value} />}
@@ -693,13 +693,13 @@ function InboxRow({
 
       <Modal
         className="inbox-discard-modal"
-        footer={<><Button autoFocus disabled={discardMutation.isPending} onClick={() => setDiscardOpen(false)}>{translate("scrap.text.025")}</Button><Button loading={discardMutation.isPending} onClick={() => discardMutation.mutate()} variant="danger">{translate("inbox.text.061")}</Button></>}
+        footer={<><Button autoFocus disabled={discardMutation.isPending} onClick={() => setDiscardOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={discardMutation.isPending} onClick={() => discardMutation.mutate()} variant="danger">{translate("inbox.action.discard")}</Button></>}
         icon="alert"
         onClose={() => { if (!discardMutation.isPending) setDiscardOpen(false); }}
         open={discardOpen}
-        title={translate("inbox.text.066")}
+        title={translate("inbox.discard.question")}
       >
-        <p>{translate("inbox.text.067")}</p>
+        <p>{translate("inbox.discard.warning")}</p>
         <blockquote>{item.raw}</blockquote>
         {actionError && <div className="inbox-editor__error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
       </Modal>
@@ -714,5 +714,5 @@ function InboxMediaThumbnail({ mediaId, name }: { mediaId: string; name: string 
 }
 
 function InboxLoading() {
-  return <div className="inbox-list inbox-list--loading" aria-label={translate("inbox.text.068")}>{Array.from({ length: 4 }, (_, index) => <Card className="inbox-item inbox-item--skeleton" key={index} />)}</div>;
+  return <div className="inbox-list inbox-list--loading" aria-label={translate("inbox.loading")}>{Array.from({ length: 4 }, (_, index) => <Card className="inbox-item inbox-item--skeleton" key={index} />)}</div>;
 }

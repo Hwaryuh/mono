@@ -12,7 +12,7 @@ function formatWon(amount: number) {
 }
 
 function WidgetLink({ to }: { to: string }) {
-  return <Link className="widget-link" to={to}>{translate("dashboard.text.001")}<Icon name="chevronRight" size={11} strokeWidth={2} /></Link>;
+  return <Link className="widget-link" to={to}>{translate("dashboard.action.open")}<Icon name="chevronRight" size={11} strokeWidth={2} /></Link>;
 }
 
 function Widget({ title, icon, to, wide = false, className = "", children }: { title: string; icon: IconName; to: string; wide?: boolean; className?: string; children: ReactNode }) {
@@ -35,7 +35,7 @@ function WidgetEmpty({ icon, children }: { icon: IconName; children: ReactNode }
 
 function LoadingState() {
   return (
-    <div className="dashboard dashboard--loading" aria-label={translate("dashboard.text.002")}>
+    <div className="dashboard dashboard--loading" aria-label={translate("dashboard.loading")}>
       <Card className="dashboard-skeleton dashboard-skeleton--wide" />
       <div className="dashboard-grid">{Array.from({ length: 5 }, (_, index) => <Card className="dashboard-skeleton" key={index} />)}</div>
     </div>
@@ -45,7 +45,7 @@ function LoadingState() {
 function ErrorState() {
   return (
     <div className="dashboard-state">
-      <Card><StatusIndicator icon="alert" label={translate("dashboard.text.003")} tone="danger" /><span>{translate("dashboard.text.004")}</span></Card>
+      <Card><StatusIndicator icon="alert" label={translate("dashboard.error.title")} tone="danger" /><span>{translate("dashboard.error.description")}</span></Card>
     </div>
   );
 }
@@ -88,12 +88,12 @@ export function DashboardPage({ repository }: { repository: DashboardRepository 
 
 function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onToggle: (taskId: string) => void }) {
   return (
-    <Widget icon="todo" title={translate("dashboard.text.005")} to="/todo" wide>
-      {snapshot.tasks.length === 0 ? <WidgetEmpty icon="todo">{translate("dashboard.text.006")}</WidgetEmpty> : (
+    <Widget icon="todo" title={translate("dashboard.todayTodos.title")} to="/todo" wide>
+      {snapshot.tasks.length === 0 ? <WidgetEmpty icon="todo">{translate("dashboard.todayTodos.empty")}</WidgetEmpty> : (
         <div className="task-list">
           {snapshot.tasks.slice(0, 3).map((task) => (
             <div className={`task-row ${task.done ? "task-row--done" : ""}`} key={task.id}>
-              <Checkbox checked={task.done} label={translate("routine.text.032", { value1: task.title, value2: task.done ? translate("routine.text.038") : translate("todo.text.008") })} onCheckedChange={() => onToggle(task.id)} />
+              <Checkbox checked={task.done} label={translate("routine.action.toggleCompletion", { title: task.title, state: task.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => onToggle(task.id)} />
               <span className="task-row__title">{task.title}</span>
               {task.isRoutine && <Badge>{translate("app.navigation.routine")}</Badge>}
               <Chip dotColor={task.labelColor}>{task.label}</Chip>
@@ -107,8 +107,8 @@ function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onTog
 
 function TodayEvents({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
-    <Widget icon="calendar" title={translate("dashboard.text.007")} to="/calendar">
-      {snapshot.events.length === 0 ? <WidgetEmpty icon="calendar">{translate("dashboard.text.008")}</WidgetEmpty> : (
+    <Widget icon="calendar" title={translate("dashboard.todayEvents.title")} to="/calendar">
+      {snapshot.events.length === 0 ? <WidgetEmpty icon="calendar">{translate("dashboard.todayEvents.empty")}</WidgetEmpty> : (
         <div className="event-list">
           {snapshot.events.map((event) => <div className="event-row" key={event.id}><i style={{ backgroundColor: event.color }} /><time>{event.time}</time><span>{event.title}</span></div>)}
         </div>
@@ -120,7 +120,7 @@ function TodayEvents({ snapshot }: { snapshot: DashboardSnapshot }) {
 function MonthlyExpense({ snapshot }: { snapshot: DashboardSnapshot }) {
   const hasExpense = snapshot.monthlyExpense.total > 0 || snapshot.monthlyExpense.categories.length > 0;
   return (
-    <Widget className="expense-widget" icon="wallet" title={translate("dashboard.text.009")} to="/ledger">
+    <Widget className="expense-widget" icon="wallet" title={translate("dashboard.monthlyExpense.title")} to="/ledger">
       {hasExpense ? (
         <>
           <strong className="expense-widget__total">{formatWon(snapshot.monthlyExpense.total)}</strong>
@@ -130,20 +130,20 @@ function MonthlyExpense({ snapshot }: { snapshot: DashboardSnapshot }) {
             ))}
           </div>
         </>
-      ) : <WidgetEmpty icon="wallet">{translate("dashboard.text.010")}</WidgetEmpty>}
+      ) : <WidgetEmpty icon="wallet">{translate("dashboard.monthlyExpense.empty")}</WidgetEmpty>}
     </Widget>
   );
 }
 
 function RoutineWidget({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
-    <Widget icon="routine" title={translate("dashboard.text.011")} to="/routine" wide>
-      {snapshot.routines.length === 0 ? <WidgetEmpty icon="routine">{translate("routine.text.011")}</WidgetEmpty> : (
+    <Widget icon="routine" title={translate("dashboard.routineStreak.title")} to="/routine" wide>
+      {snapshot.routines.length === 0 ? <WidgetEmpty icon="routine">{translate("routine.empty.title")}</WidgetEmpty> : (
         <div className="routine-list">
           {snapshot.routines.map((routine) => (
             <div className="routine-row" key={routine.id}>
               <span className="routine-row__title">{routine.title}</span>
-              <div className="routine-week" aria-label={translate("dashboard.text.012", { value1: routine.title })}>
+              <div className="routine-week" aria-label={translate("dashboard.routineStreak.summary", { title: routine.title })}>
                 {routine.week.map((done, index) => <span className={done ? "routine-day routine-day--done" : "routine-day"} key={index} />)}
               </div>
               <span>{routine.period}</span>
@@ -158,12 +158,12 @@ function RoutineWidget({ snapshot }: { snapshot: DashboardSnapshot }) {
 function RecentScraps({ snapshot }: { snapshot: DashboardSnapshot }) {
   const kindIcon = { 사진: "image", 링크: "scrap", 메모: "note", 동영상: "video" } as const;
   return (
-    <Widget icon="scrap" title={translate("dashboard.text.013")} to="/scrap" wide>
-      {snapshot.scraps.length === 0 ? <WidgetEmpty icon="scrap">{translate("scrap.text.070")}</WidgetEmpty> : (
+    <Widget icon="scrap" title={translate("dashboard.recentScraps.title")} to="/scrap" wide>
+      {snapshot.scraps.length === 0 ? <WidgetEmpty icon="scrap">{translate("scrap.empty.title")}</WidgetEmpty> : (
         <div className="scrap-grid">
           {snapshot.scraps.map((scrap) => (
             <Link className="scrap-card" key={scrap.id} to={`/scrap?detail=${encodeURIComponent(scrap.id)}`}>
-              <div className="scrap-card__meta"><Icon name={kindIcon[scrap.kind]} size={12} /><span>{scrap.kind}</span><span>{translate("dashboard.text.014")}{scrap.commentCount}</span></div>
+              <div className="scrap-card__meta"><Icon name={kindIcon[scrap.kind]} size={12} /><span>{scrap.kind}</span><span>{translate("dashboard.recentScraps.commentCount", { count: scrap.commentCount })}</span></div>
               <strong>{scrap.title}</strong>
             </Link>
           ))}

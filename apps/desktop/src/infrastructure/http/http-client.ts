@@ -56,13 +56,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, withAuth(init));
   } catch (error) {
-    throw new Error(translate("http.text.001", { value1: API_BASE_URL }), { cause: error });
+    throw new Error(translate("http.error.apiUnreachable", { apiUrl: API_BASE_URL }), { cause: error });
   }
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     throw new HttpError(
-      extractErrorMessage(body) ?? translate("http.text.002", { value1: response.status }),
+      extractErrorMessage(body) ?? translate("http.error.requestFailed", { status: response.status }),
       response.status,
     );
   }
@@ -93,9 +93,9 @@ export function httpUpload(path: string, formData: FormData): Promise<void> {
       }
       let body: unknown = null;
       try { body = JSON.parse(xhr.responseText); } catch { /* 비 JSON 응답 */ }
-      reject(new Error(extractErrorMessage(body) ?? translate("http.text.002", { value1: xhr.status })));
+      reject(new Error(extractErrorMessage(body) ?? translate("http.error.requestFailed", { status: xhr.status })));
     };
-    xhr.onerror = () => reject(new Error(translate("http.text.001", { value1: API_BASE_URL })));
+    xhr.onerror = () => reject(new Error(translate("http.error.apiUnreachable", { apiUrl: API_BASE_URL })));
     xhr.send(formData);
   });
 }
@@ -105,12 +105,12 @@ export async function httpGetBlob(path: string): Promise<Blob | null> {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, withAuth());
   } catch (error) {
-    throw new Error(translate("http.text.001", { value1: API_BASE_URL }), { cause: error });
+    throw new Error(translate("http.error.apiUnreachable", { apiUrl: API_BASE_URL }), { cause: error });
   }
   if (response.status === 404) return null;
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    throw new Error(extractErrorMessage(body) ?? translate("http.text.002", { value1: response.status }));
+    throw new Error(extractErrorMessage(body) ?? translate("http.error.requestFailed", { status: response.status }));
   }
   return response.blob();
 }

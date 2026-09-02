@@ -84,9 +84,9 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
   async save({ mode, remoteUrl, token }: SaveServerConnectionInput): Promise<ServerConnection> {
     if (mode === "remote") {
       const next = trimBaseUrl(remoteUrl ?? "");
-      if (!next) throw new Error(translate("server.text.001"));
+      if (!next) throw new Error(translate("server.validation.remoteUrlRequired"));
       if (!looksLikeRemoteApiUrl(next)) {
-        throw new Error(translate("server.text.002"));
+        throw new Error(translate("server.validation.remotePort"));
       }
       this.remoteUrl = next;
       this.remoteToken = (token ?? "").trim();
@@ -100,10 +100,10 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
 
   async probe(baseUrl: string, token?: string): Promise<void> {
     if (!this.reachable.has(trimBaseUrl(baseUrl))) {
-      throw new Error(translate("server.text.003"));
+      throw new Error(translate("server.error.unreachable"));
     }
     if (this.requiredToken && (token ?? "").trim() !== this.requiredToken) {
-      throw new Error((token ?? "").trim() ? translate("server.text.004") : translate("server.text.005"));
+      throw new Error((token ?? "").trim() ? translate("server.auth.invalidToken") : translate("server.auth.tokenRequired"));
     }
   }
 

@@ -10,7 +10,7 @@ import { calendarViewStateStoreOf, type CalendarView, type CalendarViewStateStor
 import { addDays, weekdayOf } from "./recurrence";
 
 export const calendarQueryKey = ["calendar"] as const;
-const dayNames = [translate("routine.text.001"), translate("routine.text.002"), translate("routine.text.003"), translate("routine.text.004"), translate("routine.text.005"), translate("routine.text.006"), translate("routine.text.007")];
+const dayNames = [translate("routine.weekday.sun"), translate("routine.weekday.mon"), translate("routine.weekday.tue"), translate("routine.weekday.wed"), translate("routine.weekday.thu"), translate("routine.weekday.fri"), translate("routine.weekday.sat")];
 const maxVisibleEventsPerDay = 3;
 // 월간 셀에서 이어지는 일정 막대를 몇 줄까지 그릴지. 넘치는 건 날짜별 일정 창에서 본다.
 const maxSpanLanes = 3;
@@ -28,7 +28,7 @@ type CategoryCommand =
 const blankCategoryDraft: CalendarCategoryWriteInput = { name: "", color: "oklch(0.604 0.149 260.322)" };
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("scrap.text.010");
+  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 function dateOf(year: number, month: number, day: number) {
@@ -45,22 +45,22 @@ function monthKey(date: Date) {
 
 function formatMonth(key: string) {
   const [year, month] = key.split("-").map(Number);
-  return translate("calendar.text.001", { value1: year, value2: month });
+  return translate("calendar.date.month", { year, month });
 }
 
 function formatDay(date: string) {
   const [, month, day] = date.split("-").map(Number);
-  return translate("calendar.text.002", { value1: month, value2: day });
+  return translate("calendar.date.monthDay", { month, day });
 }
 
 function formatRange(event: CalendarEvent) {
-  if (!event.startTime && !event.endTime) return translate("calendar.text.003");
+  if (!event.startTime && !event.endTime) return translate("calendar.time.allDay");
   if (event.startDate === event.endDate) return `${event.startTime ?? "00:00"}–${event.endTime ?? event.startTime ?? "00:00"}`;
-  return translate("calendar.text.004", { value1: formatDay(event.startDate), value2: event.startTime ?? translate("calendar.text.003"), value3: formatDay(event.endDate), value4: event.endTime ?? translate("calendar.text.003") });
+  return translate("calendar.event.dateTimeRange", { startDate: formatDay(event.startDate), startTime: event.startTime ?? translate("calendar.time.allDay"), endDate: formatDay(event.endDate), endTime: event.endTime ?? translate("calendar.time.allDay") });
 }
 
 function eventTime(event: CalendarEvent) {
-  return event.startTime ?? translate("calendar.text.003");
+  return event.startTime ?? translate("calendar.time.allDay");
 }
 
 function blankDraft(snapshot: CalendarSnapshot, selectedDate = snapshot.today): Draft {
@@ -124,14 +124,14 @@ function presetToRecurrence(preset: RecurrencePreset, startDate: string, prev: C
 
 function recurrenceSummary(rule: CalendarRecurrence, startDate: string): string {
   const every = rule.interval > 1 ? `${rule.interval}` : "";
-  const unit = { daily: translate("routine.text.001"), weekly: translate("calendar.text.005"), monthly: translate("calendar.text.006"), yearly: translate("calendar.text.007") }[rule.freq];
-  let base = every ? translate("calendar.text.008", { value1: every, value2: unit }) : { daily: translate("routine.text.017"), weekly: translate("calendar.text.009"), monthly: translate("calendar.text.010"), yearly: translate("calendar.text.011") }[rule.freq];
+  const unit = { daily: translate("routine.weekday.sun"), weekly: translate("calendar.recurrence.unit.week"), monthly: translate("calendar.recurrence.unit.month"), yearly: translate("calendar.recurrence.unit.year") }[rule.freq];
+  let base = every ? translate("calendar.recurrence.intervalSummary", { interval: every, unit }) : { daily: translate("routine.recurrence.daily"), weekly: translate("calendar.recurrence.weekly"), monthly: translate("calendar.recurrence.monthly"), yearly: translate("calendar.recurrence.yearly") }[rule.freq];
   if (rule.freq === "weekly") {
     const days = (rule.weekdays.length ? rule.weekdays : [weekdayOf(startDate)]).slice().sort((a, b) => a - b).map((d) => dayNames[d]);
     base = `${base} ${days.join("·")}`;
   }
-  if (rule.until) return translate("calendar.text.012", { value1: base, value2: formatDay(rule.until) });
-  if (rule.count) return translate("calendar.text.013", { value1: base, value2: rule.count });
+  if (rule.until) return translate("calendar.recurrence.untilSummary", { summary: base, endDate: formatDay(rule.until) });
+  if (rule.count) return translate("calendar.recurrence.countSummary", { summary: base, count: rule.count });
   return base;
 }
 
@@ -390,7 +390,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
   }, [searchParams, snapshotQuery.data]);
 
   if (snapshotQuery.isPending) return <CalendarLoading />;
-  if (snapshotQuery.isError) return <div className="calendar-state" role="alert"><Icon name="alert" size={18} />{translate("calendar.text.014")}</div>;
+  if (snapshotQuery.isError) return <div className="calendar-state" role="alert"><Icon name="alert" size={18} />{translate("calendar.error.load")}</div>;
 
   const snapshot = snapshotQuery.data;
   const monthEvents = sortEvents(snapshot.events.filter((event) => event.startDate.startsWith(visibleMonth)));
@@ -453,7 +453,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     event.preventDefault();
     const parsed = calendarCategoryWriteInputSchema.safeParse(categoryDraft);
     if (!parsed.success) {
-      setCategoryError(parsed.error.issues[0]?.message ?? translate("todoLabels.text.001"));
+      setCategoryError(parsed.error.issues[0]?.message ?? translate("common.validation.labelInvalid"));
       return;
     }
     if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
@@ -492,15 +492,15 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
       note: draft.note.trim(),
       recurrence: draft.recurrence,
     };
-    if (!input.title) { setFormError(translate("scrap.text.013")); return null; }
-    if (!input.startDate || !input.endDate) { setFormError(translate("calendar.text.015")); return null; }
-    if (!input.categoryId) { setFormError(translate("scrap.text.014")); return null; }
-    if (Boolean(input.startTime) !== Boolean(input.endTime)) { setFormError(translate("calendar.text.016")); return null; }
+    if (!input.title) { setFormError(translate("common.validation.titleRequired")); return null; }
+    if (!input.startDate || !input.endDate) { setFormError(translate("calendar.validation.dateRangeRequired")); return null; }
+    if (!input.categoryId) { setFormError(translate("common.validation.labelRequired")); return null; }
+    if (Boolean(input.startTime) !== Boolean(input.endTime)) { setFormError(translate("calendar.validation.timeRangeIncomplete")); return null; }
     const start = `${input.startDate}T${input.startTime ?? "00:00"}`;
     const end = `${input.endDate}T${input.endTime ?? "23:59"}`;
-    if (end < start) { setFormError(translate("calendar.text.017")); return null; }
+    if (end < start) { setFormError(translate("calendar.validation.endBeforeStart")); return null; }
     if (input.recurrence?.until && input.recurrence.until < input.startDate) {
-      setFormError(translate("calendar.text.018")); return null;
+      setFormError(translate("calendar.validation.recurrenceEndBeforeStart")); return null;
     }
     return input;
   }
@@ -566,13 +566,13 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     <div className="calendar-page" data-slide={slideDir} ref={attachWheelNav}>
       <div className="calendar-toolbar">
         <div className="calendar-toolbar__pager">
-          <button aria-label={translate("calendar.text.019")} onClick={() => moveMonth(-1)} type="button"><Icon name="arrowLeft" size={13} /></button>
-          <button aria-label={translate("calendar.text.020")} onClick={() => moveMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
+          <button aria-label={translate("calendar.navigation.previousMonth")} onClick={() => moveMonth(-1)} type="button"><Icon name="arrowLeft" size={13} /></button>
+          <button aria-label={translate("calendar.navigation.nextMonth")} onClick={() => moveMonth(1)} type="button"><Icon name="chevronRight" size={13} /></button>
         </div>
         <strong>{formatMonth(visibleMonth)}</strong>
-        <Button onClick={showCurrentMonth} size="small">{translate("todo.text.003")}</Button>
-        <div aria-label={translate("calendar.text.021")} className="calendar-view-tabs" role="tablist">
-          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? translate("routine.text.002") : translate("calendar.text.022")}</button>)}
+        <Button onClick={showCurrentMonth} size="small">{translate("todo.filter.today")}</Button>
+        <div aria-label={translate("calendar.view.label")} className="calendar-view-tabs" role="tablist">
+          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? translate("routine.weekday.mon") : translate("calendar.view.agenda")}</button>)}
         </div>
       </div>
 
@@ -588,11 +588,11 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
               return (
                 <div className={cell.inMonth ? "calendar-cell" : "calendar-cell calendar-cell--outside"} key={cell.date}>
                   {coveringCount > 0
-                    ? <button aria-label={translate("calendar.text.023", { value1: formatDay(cell.date), value2: coveringCount })} className={dayClassName} onClick={() => setDayDialogDate(cell.date)} type="button">{dayNumber}</button>
+                    ? <button aria-label={translate("calendar.day.openEvents", { date: formatDay(cell.date), count: coveringCount })} className={dayClassName} onClick={() => setDayDialogDate(cell.date)} type="button">{dayNumber}</button>
                     : <span className={dayClassName}>{dayNumber}</span>}
                   {spanLanes > 0 && <div className="calendar-cell__span-reserve" style={{ height: `calc(${spanLanes} * var(--cal-span-lane))` }} />}
                   {cell.events.slice(0, maxVisibleEventsPerDay).map((item) => <CalendarEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}
-                  {cell.events.length > maxVisibleEventsPerDay && <span className="calendar-cell__more">+{cell.events.length - maxVisibleEventsPerDay}{translate("calendar.text.024")}</span>}
+                  {cell.events.length > maxVisibleEventsPerDay && <span className="calendar-cell__more">{translate("calendar.day.moreEvents", { count: cell.events.length - maxVisibleEventsPerDay })}</span>}
                 </div>
               );
             })}
@@ -635,64 +635,64 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
         </div>
       )}
 
-      <Modal className="calendar-day-modal" icon="calendar" onClose={() => setDayDialogDate(null)} open={dayDialogDate !== null} title={<>{dayDialogDate ? formatDay(dayDialogDate) : ""}<small>{translate("calendar.text.025")}{dayEvents.length}{translate("scrap.text.044")}</small></>}>
+      <Modal className="calendar-day-modal" icon="calendar" onClose={() => setDayDialogDate(null)} open={dayDialogDate !== null} title={<>{dayDialogDate ? formatDay(dayDialogDate) : ""}<small>{translate("calendar.day.eventCount", { count: dayEvents.length })}</small></>}>
         <div className="calendar-day-list">{dayEvents.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}</div>
       </Modal>
 
       <Modal
         className="calendar-event-modal"
         footer={<>
-          {editingEvent && <Button className="calendar-event-modal__delete" disabled={editorBusy} onClick={requestDelete} variant="ghost">{translate("settings.text.029")}</Button>}
-          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("scrap.text.025")}</Button>
-          <Button form="calendar-event-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.text.013") : translate("settings.text.021")}</Button>
+          {editingEvent && <Button className="calendar-event-modal__delete" disabled={editorBusy} onClick={requestDelete} variant="ghost">{translate("common.action.delete")}</Button>}
+          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
+          <Button form="calendar-event-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
         </>}
         icon="calendar"
         onClose={closeEditor}
         open={editorItem !== null}
-        title={editorItem === "new" ? translate("app.action.newCalendar") : translate("calendar.text.026")}
+        title={editorItem === "new" ? translate("app.action.newCalendar") : translate("calendar.action.editEvent")}
       >
         <form aria-busy={editorBusy} className="calendar-event-form" id="calendar-event-form" onSubmit={submit}>
-          <label className="calendar-event-form__title"><span>{translate("scrap.text.028")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
-          <DateTimeFields draft={draft} label={translate("calendar.text.027")} onChange={setDraftField} prefix="start" />
-          <DateTimeFields draft={draft} label={translate("calendar.text.028")} onChange={setDraftField} prefix="end" />
+          <label className="calendar-event-form__title"><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
+          <DateTimeFields draft={draft} label={translate("calendar.field.start")} onChange={setDraftField} prefix="start" />
+          <DateTimeFields draft={draft} label={translate("calendar.field.end")} onChange={setDraftField} prefix="end" />
           <RecurrenceField
             disabled={editorBusy}
             onChange={(recurrence) => setDraftField("recurrence", recurrence)}
             startDate={draft.startDate}
             value={draft.recurrence}
           />
-          <label className="calendar-event-form__location-field"><span>{translate("inbox.text.007")}</span><div className="calendar-event-form__location"><Icon name="location" size={12} /><Input maxLength={500} onChange={(event) => setDraftField("location", event.target.value)} value={draft.location} /></div></label>
+          <label className="calendar-event-form__location-field"><span>{translate("common.field.location")}</span><div className="calendar-event-form__location"><Icon name="location" size={12} /><Input maxLength={500} onChange={(event) => setDraftField("location", event.target.value)} value={draft.location} /></div></label>
           <fieldset aria-labelledby="calendar-event-category-label" className="calendar-event-form__category">
             <div className="calendar-event-form__category-header">
-              <span id="calendar-event-category-label">{translate("scrap.text.040")}</span>
-              <button disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("scrap.text.041")}</button>
+              <span id="calendar-event-category-label">{translate("common.field.label")}</span>
+              <button disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("common.action.manage")}</button>
             </div>
-            <Select align="end" label={translate("scrap.text.040")} onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
+            <Select align="end" label={translate("common.field.label")} onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
           </fieldset>
-          <label className="calendar-event-form__note"><span>{translate("scrap.text.007")}</span><TextArea maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
+          <label className="calendar-event-form__note"><span>{translate("common.field.note")}</span><TextArea maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
       <Modal
         className="calendar-scope-modal"
-        footer={<Button disabled={editorBusy} onClick={() => setScopePrompt(null)}>{translate("scrap.text.025")}</Button>}
+        footer={<Button disabled={editorBusy} onClick={() => setScopePrompt(null)}>{translate("common.action.cancel")}</Button>}
         icon={scopePrompt?.mode === "delete" ? "trash" : "calendar"}
         onClose={() => { if (!editorBusy) setScopePrompt(null); }}
         open={scopePrompt !== null}
-        title={scopePrompt?.mode === "delete" ? translate("calendar.text.029") : translate("calendar.text.030")}
+        title={scopePrompt?.mode === "delete" ? translate("calendar.scope.deleteTitle") : translate("calendar.scope.editTitle")}
       >
         <div className="calendar-scope">
-          <p><strong>{scopePrompt?.event.title}</strong>{translate("calendar.text.031")}{scopePrompt?.mode === "delete" ? translate("settings.text.029") : translate("calendar.text.032")}{translate("calendar.text.033")}</p>
+          <p>{translate("calendar.scope.prompt", { title: scopePrompt?.event.title ?? "", action: scopePrompt?.mode === "delete" ? translate("common.action.delete") : translate("calendar.scope.applyAction") })}</p>
           <div className="calendar-scope__choices">
             <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("this")} type="button">
-              <strong>{translate("calendar.text.034")}</strong><span>{scopePrompt?.event.occurrenceDate ? formatDay(scopePrompt.event.occurrenceDate) : ""} {translate("calendar.text.035")}</span>
+              <strong>{translate("calendar.scope.thisEvent")}</strong><span>{translate("calendar.scope.singleDay", { date: scopePrompt?.event.occurrenceDate ? formatDay(scopePrompt.event.occurrenceDate) : "" })}</span>
             </button>
             <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("future")} type="button">
-              <strong>{translate("calendar.text.036")}</strong><span>{translate("calendar.text.037")}</span>
+              <strong>{translate("calendar.scope.futureEvents")}</strong><span>{translate("calendar.scope.futureDescription")}</span>
             </button>
             <button className="calendar-scope__choice" disabled={editorBusy} onClick={() => runScope("all")} type="button">
-              <strong>{translate("calendar.text.038")}</strong><span>{translate("calendar.text.039")}</span>
+              <strong>{translate("calendar.scope.allEvents")}</strong><span>{translate("calendar.scope.allDescription")}</span>
             </button>
           </div>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
@@ -701,33 +701,33 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
 
       <Modal
         className="calendar-category-delete-modal"
-        footer={<><Button disabled={deleteMutation.isPending} onClick={() => setDeleteConfirm(false)}>{translate("scrap.text.025")}</Button><Button loading={deleteMutation.isPending} onClick={() => editingEvent && deleteMutation.mutate({ eventId: editingEvent.id })} variant="danger">{translate("settings.text.029")}</Button></>}
+        footer={<><Button disabled={deleteMutation.isPending} onClick={() => setDeleteConfirm(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => editingEvent && deleteMutation.mutate({ eventId: editingEvent.id })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteConfirm(false); }}
         open={deleteConfirm}
-        title={translate("calendar.text.040")}
+        title={translate("calendar.delete.title")}
       >
         <div className="calendar-category-delete">
-          <p><strong>{editingEvent?.title}</strong> {translate("calendar.text.041")}</p>
+          <p>{translate("calendar.delete.confirm", { title: editingEvent?.title ?? "" })}</p>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </div>
       </Modal>
 
-      <Modal className="calendar-category-modal" icon="calendar" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("scrap.text.042")}>
+      <Modal className="calendar-category-modal" icon="calendar" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("common.labels.manage")}>
         <div className="calendar-category-manager">
-          <div aria-label={translate("inbox.text.014")} className="calendar-category-manager__list">
+          <div aria-label={translate("inbox.labels.calendar")} className="calendar-category-manager__list">
             {snapshot.categories.map((category, index) => {
               const usageCount = snapshot.events.filter((event) => event.categoryId === category.id).length;
               return (
                 <div className="calendar-category-manager__row" key={category.id}>
                   <i style={{ backgroundColor: category.color }} />
                   <strong>{category.name}</strong>
-                  <span>{usageCount}{translate("scrap.text.044")}</span>
+                  <span>{usageCount}{translate("common.unit.items")}</span>
                   <div>
-                    <IconButton aria-label={translate("todoLabels.text.002", { value1: category.name })} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title={translate("todoLabels.text.003")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                    <IconButton aria-label={translate("todoLabels.text.004", { value1: category.name })} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title={translate("todoLabels.text.005")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                    <IconButton aria-label={translate("scrap.text.045", { value1: category.name })} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title={translate("scrap.text.046")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                    <IconButton aria-label={snapshot.categories.length === 1 ? translate("scrap.text.048", { value1: category.name }) : translate("scrap.text.049", { value1: category.name })} disabled={categoryMutation.isPending || snapshot.categories.length === 1} onClick={() => openDeleteCategory(category.id)} size="small" title={snapshot.categories.length === 1 ? translate("todoLabels.text.006") : translate("settings.text.029")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
+                    <IconButton aria-label={translate("common.action.moveUpLabel", { name: category.name })} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title={translate("common.action.moveUp")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
+                    <IconButton aria-label={translate("common.action.moveDownLabel", { name: category.name })} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title={translate("common.action.moveDown")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
+                    <IconButton aria-label={translate("common.action.editLabel", { name: category.name })} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
+                    <IconButton aria-label={snapshot.categories.length === 1 ? translate("common.action.deleteDisabledLabel", { name: category.name }) : translate("common.action.deleteLabel", { name: category.name })} disabled={categoryMutation.isPending || snapshot.categories.length === 1} onClick={() => openDeleteCategory(category.id)} size="small" title={snapshot.categories.length === 1 ? translate("common.labels.lastDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
                   </div>
                 </div>
               );
@@ -735,13 +735,13 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
           </div>
           <form aria-busy={categoryMutation.isPending} className="calendar-category-editor" id="calendar-category-editor" onSubmit={submitCategory}>
             <div className="calendar-category-editor__header">
-              <strong>{editingCategoryId ? translate("scrap.text.051") : translate("scrap.text.052")}</strong>
-              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("scrap.text.025")}</button>}
+              <strong>{editingCategoryId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
+              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("common.action.cancel")}</button>}
             </div>
             <div className="calendar-category-editor__controls">
-              <ColorPicker disabled={categoryMutation.isPending} label={translate("todoLabels.text.008")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
-              <Input aria-label={translate("scrap.text.053")} autoFocus disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("scrap.text.053")} value={categoryDraft.name} />
-              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("settings.text.021") : translate("scrap.text.054")}</Button>
+              <ColorPicker disabled={categoryMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
+              <Input aria-label={translate("common.labels.name")} autoFocus disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={categoryDraft.name} />
+              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("common.action.save") : translate("common.action.add")}</Button>
             </div>
             {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
           </form>
@@ -750,19 +750,19 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
 
       <Modal
         className="calendar-category-delete-modal"
-        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("scrap.text.025")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && replacementCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId, replacementCategoryId })} variant="danger">{translate("settings.text.029")}</Button></>}
+        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("common.action.cancel")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && replacementCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId, replacementCategoryId })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
         open={deleteCategoryId !== null}
-        title={translate("scrap.text.055")}
+        title={translate("common.labels.deleteTitle")}
       >
         <div className="calendar-category-delete">
-          <p><strong>{snapshot.categories.find((category) => category.id === deleteCategoryId)?.name}</strong> {translate("scrap.text.056")}</p>
+          <p>{translate("common.labels.deleteQuestion", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "" })}</p>
           <label>
-            <span>{translate("calendar.text.042")}</span>
-            <Select disabled={categoryMutation.isPending} label={translate("scrap.text.058")} onChange={setReplacementCategoryId} options={snapshot.categories.filter((category) => category.id !== deleteCategoryId).map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={replacementCategoryId} />
+            <span>{translate("calendar.labels.moveExisting")}</span>
+            <Select disabled={categoryMutation.isPending} label={translate("common.labels.moveTarget")} onChange={setReplacementCategoryId} options={snapshot.categories.filter((category) => category.id !== deleteCategoryId).map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={replacementCategoryId} />
           </label>
-          <small>{translate("calendar.text.043")}</small>
+          <small>{translate("calendar.labels.moveExistingDescription")}</small>
           {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
         </div>
       </Modal>
@@ -789,8 +789,8 @@ function agendaGroups(events: CalendarEvent[]) {
 }
 
 function dayLabel(date: string, today: string) {
-  const name = translate("calendar.text.044", { value1: dayNames[new Date(`${date}T00:00:00Z`).getUTCDay()] });
-  return date === today ? translate("calendar.text.045", { value1: name }) : name;
+  const name = translate("calendar.weekday.full", { name: dayNames[new Date(`${date}T00:00:00Z`).getUTCDay()] });
+  return date === today ? translate("calendar.day.todayLabel", { name }) : name;
 }
 
 function CalendarEventButton({ event, category, onClick }: { event: CalendarEvent; category?: CalendarCategory; onClick: () => void }) {
@@ -805,24 +805,24 @@ function AgendaEventButton({ event, category, onClick }: { event: CalendarEvent;
 function DateTimeFields({ draft, label, prefix, onChange }: { draft: Draft; label: string; prefix: "start" | "end"; onChange: <Key extends keyof Draft>(key: Key, value: Draft[Key]) => void }) {
   const dateKey = `${prefix}Date` as "startDate" | "endDate";
   const timeKey = `${prefix}Time` as "startTime" | "endTime";
-  return <fieldset className="calendar-event-form__date-time"><legend>{label}</legend><div><DatePicker align={prefix === "end" ? "end" : "start"} label={translate("calendar.text.046", { value1: label })} onChange={(value) => onChange(dateKey, value)} value={draft[dateKey]} /><TimePicker align={prefix === "end" ? "end" : "start"} label={translate("calendar.text.047", { value1: label })} onChange={(value) => onChange(timeKey, value)} value={draft[timeKey]} /></div></fieldset>;
+  return <fieldset className="calendar-event-form__date-time"><legend>{label}</legend><div><DatePicker align={prefix === "end" ? "end" : "start"} label={translate("calendar.field.dateLabel", { label })} onChange={(value) => onChange(dateKey, value)} value={draft[dateKey]} /><TimePicker align={prefix === "end" ? "end" : "start"} label={translate("calendar.field.timeLabel", { label })} onChange={(value) => onChange(timeKey, value)} value={draft[timeKey]} /></div></fieldset>;
 }
 
 const recurrencePresetOptions: { value: RecurrencePreset; label: string }[] = [
-  { value: "none", label: translate("calendar.text.048") },
-  { value: "daily", label: translate("routine.text.017") },
-  { value: "weekly", label: translate("calendar.text.009") },
-  { value: "weekdays", label: translate("calendar.text.049") },
-  { value: "biweekly", label: translate("calendar.text.050") },
-  { value: "monthly", label: translate("calendar.text.010") },
-  { value: "yearly", label: translate("calendar.text.011") },
-  { value: "custom", label: translate("calendar.text.051") },
+  { value: "none", label: translate("calendar.recurrence.none") },
+  { value: "daily", label: translate("routine.recurrence.daily") },
+  { value: "weekly", label: translate("calendar.recurrence.weekly") },
+  { value: "weekdays", label: translate("calendar.recurrence.weekdays") },
+  { value: "biweekly", label: translate("calendar.recurrence.biweekly") },
+  { value: "monthly", label: translate("calendar.recurrence.monthly") },
+  { value: "yearly", label: translate("calendar.recurrence.yearly") },
+  { value: "custom", label: translate("calendar.recurrence.custom") },
 ];
 const recurrenceFreqOptions: { value: RecurrenceFreq; label: string }[] = [
-  { value: "daily", label: translate("routine.text.001") },
-  { value: "weekly", label: translate("calendar.text.005") },
-  { value: "monthly", label: translate("calendar.text.006") },
-  { value: "yearly", label: translate("calendar.text.007") },
+  { value: "daily", label: translate("routine.weekday.sun") },
+  { value: "weekly", label: translate("calendar.recurrence.unit.week") },
+  { value: "monthly", label: translate("calendar.recurrence.unit.month") },
+  { value: "yearly", label: translate("calendar.recurrence.unit.year") },
 ];
 
 function clamp(raw: string, min: number, max: number, fallback: number): number {
@@ -856,11 +856,11 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
 
   return (
     <fieldset className="calendar-event-form__recurrence">
-      <legend>{translate("calendar.text.052")}</legend>
+      <legend>{translate("calendar.recurrence.title")}</legend>
       <Select
         align="end"
         disabled={disabled}
-        label={translate("calendar.text.052")}
+        label={translate("calendar.recurrence.title")}
         onChange={(next) => onChange(presetToRecurrence(next as RecurrencePreset, startDate, value))}
         options={recurrencePresetOptions}
         value={preset}
@@ -870,13 +870,13 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
           {preset === "custom" && (
             <>
               <label className="calendar-recurrence__interval">
-                <span>{translate("calendar.text.053")}</span>
+                <span>{translate("calendar.recurrence.interval")}</span>
                 <div>
-                  <Input aria-label={translate("calendar.text.054")} disabled={disabled} inputMode="numeric" onChange={(event) => patch({ interval: clamp(event.target.value, 1, 999, value.interval) })} value={String(value.interval)} />
+                  <Input aria-label={translate("calendar.recurrence.intervalLabel")} disabled={disabled} inputMode="numeric" onChange={(event) => patch({ interval: clamp(event.target.value, 1, 999, value.interval) })} value={String(value.interval)} />
                   <Select
                     align="end"
                     disabled={disabled}
-                    label={translate("calendar.text.055")}
+                    label={translate("calendar.recurrence.frequencyLabel")}
                     onChange={(next) => patch({ freq: next as RecurrenceFreq, weekdays: next === "weekly" ? (value.weekdays.length ? value.weekdays : [weekdayOf(startDate)]) : [] })}
                     options={recurrenceFreqOptions}
                     value={value.freq}
@@ -884,7 +884,7 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
                 </div>
               </label>
               {value.freq === "weekly" && (
-                <div aria-label={translate("routine.text.019")} className="calendar-recurrence__weekdays" role="group">
+                <div aria-label={translate("routine.field.days")} className="calendar-recurrence__weekdays" role="group">
                   {dayNames.map((name, index) => (
                     <button
                       aria-pressed={value.weekdays.includes(index)}
@@ -900,18 +900,18 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
             </>
           )}
           <label className="calendar-recurrence__end">
-            <span>{translate("calendar.text.056")}</span>
+            <span>{translate("calendar.recurrence.end")}</span>
             <div>
               <Select
                 align="end"
                 disabled={disabled}
-                label={translate("calendar.text.056")}
+                label={translate("calendar.recurrence.end")}
                 onChange={(next) => setEnd(next as RecurrenceEnd)}
-                options={[{ value: "never", label: translate("calendar.text.048") }, { value: "until", label: translate("inbox.text.011") }, { value: "count", label: translate("calendar.text.057") }]}
+                options={[{ value: "never", label: translate("calendar.recurrence.none") }, { value: "until", label: translate("common.field.date") }, { value: "count", label: translate("calendar.recurrence.count") }]}
                 value={end}
               />
-              {end === "until" && <DatePicker align="end" disabled={disabled} label={translate("calendar.text.058")} min={startDate} onChange={(next) => patch({ until: next })} value={value.until ?? ""} />}
-              {end === "count" && <Input aria-label={translate("calendar.text.059")} disabled={disabled} inputMode="numeric" onChange={(event) => patch({ count: clamp(event.target.value, 1, 999, value.count ?? 10) })} value={String(value.count ?? "")} />}
+              {end === "until" && <DatePicker align="end" disabled={disabled} label={translate("calendar.recurrence.endDate")} min={startDate} onChange={(next) => patch({ until: next })} value={value.until ?? ""} />}
+              {end === "count" && <Input aria-label={translate("calendar.recurrence.countLabel")} disabled={disabled} inputMode="numeric" onChange={(event) => patch({ count: clamp(event.target.value, 1, 999, value.count ?? 10) })} value={String(value.count ?? "")} />}
             </div>
           </label>
           <p className="calendar-recurrence__summary"><Icon name="routine" size={11} strokeWidth={1.8} />{recurrenceSummary(value, startDate)}</p>
@@ -922,9 +922,9 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
 }
 
 function CalendarEmpty({ onCreate }: { onCreate: () => void }) {
-  return <div className="calendar-empty"><Icon name="calendar" size={28} /><strong>{translate("calendar.text.060")}</strong><span>{translate("calendar.text.061")}</span><Button onClick={onCreate} variant="primary">{translate("app.action.newCalendar")}</Button></div>;
+  return <div className="calendar-empty"><Icon name="calendar" size={28} /><strong>{translate("calendar.empty.title")}</strong><span>{translate("calendar.empty.description")}</span><Button onClick={onCreate} variant="primary">{translate("app.action.newCalendar")}</Button></div>;
 }
 
 function CalendarLoading() {
-  return <div aria-label={translate("calendar.text.062")} className="calendar-page calendar-page--loading"><div className="calendar-toolbar" /><div className="calendar-month"><div className="calendar-grid calendar-grid--skeleton" /></div></div>;
+  return <div aria-label={translate("calendar.loading")} className="calendar-page calendar-page--loading"><div className="calendar-toolbar" /><div className="calendar-month"><div className="calendar-grid calendar-grid--skeleton" /></div></div>;
 }

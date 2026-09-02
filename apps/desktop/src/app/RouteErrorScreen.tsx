@@ -5,7 +5,7 @@ import { useRouteError } from "react-router";
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return translate("routeError.text.001");
+  return translate("routeError.unknown");
 }
 
 export function RouteErrorScreen() {
@@ -15,9 +15,9 @@ export function RouteErrorScreen() {
 
   return (
     <div className="route-error" role="alert">
-      <StatusIndicator icon="alert" label={translate("routeError.text.002")} tone="danger" />
+      <StatusIndicator icon="alert" label={translate("routeError.title")} tone="danger" />
       <p>{errorMessage(error)}</p>
-      <button onClick={() => window.location.reload()} type="button">{translate("routeError.text.003")}</button>
+      <button onClick={() => window.location.reload()} type="button">{translate("routeError.retry")}</button>
     </div>
   );
 }

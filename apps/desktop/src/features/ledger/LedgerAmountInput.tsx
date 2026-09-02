@@ -13,7 +13,7 @@ export function formatLedgerAmountInput(raw: string) {
   return digits ? Number(digits).toLocaleString("ko-KR") : "";
 }
 
-export function LedgerAmountInput({ autoFocus = false, label = translate("inbox.text.010"), onChange, value }: LedgerAmountInputProps) {
+export function LedgerAmountInput({ autoFocus = false, label = translate("ledger.field.amount"), onChange, value }: LedgerAmountInputProps) {
   return (
     <div className="ledger-amount-input">
       <b aria-hidden="true">₩</b>

@@ -22,7 +22,7 @@ export class InMemoryR2SettingsStore implements R2SettingsStore {
 
   async setCredentials(credentials: R2Credentials): Promise<void> {
     if (!credentials.accountId.trim() || !credentials.accessKeyId.trim() || !credentials.secretAccessKey.trim() || !credentials.bucket.trim()) {
-      throw new Error(translate("r2.text.001"));
+      throw new Error(translate("r2.validation.credentialsRequired"));
     }
     this.credentials = credentials;
   }
@@ -32,6 +32,6 @@ export class InMemoryR2SettingsStore implements R2SettingsStore {
   }
 
   async testConnection(): Promise<void> {
-    if (this.credentials === null) throw new Error(translate("r2.text.002"));
+    if (this.credentials === null) throw new Error(translate("r2.error.credentialsNotConfigured"));
   }
 }

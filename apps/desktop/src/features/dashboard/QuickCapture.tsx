@@ -56,10 +56,10 @@ function droppedTextOf(dataTransfer: DataTransfer) {
 function captureImageOf(file: File) {
   return new Promise<PendingMedia>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(translate("quickCapture.text.001")));
+    reader.onerror = () => reject(new Error(translate("quickCapture.error.readImage")));
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error(translate("quickCapture.text.001")));
+        reject(new Error(translate("quickCapture.error.readImage")));
         return;
       }
       resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result, file });
@@ -71,10 +71,10 @@ function captureImageOf(file: File) {
 function captureVideoOf(file: File) {
   return new Promise<PendingMedia>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(translate("quickCapture.text.002")));
+    reader.onerror = () => reject(new Error(translate("quickCapture.error.readVideo")));
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error(translate("quickCapture.text.002")));
+        reject(new Error(translate("quickCapture.error.readVideo")));
         return;
       }
       resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: reader.result, file });
@@ -137,29 +137,29 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
   async function addMedia(files: File[]) {
     if (files.length === 0 || mediaPending) return;
     if (files.some((file) => !file.type.startsWith("image/") && !file.type.startsWith("video/"))) {
-      setDropError(translate("quickCapture.text.003"));
+      setDropError(translate("quickCapture.error.unsupportedMedia"));
       return;
     }
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
     const videoFiles = files.filter((file) => file.type.startsWith("video/"));
     if (imageFiles.some((file) => file.size > maxCaptureImageBytes)) {
-      setDropError(translate("quickCapture.text.004"));
+      setDropError(translate("quickCapture.error.imageTooLarge"));
       return;
     }
     if ([...captureImages, ...imageFiles].reduce((total, file) => total + file.size, 0) > maxCaptureImageTotalBytes) {
-      setDropError(translate("quickCapture.text.005"));
+      setDropError(translate("quickCapture.error.imagesTooLarge"));
       return;
     }
     if (videoFiles.some((file) => file.size > maxCaptureVideoBytes)) {
-      setDropError(translate("quickCapture.text.006"));
+      setDropError(translate("quickCapture.error.videoTooLarge"));
       return;
     }
     if (captureImages.length + imageFiles.length > maxCaptureImages) {
-      setDropError(translate("quickCapture.text.007", { value1: maxCaptureImages }));
+      setDropError(translate("quickCapture.error.tooManyImages", { max: maxCaptureImages }));
       return;
     }
     if (captureVideos.length + videoFiles.length > maxCaptureVideos) {
-      setDropError(translate("quickCapture.text.008"));
+      setDropError(translate("quickCapture.error.tooManyVideos"));
       return;
     }
     setMediaPending(true);
@@ -173,7 +173,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
       setCaptureImages((current) => [...current, ...nextImages].slice(0, maxCaptureImages));
       setCaptureVideos((current) => [...current, ...nextVideos].slice(0, maxCaptureVideos));
     } catch {
-      setDropError(translate("quickCapture.text.009"));
+      setDropError(translate("quickCapture.error.readMedia"));
     } finally {
       setMediaPending(false);
     }
@@ -214,12 +214,12 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
     }
     const droppedText = droppedTextOf(event.dataTransfer);
     if (!droppedText) {
-      setDropError(translate("quickCapture.text.010"));
+      setDropError(translate("quickCapture.error.emptyDrop"));
       return;
     }
     const nextText = [captureText.trim(), droppedText].filter(Boolean).join(" ");
     if (nextText.length > 2_000) {
-      setDropError(translate("quickCapture.text.011"));
+      setDropError(translate("quickCapture.error.textTooLong"));
       return;
     }
     setCaptureText(nextText);
@@ -229,7 +229,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
 
   return (
     <section
-      aria-label={translate("quickCapture.text.012")}
+      aria-label={translate("quickCapture.dropZone.label")}
       className={`quick-capture ${dragMode ? "quick-capture--dragging" : ""}`.trim()}
       onDragEnter={enterDropZone}
       onDragLeave={leaveDropZone}
@@ -238,8 +238,8 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
     >
       <div aria-hidden="true" className="quick-capture__drop-feedback">
         <Icon name={dragMode === "media" ? "video" : "inbox"} size={18} strokeWidth={1.6} />
-        <strong>{dragMode === "media" ? translate("quickCapture.text.013") : translate("quickCapture.text.014")}</strong>
-        <span>{translate("quickCapture.text.015")}</span>
+        <strong>{dragMode === "media" ? translate("quickCapture.dropZone.mediaPrompt") : translate("quickCapture.dropZone.textPrompt")}</strong>
+        <span>{translate("quickCapture.dropZone.hint")}</span>
       </div>
 
       {showHeading && <SectionHeader title={<span className="section-title-with-icon"><Icon name="sparkles" size={15} strokeWidth={1.5} />{translate("app.quickCapture.title")}</span>} />}
@@ -253,12 +253,12 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
             setDropError(null);
             if (captureMutation.isError) captureMutation.reset();
           }}
-          placeholder={translate("quickCapture.text.016")}
+          placeholder={translate("quickCapture.input.placeholder")}
           value={captureText}
         />
         <input
           accept="image/*,video/*"
-          aria-label={translate("quickCapture.text.017")}
+          aria-label={translate("quickCapture.mediaPicker.label")}
           className="capture-file-input"
           multiple
           onChange={(event) => {
@@ -268,22 +268,22 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
           ref={mediaInputRef}
           type="file"
         />
-        <Button aria-label={translate("quickCapture.text.018")} disabled={captureMutation.isPending || mediaPending} onClick={() => mediaInputRef.current?.click()} type="button">
+        <Button aria-label={translate("quickCapture.action.addMedia")} disabled={captureMutation.isPending || mediaPending} onClick={() => mediaInputRef.current?.click()} type="button">
           <Icon name="file" size={15} strokeWidth={1.7} />
         </Button>
-        <Button aria-label={translate("quickCapture.text.019")} loading={captureMutation.isPending} type="submit" variant="primary">
+        <Button aria-label={translate("quickCapture.action.submit")} loading={captureMutation.isPending} type="submit" variant="primary">
           <Icon name="send" size={15} strokeWidth={2} />
         </Button>
       </form>
 
       {(captureImages.length > 0 || captureVideos.length > 0 || mediaPending) && (
-        <div aria-label={translate("quickCapture.text.020")} className="capture-images" role="list">
+        <div aria-label={translate("quickCapture.attachments.label")} className="capture-images" role="list">
           {captureImages.map((image, index) => (
             <div className="capture-image" key={`${image.name}-${image.size}-${index}`} role="listitem">
               <img alt={image.name} src={image.dataUrl} />
               <span><strong title={image.name}>{image.name}</strong><small>{formatMediaSize(image.size)}</small></span>
               <button
-                aria-label={translate("quickCapture.text.021", { value1: image.name })}
+                aria-label={translate("quickCapture.attachments.remove", { name: image.name })}
                 onClick={() => setCaptureImages((current) => current.filter((_, imageIndex) => imageIndex !== index))}
                 type="button"
               >
@@ -293,10 +293,10 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
           ))}
           {captureVideos.map((video, index) => (
             <div className="capture-image" key={`${video.name}-${video.size}-${index}`} role="listitem">
-              <div aria-label={translate("quickCapture.text.022", { value1: video.name })} className="capture-video-placeholder" role="img"><Icon name="video" size={16} /></div>
-              <span><strong title={video.name}>{video.name}</strong><small>{formatMediaSize(video.size)} {translate("quickCapture.text.023")}</small></span>
+              <div aria-label={translate("quickCapture.attachments.videoLabel", { name: video.name })} className="capture-video-placeholder" role="img"><Icon name="video" size={16} /></div>
+              <span><strong title={video.name}>{video.name}</strong><small>{translate("quickCapture.attachments.videoClassification", { size: formatMediaSize(video.size) })}</small></span>
               <button
-                aria-label={translate("quickCapture.text.021", { value1: video.name })}
+                aria-label={translate("quickCapture.attachments.remove", { name: video.name })}
                 onClick={() => setCaptureVideos((current) => current.filter((_, videoIndex) => videoIndex !== index))}
                 type="button"
               >
@@ -304,18 +304,18 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
               </button>
             </div>
           ))}
-          {mediaPending && <span className="capture-image-loading" role="status">{translate("quickCapture.text.024")}</span>}
+          {mediaPending && <span className="capture-image-loading" role="status">{translate("quickCapture.attachments.loading")}</span>}
         </div>
       )}
 
       {(dropError || captureMutation.isError) && (
-        <p className="capture-error" role="alert">{dropError ?? translate("quickCapture.text.025")}</p>
+        <p className="capture-error" role="alert">{dropError ?? translate("quickCapture.error.submit")}</p>
       )}
 
       {snapshot && (
         <div className="capture-meta">
-          <span className="capture-meta__label">{translate("quickCapture.text.026")}</span>
-          {snapshot.recentCaptures.length === 0 && <span className="capture-meta__empty">{translate("quickCapture.text.027")}</span>}
+          <span className="capture-meta__label">{translate("quickCapture.recent.label")}</span>
+          {snapshot.recentCaptures.length === 0 && <span className="capture-meta__empty">{translate("quickCapture.recent.empty")}</span>}
           {snapshot.recentCaptures.slice(0, 2).map((capture) => {
             const meta = moduleMeta[capture.module];
             return (
@@ -327,7 +327,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
               </Link>
             );
           })}
-          <Link className="inbox-link" to="/inbox">{translate("quickCapture.text.028")}{snapshot.pendingCaptureCount}{translate("quickCapture.text.029")}<Icon name="chevronRight" size={11} /></Link>
+          <Link className="inbox-link" to="/inbox">{translate("quickCapture.inbox.pendingCount", { count: snapshot.pendingCaptureCount })}<Icon name="chevronRight" size={11} /></Link>
         </div>
       )}
     </section>
