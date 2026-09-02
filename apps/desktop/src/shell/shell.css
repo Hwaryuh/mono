@@ -247,7 +247,6 @@
 .settings-modal .ui-overlay__body { padding: 0; overflow: hidden; }
 .settings-layout { min-height: 0; height: 100%; display: grid; grid-template-columns: 188px minmax(0, 1fr); }
 .settings-navigation { min-width: 0; padding: 18px 12px; border-right: 1px solid var(--color-border); background: var(--color-surface-subtle); }
-.settings-navigation > span { display: block; padding: 0 9px 9px; color: var(--color-text-faint); font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; }
 .settings-navigation nav { display: flex; flex-direction: column; gap: 3px; }
 .settings-navigation__group { padding: 14px 10px 5px; color: var(--color-text-faint); font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; }
 .settings-navigation__group:first-child { padding-top: 2px; }

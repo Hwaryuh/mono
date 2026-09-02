@@ -448,7 +448,6 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
     <Modal className="settings-modal" icon="settings" onClose={onClose} open={open} title={t("settings.title")}>
       <div className="settings-layout">
         <aside className="settings-navigation">
-          <span>{t("settings.title")}</span>
           <nav aria-label={t("settings.navigation")}>
             {settingsSections.map((section, index) => (
               <Fragment key={section.id}>
