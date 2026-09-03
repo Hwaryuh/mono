@@ -78,12 +78,14 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   const selectedTodoIdRef = useRef<string | null>(null);
   // 방금 끝나서 울리고 있는 페이즈. 끄기 전까지 다음 페이즈로 넘어가지 않는다.
   const [ringing, setRinging] = useState<Phase | null>(null);
-  // 시작 전 길이 입력 중인 원본 문자열. 커밋(blur·Enter) 때만 숫자로 좁힌다.
+  // 큰 숫자를 눌러 길이를 고치는 중인지. 입력값은 커밋(blur·Enter) 때만 숫자로 좁힌다.
+  const [editingMinutes, setEditingMinutes] = useState(false);
   const [minutesDraft, setMinutesDraft] = useState<string | null>(null);
 
   const total = minutesOf(settings, phase) * 60;
   const running = endsAt !== null;
-  const idle = !running && ringing === null && remaining === total;
+  // 카운트다운 중도, 울리는 중도 아닐 때만 길이를 고칠 수 있다(시작 전·일시정지 포함).
+  const canEditMinutes = !running && ringing === null;
 
   const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
   const candidates = [...(snapshotQuery.data?.items ?? [])]
@@ -196,6 +198,7 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   function commitMinutesDraft() {
     const raw = minutesDraft;
     setMinutesDraft(null);
+    setEditingMinutes(false);
     if (raw === null || raw.trim() === "") return;
     const next = normalizeTimerSettings({ ...settings, [minutesKeyOf(phase)]: Number(raw) });
     setSettings(next);
@@ -234,32 +237,44 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
         <div
           className={`timer-digits ${phase === "focus" ? "" : "timer-digits--break"} ${ringing !== null ? "timer-digits--ringing" : ""}`}
         >
-          {formatClock(remaining)}
-        </div>
-        {idle ? (
-          <div className="timer-adjust">
-            <span className="timer-adjust__phase">{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
+          {editingMinutes && canEditMinutes ? (
             <input
               aria-label={translate("timer.adjust.label")}
-              className="timer-adjust__input"
+              autoFocus
+              className="timer-digits__input"
               inputMode="numeric"
               max={180}
               min={1}
               onBlur={commitMinutesDraft}
               onChange={(event) => setMinutesDraft(event.target.value)}
+              onFocus={(event) => event.currentTarget.select()}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape") {
+                  setMinutesDraft(null);
+                  setEditingMinutes(false);
+                }
               }}
               type="number"
               value={minutesDraft ?? String(currentMinutes)}
             />
-            <span className="timer-adjust__unit">{translate("timer.adjust.unit")}</span>
-          </div>
-        ) : (
-          <div className="timer-bar">
-            <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
-          </div>
-        )}
+          ) : canEditMinutes ? (
+            <button
+              className="timer-digits__edit"
+              onClick={() => setEditingMinutes(true)}
+              title={translate("timer.adjust.edit")}
+              type="button"
+            >
+              {formatClock(remaining)}
+            </button>
+          ) : (
+            formatClock(remaining)
+          )}
+        </div>
+        <div className="timer-bar" hidden={editingMinutes && canEditMinutes}>
+          <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
+        </div>
+        <span className="timer-phase">{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
 
         <div className="timer-tally">
           <span>{translate("todo.filter.today")}</span>

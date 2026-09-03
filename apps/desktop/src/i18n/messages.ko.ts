@@ -557,7 +557,7 @@ export const koMessages = {
   "timer.phase.focus": "집중",
   "timer.phase.shortBreak": "휴식",
   "timer.adjust.label": "세션 길이(분)",
-  "timer.adjust.unit": "분",
+  "timer.adjust.edit": "세션 길이 변경",
   "timer.todo.noLabel": "라벨 없음",
   "timer.todo.noSessions": "세션 없음",
   "timer.todo.sessionCount": "{count}세션",

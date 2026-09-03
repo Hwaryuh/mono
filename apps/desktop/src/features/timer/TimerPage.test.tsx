@@ -40,9 +40,10 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("시작 전 화면에서 집중 길이를 직접 입력한다", () => {
+  it("큰 숫자를 눌러 집중 길이를 직접 입력한다", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 25 });
 
+    fireEvent.click(screen.getByRole("button", { name: "25:00" }));
     const input = screen.getByLabelText("세션 길이(분)");
     fireEvent.change(input, { target: { value: "40" } });
     fireEvent.blur(input);
@@ -54,11 +55,36 @@ describe("TimerPage", () => {
   it("범위를 벗어난 입력은 경계로 잘라낸다", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 25 });
 
+    fireEvent.click(screen.getByRole("button", { name: "25:00" }));
     const input = screen.getByLabelText("세션 길이(분)");
     fireEvent.change(input, { target: { value: "999" } });
     fireEvent.blur(input);
 
     expect(settingsStore.read().focusMinutes).toBe(180);
+  });
+
+  it("일시정지 중에도 길이를 고칠 수 있다", () => {
+    const { settingsStore } = renderTimer({ focusMinutes: 2 });
+    fireEvent.click(screen.getByRole("button", { name: /시작/ }));
+    act(() => { vi.advanceTimersByTime(30_000); });
+    fireEvent.click(screen.getByRole("button", { name: /일시정지/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "01:30" }));
+    const input = screen.getByLabelText("세션 길이(분)");
+    fireEvent.change(input, { target: { value: "10" } });
+    fireEvent.blur(input);
+
+    expect(screen.getByText("10:00")).toBeInTheDocument();
+    expect(settingsStore.read().focusMinutes).toBe(10);
+  });
+
+  it("카운트다운 중에는 숫자를 편집할 수 없다", () => {
+    renderTimer({ focusMinutes: 2 });
+    fireEvent.click(screen.getByRole("button", { name: /시작/ }));
+    act(() => { vi.advanceTimersByTime(1_000); });
+
+    expect(screen.queryByLabelText("세션 길이(분)")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
   it("집중이 끝나면 알람이 울리고, 끄기 전에는 휴식으로 넘어가지 않는다", () => {
