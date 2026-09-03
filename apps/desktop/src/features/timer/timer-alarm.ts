@@ -4,12 +4,8 @@ export interface Alarm {
   stop(): void;
 }
 
-/** alarm.mp3 는 2.76초 클립. 3.25초마다 처음부터 다시 재생해 "울림 … 짧은 정적 … 울림" 리듬을 만든다. */
-const REPLAY_MS = 3250;
-
 export function createAlarm(src = "/alarm.mp3"): Alarm {
   let audio: HTMLAudioElement | null = null;
-  let replay: ReturnType<typeof setInterval> | null = null;
   let ctx: AudioContext | null = null;
   let beep: ReturnType<typeof setInterval> | null = null;
   let stopped = true;
@@ -39,17 +35,13 @@ export function createAlarm(src = "/alarm.mp3"): Alarm {
       if (!stopped) return;
       stopped = false;
       const el = new Audio(src);
+      // 네이티브 loop 에 맡긴다. 벽시계 setInterval 로 되감으면 play() 지연·디코드 멈춤·
+      // 백그라운드 스로틀에 밀려 클립이 겹치거나("두 번 연속") 한참 비게 된다.
+      el.loop = true;
+      audio = el;
       Promise.resolve(el.play())
         .then(() => {
-          if (stopped) {
-            el.pause();
-            return;
-          }
-          audio = el;
-          replay = setInterval(() => {
-            el.currentTime = 0;
-            void el.play().catch(() => {});
-          }, REPLAY_MS);
+          if (stopped) el.pause();
         })
         .catch(() => {
           if (!stopped) synth();
@@ -57,10 +49,6 @@ export function createAlarm(src = "/alarm.mp3"): Alarm {
     },
     stop() {
       stopped = true;
-      if (replay) {
-        clearInterval(replay);
-        replay = null;
-      }
       audio?.pause();
       audio = null;
       if (beep) {
