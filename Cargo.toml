@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 # `npm run version:set -- X.Y.Z`로 변경
-version = "0.3.4"
+version = "0.3.5"
 
 # 워크스페이스는 루트 매니페스트에서만 profile을 인식한다 — 멤버의 [profile.*]는 무시됨.
 [profile.release]
