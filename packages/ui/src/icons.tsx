@@ -22,7 +22,6 @@ const paths = {
   label: "M4 7h9l7 5-7 5H4zM8 12h.01",
   search: "M11 4a7 7 0 100 14 7 7 0 000-14zM16.5 16.5L20 20",
   plus: "M12 5v14M5 12h14",
-  minus: "M5 12h14",
   bell: "M6 16V10a6 6 0 0112 0v6l2 2H4zM10 20a2 2 0 004 0",
   check: "M5 12.5l4.5 4.5L19 7",
   close: "M6 6l12 12M18 6L6 18",

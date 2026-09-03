@@ -28,22 +28,30 @@
 @media (prefers-reduced-motion: reduce) { .timer-digits--ringing { animation: none; } }
 
 .timer-adjust {
-  height: 32px;
-  margin-top: -6px;
+  height: 34px;
+  margin-top: -4px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--color-text-faint);
+  font-size: 11px;
 }
-.timer-adjust .ui-icon-button { width: 30px; height: 30px; }
-.timer-adjust__value {
-  min-width: 108px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
+.timer-adjust__phase { letter-spacing: 0.06em; }
+.timer-adjust__input {
+  width: 3.4em;
+  padding: 2px 4px;
+  border: none;
+  border-bottom: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  font: 500 16px/1 var(--font-code);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
 }
-.timer-adjust__value > span { color: var(--color-text-faint); font-size: 9.5px; letter-spacing: 0.06em; }
-.timer-adjust__value > strong { color: var(--color-text); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.timer-adjust__input::-webkit-outer-spin-button,
+.timer-adjust__input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
+.timer-adjust__input:focus { border-bottom-color: var(--color-accent); outline: none; }
 
 .timer-bar {
   width: 420px;

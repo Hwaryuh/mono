@@ -40,13 +40,25 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("시작 전 화면에서 집중 길이를 조절한다", () => {
+  it("시작 전 화면에서 집중 길이를 직접 입력한다", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 25 });
 
-    fireEvent.click(screen.getByRole("button", { name: "시간 늘리기" }));
+    const input = screen.getByLabelText("세션 길이(분)");
+    fireEvent.change(input, { target: { value: "40" } });
+    fireEvent.blur(input);
 
-    expect(screen.getByText("30:00")).toBeInTheDocument();
-    expect(settingsStore.read().focusMinutes).toBe(30);
+    expect(screen.getByText("40:00")).toBeInTheDocument();
+    expect(settingsStore.read().focusMinutes).toBe(40);
+  });
+
+  it("범위를 벗어난 입력은 경계로 잘라낸다", () => {
+    const { settingsStore } = renderTimer({ focusMinutes: 25 });
+
+    const input = screen.getByLabelText("세션 길이(분)");
+    fireEvent.change(input, { target: { value: "999" } });
+    fireEvent.blur(input);
+
+    expect(settingsStore.read().focusMinutes).toBe(180);
   });
 
   it("집중이 끝나면 알람이 울리고, 끄기 전에는 휴식으로 넘어가지 않는다", () => {

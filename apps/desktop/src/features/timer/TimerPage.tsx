@@ -26,9 +26,6 @@ const TICK_MS = 250;
 
 type Phase = "focus" | "shortBreak";
 
-/** 시작 전 화면에서 길이를 조절할 때 한 번에 움직이는 분. 집중은 성큼, 휴식은 촘촘하게. */
-const ADJUST_STEP: Record<Phase, number> = { focus: 5, shortBreak: 1 };
-
 function minutesOf(settings: TimerSettings, phase: Phase): number {
   return phase === "focus" ? settings.focusMinutes : settings.shortBreakMinutes;
 }
@@ -81,6 +78,8 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   const selectedTodoIdRef = useRef<string | null>(null);
   // 방금 끝나서 울리고 있는 페이즈. 끄기 전까지 다음 페이즈로 넘어가지 않는다.
   const [ringing, setRinging] = useState<Phase | null>(null);
+  // 시작 전 길이 입력 중인 원본 문자열. 커밋(blur·Enter) 때만 숫자로 좁힌다.
+  const [minutesDraft, setMinutesDraft] = useState<string | null>(null);
 
   const total = minutesOf(settings, phase) * 60;
   const running = endsAt !== null;
@@ -194,8 +193,11 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     if (ended) advance(ended, true);
   }
 
-  function adjustMinutes(delta: number) {
-    const next = normalizeTimerSettings({ ...settings, [minutesKeyOf(phase)]: minutesOf(settings, phase) + delta });
+  function commitMinutesDraft() {
+    const raw = minutesDraft;
+    setMinutesDraft(null);
+    if (raw === null || raw.trim() === "") return;
+    const next = normalizeTimerSettings({ ...settings, [minutesKeyOf(phase)]: Number(raw) });
     setSettings(next);
     preferences.write(next);
     setRemaining(minutesOf(next, phase) * 60);
@@ -236,26 +238,22 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
         </div>
         {idle ? (
           <div className="timer-adjust">
-            <IconButton
-              aria-label={translate("timer.adjust.decrease")}
-              disabled={currentMinutes <= 1}
-              onClick={() => adjustMinutes(-ADJUST_STEP[phase])}
-              variant="secondary"
-            >
-              <Icon name="minus" size={14} />
-            </IconButton>
-            <span className="timer-adjust__value">
-              <span>{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
-              <strong>{translate("timer.duration.minutes", { minutes: currentMinutes })}</strong>
-            </span>
-            <IconButton
-              aria-label={translate("timer.adjust.increase")}
-              disabled={currentMinutes >= 180}
-              onClick={() => adjustMinutes(ADJUST_STEP[phase])}
-              variant="secondary"
-            >
-              <Icon name="plus" size={14} />
-            </IconButton>
+            <span className="timer-adjust__phase">{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
+            <input
+              aria-label={translate("timer.adjust.label")}
+              className="timer-adjust__input"
+              inputMode="numeric"
+              max={180}
+              min={1}
+              onBlur={commitMinutesDraft}
+              onChange={(event) => setMinutesDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              type="number"
+              value={minutesDraft ?? String(currentMinutes)}
+            />
+            <span className="timer-adjust__unit">{translate("timer.adjust.unit")}</span>
           </div>
         ) : (
           <div className="timer-bar">
