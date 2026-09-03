@@ -1,5 +1,5 @@
 import { translate } from "../../i18n/i18n";
-import type { ScrapComment, ScrapItem, ScrapKind, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
+import type { ScrapComment, ScrapCommentFile, ScrapItem, ScrapKind, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
 import { formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,7 @@ type PendingPhoto = { file: File; previewUrl: string };
 
 const blankDraft: Draft = { title: "", memo: "", url: "", tag: translate("scrap.label.inbox") };
 const maxPhotoBytes = 10 * 1024 * 1024;
+const maxCommentFileBytes = 50 * 1024 * 1024;
 const photoPickerDomId = "scrap-photo-picker";
 const photoReplaceDomId = "scrap-photo-replace";
 const externalUrlOpener = PlatformExternalUrlOpener.of();
@@ -99,8 +100,10 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   const [sortKey, setSortKey] = useState<SortKey>(loadSortKey);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
+  const [commentFile, setCommentFile] = useState<File | null>(null);
   const [commentBusyId, setCommentBusyId] = useState<string | null>(null);
   const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -162,6 +165,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       setConfirmDeleteId(null);
       setDetailId(null);
       setCommentText("");
+      setCommentFile(null);
       if (searchParams.has("detail")) setSearchParams({}, { replace: true });
     },
     onError: (error) => setDeleteError(errorMessage(error)),
@@ -262,19 +266,37 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     requestAnimationFrame(() => document.getElementById(photoPickerDomId)?.focus());
   }
 
+  function chooseCommentFile(file: File | undefined) {
+    if (commentFileInputRef.current) commentFileInputRef.current.value = "";
+    if (!file) return;
+    if (file.size === 0) { setCommentErrors((current) => detail ? { ...current, [detail.id]: translate("scrap.photo.readFailed") } : current); return; }
+    if (file.size > maxCommentFileBytes) { setCommentErrors((current) => detail ? { ...current, [detail.id]: translate("scrap.comment.fileTooLarge") } : current); return; }
+    setCommentFile(file);
+    if (detail) setCommentErrors((current) => ({ ...current, [detail.id]: "" }));
+  }
+
   async function submitComment(event: FormEvent) {
     event.preventDefault();
     if (!detail) return;
     const text = commentText.trim();
-    if (!text) return;
+    if (!text && !commentFile) return;
     const scrapId = detail.id;
     setCommentBusyId(scrapId);
     setCommentErrors((current) => ({ ...current, [scrapId]: "" }));
+    let stagedMediaId: string | null = null;
     try {
-      await repository.addComment(scrapId, { text });
+      let file: ScrapCommentFile | undefined;
+      if (commentFile) {
+        stagedMediaId = newMediaId();
+        await mediaStore.save(stagedMediaId, commentFile);
+        file = { mediaId: stagedMediaId, name: commentFile.name, size: commentFile.size };
+      }
+      await repository.addComment(scrapId, { text, file });
       await invalidateSnapshots();
       setCommentText("");
+      setCommentFile(null);
     } catch (error) {
+      if (stagedMediaId) { try { await mediaStore.delete(stagedMediaId); } catch { /* 고아 미디어 GC가 후속 정리한다. */ } }
       setCommentErrors((current) => ({ ...current, [scrapId]: errorMessage(error) }));
     } finally {
       setCommentBusyId((current) => current === scrapId ? null : current);
@@ -408,15 +430,30 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
 
       {snapshot.items.length === 0 ? <ScrapEmpty onCreate={openCreate} /> : visibleItems.length === 0 ? <ScrapFilterEmpty onReset={() => changeActiveTag(null)} /> : (
         <div className="scrap-list">
-          {visibleItems.map((item) => <ScrapCard item={item} key={item.id} onOpen={() => { setDetailId(item.id); setCommentText(""); setSearchParams({ detail: item.id }, { replace: true }); }} />)}
+          {visibleItems.map((item) => <ScrapCard item={item} key={item.id} onOpen={() => { setDetailId(item.id); setCommentText(""); setCommentFile(null); setSearchParams({ detail: item.id }, { replace: true }); }} />)}
         </div>
       )}
 
       <Drawer
         className="scrap-detail-drawer"
-        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}><TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} /><Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>{commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}</form> : undefined}
+        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}>
+          <input aria-label={translate("scrap.comment.filePicker")} className="capture-file-input" disabled={commentBusyId === detail.id} onChange={(event) => chooseCommentFile(event.currentTarget.files?.[0])} ref={commentFileInputRef} tabIndex={-1} type="file" />
+          {commentFile && (
+            <div className="scrap-comment-form__file">
+              <Icon name="file" size={12} strokeWidth={1.6} />
+              <span title={commentFile.name}>{commentFile.name}</span>
+              <IconButton aria-label={translate("scrap.comment.fileRemove")} disabled={commentBusyId === detail.id} onClick={() => setCommentFile(null)} size="small" title={translate("scrap.comment.fileRemove")} type="button" variant="ghost"><Icon name="close" size={12} /></IconButton>
+            </div>
+          )}
+          <div className="scrap-comment-form__row">
+            <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.6} /></IconButton>
+            <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
+            <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
+          </div>
+          {commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}
+        </form> : undefined}
         icon="scrap"
-        onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
+        onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); setCommentFile(null); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
         title={<span className="scrap-detail-title">{translate("app.navigation.scrap")}{detail && <small>{formatTimestamp(detail.savedAt)}</small>}</span>}
       >
@@ -573,6 +610,18 @@ function CommentContent({ text, urlOpener }: { text: string; urlOpener: External
   }
 
   return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.strike ? <s key={`${index}-${segment.text}`}>{segment.text}</s> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
+}
+
+// ponytail: <a download>는 데스크톱 WebView2·webkitgtk에선 저장 대화상자를 띄우지만
+// macOS WKWebView에선 새 탭 열기로 떨어질 수 있다. 제대로 하려면 tauri dialog+fs 플러그인.
+function CommentFileChip({ file }: { file: ScrapCommentFile }) {
+  const { data: href } = useMedia(file.mediaId);
+  return (
+    <a className="scrap-comment__file" download={file.name} href={href ?? undefined} rel="noreferrer" target="_blank">
+      <Icon name="file" size={14} strokeWidth={1.5} />
+      <span><strong title={file.name}>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
+    </a>
+  );
 }
 
 function CommentLinkPreview({ externalUrl, onOpen }: { externalUrl: string; onOpen: (event: MouseEvent<HTMLAnchorElement>, externalUrl: string) => void }) {
@@ -853,7 +902,12 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
           </div>
           {editError && <span className="scrap-comment__edit-error" role="alert">{editError}</span>}
         </form>
-      ) : <CommentContent text={comment.text} urlOpener={urlOpener} />}
+      ) : (
+        <>
+          {comment.text && <CommentContent text={comment.text} urlOpener={urlOpener} />}
+          {comment.file && <CommentFileChip file={comment.file} />}
+        </>
+      )}
       {deleteError && <span className="scrap-comment__edit-error" role="alert">{deleteError}</span>}
     </article>
   );

@@ -142,7 +142,10 @@ CREATE TABLE IF NOT EXISTS scrap_comments (
   seq INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   text TEXT NOT NULL,
-  version INTEGER NOT NULL DEFAULT 1
+  version INTEGER NOT NULL DEFAULT 1,
+  file_media_id TEXT,
+  file_name TEXT,
+  file_size INTEGER
 );
 CREATE TABLE IF NOT EXISTS inbox_items (
   id TEXT PRIMARY KEY,
@@ -213,11 +216,30 @@ fn migrate_version_columns(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+// 이미 존재하는 DB에 빠진 컬럼을 채운다. 컬럼 이름·선언은 고정 상수라 식별자 주입 경로 없음.
+fn migrate_add_columns(conn: &Connection, table: &str, columns: &[(&str, &str)]) -> rusqlite::Result<()> {
+    let existing = conn
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for (name, decl) in columns {
+        if !existing.iter().any(|column| column == name) {
+            conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {name} {decl}"))?;
+        }
+    }
+    Ok(())
+}
+
 fn init(conn: &Connection) -> rusqlite::Result<()> {
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
     conn.execute_batch(DDL)?;
     migrate_version_columns(conn)?;
+    migrate_add_columns(
+        conn,
+        "scrap_comments",
+        &[("file_media_id", "TEXT"), ("file_name", "TEXT"), ("file_size", "INTEGER")],
+    )?;
     conn.execute_batch(SEED)?;
     Ok(())
 }

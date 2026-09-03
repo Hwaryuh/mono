@@ -7,8 +7,8 @@ function item(over: Partial<ScrapItem>): ScrapItem {
 }
 
 const a = item({ id: "a", title: "가나다", savedAt: "2026-03-01T00:00:00Z", comments: [] });
-const b = item({ id: "b", title: "하나", savedAt: "2026-01-15T00:00:00Z", comments: [{ id: "c1", createdAt: "", text: "" }, { id: "c2", createdAt: "", text: "" }] });
-const c = item({ id: "c", title: "다라마", savedAt: "2026-05-20T00:00:00Z", comments: [{ id: "c3", createdAt: "", text: "" }] });
+const b = item({ id: "b", title: "하나", savedAt: "2026-01-15T00:00:00Z", comments: [{ id: "c1", createdAt: "", text: "", file: null }, { id: "c2", createdAt: "", text: "", file: null }] });
+const c = item({ id: "c", title: "다라마", savedAt: "2026-05-20T00:00:00Z", comments: [{ id: "c3", createdAt: "", text: "", file: null }] });
 
 const ids = (items: ScrapItem[]) => items.map((i) => i.id);
 

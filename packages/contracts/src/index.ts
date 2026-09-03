@@ -326,11 +326,19 @@ export type CalendarWriteInput = z.infer<typeof calendarWriteInputSchema>;
 
 export const scrapKindSchema = z.enum(["image", "url", "text", "video"]);
 
+// 댓글 첨부 파일. 원본 바이트는 media 테이블(R2), 여기엔 참조 id + 표시용 메타만.
+export const scrapCommentFileSchema = z.object({
+  mediaId: z.string().min(1),
+  name: z.string().trim().min(1).max(255),
+  size: z.number().int().nonnegative().max(50 * 1024 * 1024),
+});
+
 export const scrapCommentSchema = z.object({
   id: z.string(),
   version: recordVersionSchema,
   createdAt: z.string(),
   text: z.string(),
+  file: scrapCommentFileSchema.nullable().default(null),
 });
 
 export const scrapItemSchema = z.object({
@@ -359,10 +367,14 @@ export const scrapWriteInputSchema = z.object({
 });
 
 export const scrapCommentInputSchema = z.object({
-  text: z.string().trim().min(1).max(2_000),
+  text: z.string().trim().max(2_000),
+  file: scrapCommentFileSchema.nullable().optional(),
+}).refine((input) => input.text.length > 0 || input.file != null, {
+  message: "댓글 내용이나 파일이 필요합니다.",
 });
 
 export type ScrapKind = z.infer<typeof scrapKindSchema>;
+export type ScrapCommentFile = z.infer<typeof scrapCommentFileSchema>;
 export type ScrapComment = z.infer<typeof scrapCommentSchema>;
 export type ScrapItem = z.infer<typeof scrapItemSchema>;
 export type ScrapSnapshot = z.infer<typeof scrapSnapshotSchema>;

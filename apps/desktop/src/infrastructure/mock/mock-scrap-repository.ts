@@ -74,7 +74,7 @@ class MockScrapRepository implements ScrapRepository {
   async addComment(scrapId: string, input: Parameters<ScrapRepository["addComment"]>[1]) {
     const scrap = requireScrap(this.state, scrapId);
     const parsed = scrapCommentInputSchema.parse(input);
-    scrap.comments.push({ id: `comment-${this.state.nextScrapCommentId++}`, createdAt: "오늘", text: parsed.text });
+    scrap.comments.push({ id: `comment-${this.state.nextScrapCommentId++}`, createdAt: "오늘", text: parsed.text, file: parsed.file ?? null });
   }
 
   async updateComment(scrapId: string, commentId: string, input: Parameters<ScrapRepository["updateComment"]>[2]) {

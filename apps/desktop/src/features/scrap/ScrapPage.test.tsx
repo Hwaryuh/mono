@@ -174,7 +174,7 @@ describe("ScrapPage", () => {
     renderPage(
       repositoryOf({
         tags: ["수집"],
-        items: [{ id: "comment-link", kind: "text", title: "댓글 링크", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-link-1", createdAt: "오늘", text: `첫 줄\n${url}.` }] }],
+        items: [{ id: "comment-link", kind: "text", title: "댓글 링크", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-link-1", createdAt: "오늘", text: `첫 줄\n${url}.`, file: null }] }],
       }),
       "/scrap?detail=comment-link",
       { open },
@@ -195,7 +195,7 @@ describe("ScrapPage", () => {
     renderPage(
       repositoryOf({
         tags: ["수집"],
-        items: [{ id: "comment-strike", kind: "text", title: "댓글 취소선", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-strike-1", createdAt: "오늘", text: "이건 ~~틀림~~ 맞음" }] }],
+        items: [{ id: "comment-strike", kind: "text", title: "댓글 취소선", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-strike-1", createdAt: "오늘", text: "이건 ~~틀림~~ 맞음", file: null }] }],
       }),
       "/scrap?detail=comment-strike",
     );
@@ -228,7 +228,7 @@ describe("ScrapPage", () => {
     const updateComment = vi.fn(async () => {});
     const text = "수정 전";
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "edit-keyboard", kind: "text", title: "댓글 수정 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "edit-keyboard-comment", createdAt: "오늘", text }] }] }, { updateComment }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "edit-keyboard", kind: "text", title: "댓글 수정 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "edit-keyboard-comment", createdAt: "오늘", text, file: null }] }] }, { updateComment }),
       "/scrap?detail=edit-keyboard",
     );
 
@@ -572,5 +572,27 @@ describe("ScrapPage", () => {
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
     expect(await within(modal).findByRole("alert")).toHaveTextContent("스크랩 저장 실패");
     expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("보존할 제목");
+  });
+
+  it("댓글에 파일을 첨부해 업로드하고 mediaId·이름·크기와 함께 등록한다", async () => {
+    const addComment = vi.fn(async () => {});
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:file"), delete: vi.fn(async () => {}) };
+    const mediaId = "00000000-0000-4000-8000-0000000000fa";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(mediaId);
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "with-file", kind: "text", title: "파일 댓글", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [] }] }, { addComment }),
+      "/scrap?detail=with-file",
+      undefined,
+      mediaStore,
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const file = new File(["hello"], "보고서.pdf", { type: "application/pdf" });
+    fireEvent.change(within(drawer).getByLabelText("댓글 파일 선택"), { target: { files: [file] } });
+    expect(within(drawer).getByText("보고서.pdf")).toBeInTheDocument();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "댓글" }));
+
+    await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith(mediaId, file));
+    expect(addComment).toHaveBeenCalledWith("with-file", { text: "", file: { mediaId, name: "보고서.pdf", size: 5 } });
   });
 });

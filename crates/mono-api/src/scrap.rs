@@ -18,11 +18,20 @@ const OTHER_TAG: &str = "기타";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct CommentFile {
+    media_id: String,
+    name: String,
+    size: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ScrapComment {
     id: String,
     version: i64,
     created_at: String,
     text: String,
+    file: Option<CommentFile>,
 }
 
 #[derive(Serialize)]
@@ -60,7 +69,18 @@ struct ScrapWriteInput {
 
 #[derive(Deserialize)]
 struct CommentInput {
+    #[serde(default)]
     text: String,
+    #[serde(default)]
+    file: Option<CommentFileInput>,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CommentFileInput {
+    media_id: String,
+    name: String,
+    size: i64,
 }
 
 #[derive(Deserialize)]
@@ -146,6 +166,40 @@ fn validated_comment(raw: &str) -> ApiResult<String> {
     Ok(text.to_string())
 }
 
+// 첨부가 있으면 본문은 비어 있어도 된다.
+fn validated_comment_text(raw: &str, has_file: bool) -> ApiResult<String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return if has_file {
+            Ok(String::new())
+        } else {
+            Err(ApiError::validation("댓글 내용을 입력해야 합니다."))
+        };
+    }
+    if text.chars().count() > 2_000 {
+        return Err(ApiError::validation("댓글은 2000자 이하여야 합니다."));
+    }
+    Ok(text.to_string())
+}
+
+const COMMENT_FILE_MAX_BYTES: i64 = 50 * 1024 * 1024;
+
+fn validated_comment_file(input: Option<&CommentFileInput>) -> ApiResult<Option<CommentFileInput>> {
+    let Some(file) = input else {
+        return Ok(None);
+    };
+    let media_id = validated_media_id(Some(&file.media_id))?
+        .ok_or_else(|| ApiError::validation("첨부 파일의 미디어 id가 없습니다."))?;
+    let name = file.name.trim();
+    if name.is_empty() || name.chars().count() > 255 {
+        return Err(ApiError::validation("첨부 파일 이름이 올바르지 않습니다."));
+    }
+    if file.size < 0 || file.size > COMMENT_FILE_MAX_BYTES {
+        return Err(ApiError::validation("첨부 파일 크기가 올바르지 않습니다."));
+    }
+    Ok(Some(CommentFileInput { media_id, name: name.to_string(), size: file.size }))
+}
+
 // ---------- 저장소 로직 (apps/api/src/repositories/scrap-repository.ts 1:1) ----------
 
 fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
@@ -174,11 +228,28 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     let comments = conn
-        .prepare("SELECT id, scrap_id, created_at, text, version FROM scrap_comments ORDER BY seq ASC")?
+        .prepare(
+            "SELECT id, scrap_id, created_at, text, version, file_media_id, file_name, file_size \
+             FROM scrap_comments ORDER BY seq ASC",
+        )?
         .query_map([], |row| {
+            let file = match row.get::<_, Option<String>>(5)? {
+                Some(media_id) => Some(CommentFile {
+                    media_id,
+                    name: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                    size: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+                }),
+                None => None,
+            };
             Ok((
                 row.get::<_, String>(1)?,
-                ScrapComment { id: row.get(0)?, created_at: row.get(2)?, text: row.get(3)?, version: row.get(4)? },
+                ScrapComment {
+                    id: row.get(0)?,
+                    created_at: row.get(2)?,
+                    text: row.get(3)?,
+                    version: row.get(4)?,
+                    file,
+                },
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -335,17 +406,28 @@ fn delete_tag(conn: &mut Connection, tag: &str, replacement: &str) -> ApiResult<
     Ok(())
 }
 
-fn add_comment(conn: &Connection, scrap_id: &str, text: &str) -> ApiResult<()> {
+fn add_comment(conn: &Connection, scrap_id: &str, input: &CommentInput) -> ApiResult<()> {
     require_scrap(conn, scrap_id)?;
-    let text = validated_comment(text)?;
+    let file = validated_comment_file(input.file.as_ref())?;
+    let text = validated_comment_text(&input.text, file.is_some())?;
     let next_seq: i64 = conn.query_row(
         "SELECT COALESCE(MAX(seq), 0) FROM scrap_comments WHERE scrap_id = ?1",
         [scrap_id],
         |row| row.get(0),
     )?;
     conn.execute(
-        "INSERT INTO scrap_comments (id, scrap_id, seq, created_at, text) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![uuid::Uuid::new_v4().to_string(), scrap_id, next_seq + 1, now_iso(), text],
+        "INSERT INTO scrap_comments (id, scrap_id, seq, created_at, text, file_media_id, file_name, file_size) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            uuid::Uuid::new_v4().to_string(),
+            scrap_id,
+            next_seq + 1,
+            now_iso(),
+            text,
+            file.as_ref().map(|f| f.media_id.clone()),
+            file.as_ref().map(|f| f.name.clone()),
+            file.as_ref().map(|f| f.size),
+        ],
     )?;
     Ok(())
 }
@@ -448,7 +530,7 @@ async fn add_comment_handler(
     Path(id): Path<String>,
     Json(input): Json<CommentInput>,
 ) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
-    add_comment(&db.conn(), &id, &input.text)?;
+    add_comment(&db.conn(), &id, &input)?;
     Ok(created())
 }
 
@@ -486,6 +568,12 @@ mod tests {
             media_id: None,
         }
     }
+
+    fn text_comment(text: &str) -> CommentInput {
+        CommentInput { text: text.into(), file: None }
+    }
+
+    const SAMPLE_MEDIA_ID: &str = "11111111-1111-4111-8111-111111111111";
 
     fn first_scrap_id(conn: &Connection) -> String {
         get_snapshot(conn).unwrap().items[0].id.clone()
@@ -612,7 +700,7 @@ mod tests {
         create_scrap(&mut conn, write_input("스크랩", "", "태그")).unwrap();
         let scrap_id = first_scrap_id(&conn);
 
-        add_comment(&conn, &scrap_id, "첫 댓글").unwrap();
+        add_comment(&conn, &scrap_id, &text_comment("첫 댓글")).unwrap();
         let comment_id = get_snapshot(&conn).unwrap().items[0].comments[0].id.clone();
 
         update_comment(&conn, &scrap_id, &comment_id, "수정됨", None).unwrap();
@@ -623,12 +711,45 @@ mod tests {
     }
 
     #[test]
+    fn comment_can_be_file_only_and_snapshot_returns_the_file() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        create_scrap(&mut conn, write_input("스크랩", "", "태그")).unwrap();
+        let scrap_id = first_scrap_id(&conn);
+
+        // 본문 없이 파일만
+        add_comment(
+            &conn,
+            &scrap_id,
+            &CommentInput {
+                text: String::new(),
+                file: Some(CommentFileInput {
+                    media_id: SAMPLE_MEDIA_ID.into(),
+                    name: "보고서.pdf".into(),
+                    size: 2048,
+                }),
+            },
+        )
+        .unwrap();
+
+        let comment = &get_snapshot(&conn).unwrap().items[0].comments[0];
+        assert_eq!(comment.text, "");
+        let file = comment.file.as_ref().expect("첨부 있어야 함");
+        assert_eq!(file.media_id, SAMPLE_MEDIA_ID);
+        assert_eq!(file.name, "보고서.pdf");
+        assert_eq!(file.size, 2048);
+
+        // 본문도 파일도 없으면 거부
+        assert!(add_comment(&conn, &scrap_id, &text_comment("")).is_err());
+    }
+
+    #[test]
     fn delete_scrap_removes_comments() {
         let db = db::open_memory();
         let mut conn = db.lock().unwrap();
         create_scrap(&mut conn, write_input("스크랩", "", "태그")).unwrap();
         let scrap_id = first_scrap_id(&conn);
-        add_comment(&conn, &scrap_id, "댓글").unwrap();
+        add_comment(&conn, &scrap_id, &text_comment("댓글")).unwrap();
 
         delete_scrap(&mut conn, &scrap_id).unwrap();
         assert!(get_snapshot(&conn).unwrap().items.is_empty());

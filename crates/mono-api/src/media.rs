@@ -395,6 +395,12 @@ fn referenced_media_ids(conn: &Connection) -> ApiResult<HashSet<String>> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
     ids.extend(scrap_ids);
 
+    let comment_ids = conn
+        .prepare("SELECT file_media_id FROM scrap_comments WHERE file_media_id IS NOT NULL")?
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    ids.extend(comment_ids);
+
     let inbox_json = conn
         .prepare("SELECT images_json, videos_json FROM inbox_items")?
         .query_map([], |row| {
@@ -641,11 +647,19 @@ mod tests {
         )
         .unwrap();
 
+        conn.execute(
+            "INSERT INTO scrap_comments (id, scrap_id, seq, created_at, text, file_media_id, file_name, file_size) \
+             VALUES ('c1', 's1', 1, 'now', '', 'media-comment', 'a.pdf', 10)",
+            [],
+        )
+        .unwrap();
+
         let ids = referenced_media_ids(&conn).unwrap();
-        assert_eq!(ids.len(), 3);
+        assert_eq!(ids.len(), 4);
         assert!(ids.contains("media-scrap"));
         assert!(ids.contains("media-img"));
         assert!(ids.contains("media-vid"));
+        assert!(ids.contains("media-comment"));
     }
 
     #[test]
