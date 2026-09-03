@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
 import { I18nProvider } from "../../i18n/i18n";
+import type { Alarm } from "./timer-alarm";
 import { InMemoryTimerSessionStore } from "./timer-session-store";
 import { InMemoryTimerSettingsStore, type TimerSettings } from "./timer-settings-store";
 import { TimerPage } from "./TimerPage";
@@ -12,15 +13,16 @@ function renderTimer(settings?: Partial<TimerSettings>) {
   const sessionStore = new InMemoryTimerSessionStore();
   const settingsStore = new InMemoryTimerSettingsStore();
   if (settings) settingsStore.write({ ...settingsStore.read(), ...settings });
+  const alarm: Alarm = { start: vi.fn(), stop: vi.fn() };
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <TimerPage repository={createMockTodoRepository()} sessionStore={sessionStore} settingsStore={settingsStore} />
+        <TimerPage repository={createMockTodoRepository()} sessionStore={sessionStore} settingsStore={settingsStore} alarm={alarm} />
       </I18nProvider>
     </QueryClientProvider>,
   );
-  return { sessionStore };
+  return { sessionStore, settingsStore, alarm };
 }
 
 describe("TimerPage", () => {
@@ -38,14 +40,38 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("집중이 끝나면 세션을 기록하고 휴식으로 넘어간다", () => {
-    const { sessionStore } = renderTimer({ focusMinutes: 1, shortBreakMinutes: 3, autoStartBreak: false });
+  it("시작 전 화면에서 집중 길이를 조절한다", () => {
+    const { settingsStore } = renderTimer({ focusMinutes: 25 });
+
+    fireEvent.click(screen.getByRole("button", { name: "시간 늘리기" }));
+
+    expect(screen.getByText("30:00")).toBeInTheDocument();
+    expect(settingsStore.read().focusMinutes).toBe(30);
+  });
+
+  it("집중이 끝나면 알람이 울리고, 끄기 전에는 휴식으로 넘어가지 않는다", () => {
+    const { sessionStore, alarm } = renderTimer({ focusMinutes: 1, shortBreakMinutes: 3, autoStartBreak: false });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
 
+    expect(alarm.start).toHaveBeenCalled();
+    expect(sessionStore.read(currentIsoDate())).toHaveLength(1);
+    expect(screen.queryByText("03:00")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "알람 끄기" }));
+
+    expect(alarm.stop).toHaveBeenCalled();
     expect(screen.getByText("03:00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^시작$/ })).toBeInTheDocument();
-    expect(sessionStore.read(currentIsoDate())).toHaveLength(1);
+  });
+
+  it("알람이 꺼져 있으면 곧바로 휴식으로 넘어간다", () => {
+    const { alarm } = renderTimer({ focusMinutes: 1, shortBreakMinutes: 3, autoStartBreak: false, alarmEnabled: false });
+    fireEvent.click(screen.getByRole("button", { name: /시작/ }));
+    act(() => { vi.advanceTimersByTime(61_000); });
+
+    expect(alarm.start).not.toHaveBeenCalled();
+    expect(screen.getByText("03:00")).toBeInTheDocument();
   });
 
   it("건너뛰기는 세션을 기록하지 않는다", () => {

@@ -13,18 +13,28 @@ import {
 } from "./timer-session-store";
 import {
   LocalStorageTimerSettingsStore,
+  normalizeTimerSettings,
   TIMER_SETTINGS_EVENT,
   type TimerSettings,
   type TimerSettingsStore,
 } from "./timer-settings-store";
+import { createAlarm, type Alarm } from "./timer-alarm";
+import { focusAppWindow, notifySessionEnd, onNotificationClick } from "./timer-notify";
 
 const DAILY_GOAL = 8;
 const TICK_MS = 250;
 
 type Phase = "focus" | "shortBreak";
 
+/** 시작 전 화면에서 길이를 조절할 때 한 번에 움직이는 분. 집중은 성큼, 휴식은 촘촘하게. */
+const ADJUST_STEP: Record<Phase, number> = { focus: 5, shortBreak: 1 };
+
 function minutesOf(settings: TimerSettings, phase: Phase): number {
   return phase === "focus" ? settings.focusMinutes : settings.shortBreakMinutes;
+}
+
+function minutesKeyOf(phase: Phase): "focusMinutes" | "shortBreakMinutes" {
+  return phase === "focus" ? "focusMinutes" : "shortBreakMinutes";
 }
 
 function formatClock(seconds: number) {
@@ -45,9 +55,10 @@ interface TimerPageProps {
   repository: TodoRepository;
   sessionStore?: TimerSessionStore;
   settingsStore?: TimerSettingsStore;
+  alarm?: Alarm;
 }
 
-export function TimerPage({ repository, sessionStore, settingsStore }: TimerPageProps) {
+export function TimerPage({ repository, sessionStore, settingsStore, alarm: alarmProp }: TimerPageProps) {
   const store = useMemo(
     () => sessionStore ?? LocalStorageTimerSessionStore.of(window.localStorage),
     [sessionStore],
@@ -56,6 +67,7 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
     () => settingsStore ?? LocalStorageTimerSettingsStore.of(window.localStorage),
     [settingsStore],
   );
+  const alarm = useMemo(() => alarmProp ?? createAlarm(), [alarmProp]);
   const today = currentIsoDate();
   const snapshotQuery = useQuery({ queryKey: ["todo"], queryFn: () => repository.getSnapshot() });
 
@@ -67,9 +79,12 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const selectedTodoIdRef = useRef<string | null>(null);
+  // 방금 끝나서 울리고 있는 페이즈. 끄기 전까지 다음 페이즈로 넘어가지 않는다.
+  const [ringing, setRinging] = useState<Phase | null>(null);
 
   const total = minutesOf(settings, phase) * 60;
   const running = endsAt !== null;
+  const idle = !running && ringing === null && remaining === total;
 
   const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
   const candidates = [...(snapshotQuery.data?.items ?? [])]
@@ -123,6 +138,23 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
     return () => window.removeEventListener(TIMER_SETTINGS_EVENT, reload);
   }, [preferences, phase]);
 
+  // 페이지를 벗어나면 울리던 알람을 멈춘다.
+  useEffect(() => () => alarm.stop(), [alarm]);
+
+  // 알림 배너를 클릭하면 앱 창을 앞으로 가져온다.
+  useEffect(() => {
+    let disposed = false;
+    let dispose = () => {};
+    void onNotificationClick(() => void focusAppWindow()).then((off) => {
+      if (disposed) off();
+      else dispose = off;
+    });
+    return () => {
+      disposed = true;
+      dispose();
+    };
+  }, []);
+
   function startPhase(next: Phase, autoStart: boolean) {
     const seconds = minutesOf(settings, next) * 60;
     setPhase(next);
@@ -130,23 +162,50 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
     setEndsAt(autoStart ? Date.now() + seconds * 1000 : null);
   }
 
+  function advance(endedPhase: Phase, autoAllowed: boolean) {
+    if (endedPhase === "focus") startPhase("shortBreak", autoAllowed && settings.autoStartBreak);
+    else startPhase("focus", autoAllowed && settings.autoStartFocus);
+  }
+
   function finishPhase(record: boolean) {
-    if (phase !== "focus") {
-      startPhase("focus", record && settings.autoStartFocus);
-      return;
-    }
-    const done = record
-      ? store.append(today, {
+    if (record && phase === "focus") {
+      setSessions(store.append(today, {
         startedAt: startedAtOf(new Date(Date.now() - settings.focusMinutes * 60_000)),
         todoId: selectedTodoIdRef.current,
         minutes: settings.focusMinutes,
-      })
-      : sessions;
-    if (record) setSessions(done);
-    startPhase("shortBreak", record && settings.autoStartBreak);
+      }));
+    }
+    if (record && settings.alarmEnabled) {
+      alarm.start();
+      void notifySessionEnd(
+        translate(phase === "focus" ? "timer.notify.focusTitle" : "timer.notify.breakTitle"),
+        translate("timer.notify.body"),
+      );
+      setRinging(phase);
+      return;
+    }
+    advance(phase, record);
+  }
+
+  function dismissAlarm() {
+    alarm.stop();
+    const ended = ringing;
+    setRinging(null);
+    if (ended) advance(ended, true);
+  }
+
+  function adjustMinutes(delta: number) {
+    const next = normalizeTimerSettings({ ...settings, [minutesKeyOf(phase)]: minutesOf(settings, phase) + delta });
+    setSettings(next);
+    preferences.write(next);
+    setRemaining(minutesOf(next, phase) * 60);
   }
 
   function toggle() {
+    if (ringing !== null) {
+      dismissAlarm();
+      return;
+    }
     if (running) {
       setEndsAt(null);
       return;
@@ -165,14 +224,44 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
   }
 
   const toggleLabel = running ? translate("timer.action.pause") : remaining === total ? translate("timer.action.start") : translate("timer.action.resume");
+  const currentMinutes = minutesOf(settings, phase);
 
   return (
     <div className="timer-page">
       <section className="timer-stage">
-        <div className={`timer-digits ${phase === "focus" ? "" : "timer-digits--break"}`}>{formatClock(remaining)}</div>
-        <div className="timer-bar">
-          <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
+        <div
+          className={`timer-digits ${phase === "focus" ? "" : "timer-digits--break"} ${ringing !== null ? "timer-digits--ringing" : ""}`}
+        >
+          {formatClock(remaining)}
         </div>
+        {idle ? (
+          <div className="timer-adjust">
+            <IconButton
+              aria-label={translate("timer.adjust.decrease")}
+              disabled={currentMinutes <= 1}
+              onClick={() => adjustMinutes(-ADJUST_STEP[phase])}
+              variant="secondary"
+            >
+              <Icon name="minus" size={14} />
+            </IconButton>
+            <span className="timer-adjust__value">
+              <span>{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
+              <strong>{translate("timer.duration.minutes", { minutes: currentMinutes })}</strong>
+            </span>
+            <IconButton
+              aria-label={translate("timer.adjust.increase")}
+              disabled={currentMinutes >= 180}
+              onClick={() => adjustMinutes(ADJUST_STEP[phase])}
+              variant="secondary"
+            >
+              <Icon name="plus" size={14} />
+            </IconButton>
+          </div>
+        ) : (
+          <div className="timer-bar">
+            <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
+          </div>
+        )}
 
         <div className="timer-tally">
           <span>{translate("todo.filter.today")}</span>
@@ -186,16 +275,25 @@ export function TimerPage({ repository, sessionStore, settingsStore }: TimerPage
         </div>
 
         <div className="timer-controls">
-          <Button onClick={toggle} variant="primary">
-            <Icon name={running ? "pause" : "play"} size={15} strokeWidth={1.8} />
-            {toggleLabel}
-          </Button>
-          <IconButton aria-label={translate("timer.action.skipSession")} onClick={skip} title={translate("timer.action.skipSession")} variant="secondary">
-            <Icon name="skip" size={15} />
-          </IconButton>
-          <IconButton aria-label={translate("timer.action.reset")} onClick={reset} title={translate("timer.action.reset")} variant="secondary">
-            <Icon name="sync" size={15} />
-          </IconButton>
+          {ringing !== null ? (
+            <Button onClick={dismissAlarm} variant="primary">
+              <Icon name="bell" size={15} strokeWidth={1.8} />
+              {translate("timer.action.stopAlarm")}
+            </Button>
+          ) : (
+            <>
+              <Button onClick={toggle} variant="primary">
+                <Icon name={running ? "pause" : "play"} size={15} strokeWidth={1.8} />
+                {toggleLabel}
+              </Button>
+              <IconButton aria-label={translate("timer.action.skipSession")} onClick={skip} title={translate("timer.action.skipSession")} variant="secondary">
+                <Icon name="skip" size={15} />
+              </IconButton>
+              <IconButton aria-label={translate("timer.action.reset")} onClick={reset} title={translate("timer.action.reset")} variant="secondary">
+                <Icon name="sync" size={15} />
+              </IconButton>
+            </>
+          )}
         </div>
       </section>
 

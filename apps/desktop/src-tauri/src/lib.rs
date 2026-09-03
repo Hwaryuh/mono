@@ -115,7 +115,9 @@ fn restart_app(app: tauri::AppHandle) {
 // server.json(설정 > 서버) 또는 MONO_API_BASE_URL로 그쪽을 가리킨다.
 
 pub fn run() {
-    let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init());
 
     // 자동 업데이트는 데스크톱 전용. 모바일 타깃에는 updater/process 플러그인이 없다.
     #[cfg(desktop)]

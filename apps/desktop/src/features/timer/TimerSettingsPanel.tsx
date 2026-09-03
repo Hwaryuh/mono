@@ -1,22 +1,17 @@
-import { Checkbox, Input, Select } from "@mono/ui";
+import { Checkbox, Select } from "@mono/ui";
 import { useState } from "react";
 import { useI18n } from "../../i18n/i18n";
 import {
   normalizeTimerSettings,
-  timerMinuteBounds,
   TIMER_SETTINGS_EVENT,
   type TimerSettings,
   type TimerSettingsStore,
   type TimerTodoScope,
 } from "./timer-settings-store";
 
-/** 입력 중 빈 칸을 허용하려고 원본 문자열을 따로 들고 있다가, 저장할 때만 숫자로 좁힌다. */
-type Drafts = Partial<Record<keyof TimerSettings, string>>;
-
 export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
   const { t } = useI18n();
   const [settings, setSettings] = useState<TimerSettings>(() => store.read());
-  const [drafts, setDrafts] = useState<Drafts>({});
 
   function commit(next: TimerSettings) {
     const normalized = normalizeTimerSettings(next);
@@ -25,42 +20,12 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
     window.dispatchEvent(new Event(TIMER_SETTINGS_EVENT));
   }
 
-  function numberField(key: "focusMinutes" | "shortBreakMinutes", labelKey: Parameters<typeof t>[0], bounds: { min: number; max: number }) {
-    return (
-      <label className="timer-settings__field">
-        <span>{t(labelKey)}</span>
-        <Input
-          inputMode="numeric"
-          max={bounds.max}
-          min={bounds.min}
-          onBlur={() => {
-            setDrafts((current) => ({ ...current, [key]: undefined }));
-            commit({ ...settings, [key]: Number(drafts[key] ?? settings[key]) });
-          }}
-          onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
-          type="number"
-          value={drafts[key] ?? String(settings[key])}
-        />
-      </label>
-    );
-  }
-
   return (
     <>
       <header className="settings-heading">
         <strong>{t("settings.section.timer")}</strong>
         <p>{t("settings.timer.description")}</p>
       </header>
-
-      <section className="settings-group">
-        <header>
-          <strong>{t("settings.timer.length.title")}</strong>
-        </header>
-        <div className="timer-settings__lengths">
-          {numberField("focusMinutes", "settings.timer.focus", timerMinuteBounds)}
-          {numberField("shortBreakMinutes", "settings.timer.shortBreak", timerMinuteBounds)}
-        </div>
-      </section>
 
       <section className="settings-group">
         <header><strong>{t("settings.timer.flow.title")}</strong></header>
@@ -84,6 +49,17 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
             checked={settings.autoStartFocus}
             label={t("settings.timer.autoFocus.title")}
             onCheckedChange={(checked) => commit({ ...settings, autoStartFocus: checked })}
+          />
+        </div>
+        <div className="settings-toggle-row timer-settings__row--divided">
+          <div>
+            <strong>{t("settings.timer.alarm.title")}</strong>
+            <span>{t("settings.timer.alarm.description")}</span>
+          </div>
+          <Checkbox
+            checked={settings.alarmEnabled}
+            label={t("settings.timer.alarm.title")}
+            onCheckedChange={(checked) => commit({ ...settings, alarmEnabled: checked })}
           />
         </div>
       </section>

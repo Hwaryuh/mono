@@ -23,6 +23,27 @@
   color: var(--color-text);
 }
 .timer-digits--break { color: var(--color-text-muted); }
+.timer-digits--ringing { color: var(--color-accent); animation: timer-ring 1s steps(1, end) infinite; }
+@keyframes timer-ring { 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .timer-digits--ringing { animation: none; } }
+
+.timer-adjust {
+  height: 32px;
+  margin-top: -6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.timer-adjust .ui-icon-button { width: 30px; height: 30px; }
+.timer-adjust__value {
+  min-width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.timer-adjust__value > span { color: var(--color-text-faint); font-size: 9.5px; letter-spacing: 0.06em; }
+.timer-adjust__value > strong { color: var(--color-text); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .timer-bar {
   width: 420px;
@@ -144,8 +165,4 @@
 .timer-log__title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timer-log__minutes { color: var(--color-text-faint); font-variant-numeric: tabular-nums; }
 
-.timer-settings__lengths { display: flex; flex-direction: column; gap: 10px; }
-.timer-settings__field { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.timer-settings__field > span { color: var(--color-text-faint); font-size: 10.5px; }
-.timer-settings__field .ui-input { width: 88px; font-variant-numeric: tabular-nums; }
 .timer-settings__row--divided { border-top: 1px solid var(--color-border); }

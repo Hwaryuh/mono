@@ -10,6 +10,7 @@ export type TimerSettings = {
   autoStartBreak: boolean;
   autoStartFocus: boolean;
   todoScope: TimerTodoScope;
+  alarmEnabled: boolean;
 };
 
 export const defaultTimerSettings: TimerSettings = {
@@ -18,6 +19,7 @@ export const defaultTimerSettings: TimerSettings = {
   autoStartBreak: true,
   autoStartFocus: false,
   todoScope: "all",
+  alarmEnabled: true,
 };
 
 export const timerMinuteBounds = { min: 1, max: 180 } as const;
@@ -37,6 +39,7 @@ export function normalizeTimerSettings(value: unknown): TimerSettings {
     autoStartBreak: typeof raw.autoStartBreak === "boolean" ? raw.autoStartBreak : defaultTimerSettings.autoStartBreak,
     autoStartFocus: typeof raw.autoStartFocus === "boolean" ? raw.autoStartFocus : defaultTimerSettings.autoStartFocus,
     todoScope: raw.todoScope === "today" ? "today" : "all",
+    alarmEnabled: typeof raw.alarmEnabled === "boolean" ? raw.alarmEnabled : defaultTimerSettings.alarmEnabled,
   };
 }
 
