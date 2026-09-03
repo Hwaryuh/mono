@@ -11,6 +11,7 @@
     "release": "node scripts/version.mjs release",
     "branding:sync": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-windows-branding.ps1",
     "build": "npm run build --workspace @mono/desktop",
+    "clean": "node scripts/clean-target.mjs",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b",
     "predesktop:dev": "npm run branding:sync",

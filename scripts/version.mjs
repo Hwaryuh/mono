@@ -50,7 +50,10 @@ function setVersion(nextVersion) {
   const nextManifest = manifest.replace(tablePattern, `$1${nextVersion}$2`);
   if (nextManifest === manifest && currentVersion !== nextVersion) throw new Error("Cargo.toml version 갱신에 실패했습니다.");
   writeFileSync(cargoManifestPath, nextManifest);
-  execFileSync("cargo", ["check", "--workspace"], { cwd: repositoryRoot, stdio: "inherit" });
+  // Cargo.lock의 workspace 멤버 버전만 동기화한다. `cargo check --workspace`는 버전 문자열
+  // 하나 때문에 workspace 전체를 재컴파일해 릴리즈마다 100MB대 rlib을 target/에 쌓았다 —
+  // 버전 bump는 컴파일을 깨뜨릴 수 없으므로 lock 동기화(1초)로 충분하다. check()가 정합성 검증.
+  execFileSync("cargo", ["update", "--workspace"], { cwd: repositoryRoot, stdio: "inherit" });
   check();
 }
 
