@@ -447,8 +447,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
             </div>
           )}
           <div className="scrap-comment-form__row">
-            <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.5} /></IconButton>
             <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
+            <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.5} /></IconButton>
             <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
           </div>
           {commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}
