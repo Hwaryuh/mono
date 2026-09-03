@@ -134,7 +134,9 @@ CREATE TABLE IF NOT EXISTS scrap_items (
   tag TEXT NOT NULL,
   saved_at TEXT NOT NULL,
   url TEXT,
-  media_id TEXT
+  media_id TEXT,
+  file_name TEXT,
+  file_size INTEGER
 );
 CREATE TABLE IF NOT EXISTS scrap_comments (
   id TEXT PRIMARY KEY,
@@ -240,6 +242,7 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
         "scrap_comments",
         &[("file_media_id", "TEXT"), ("file_name", "TEXT"), ("file_size", "INTEGER")],
     )?;
+    migrate_add_columns(conn, "scrap_items", &[("file_name", "TEXT"), ("file_size", "INTEGER")])?;
     conn.execute_batch(SEED)?;
     Ok(())
 }

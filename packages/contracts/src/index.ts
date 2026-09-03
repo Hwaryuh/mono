@@ -324,7 +324,8 @@ export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 export type CalendarSnapshot = z.infer<typeof calendarSnapshotSchema>;
 export type CalendarWriteInput = z.infer<typeof calendarWriteInputSchema>;
 
-export const scrapKindSchema = z.enum(["image", "url", "text", "video"]);
+export const scrapKindSchema = z.enum(["image", "url", "text", "video", "file"]);
+export const scrapFileMaxBytes = 50 * 1024 * 1024;
 
 // 댓글 첨부 파일. 원본 바이트는 media 테이블(R2), 여기엔 참조 id + 표시용 메타만.
 export const scrapCommentFileSchema = z.object({
@@ -350,6 +351,9 @@ export const scrapItemSchema = z.object({
   savedAt: z.string(),
   url: z.string().nullable(),
   mediaId: z.string().nullable().default(null),
+  // 이미지가 아닌 첨부 파일(kind "file")의 원본 이름·크기. 이미지면 둘 다 null.
+  fileName: z.string().nullable().default(null),
+  fileSize: z.number().int().nonnegative().nullable().default(null),
   comments: z.array(scrapCommentSchema),
 });
 
@@ -364,6 +368,8 @@ export const scrapWriteInputSchema = z.object({
   url: z.string().trim().max(2_000),
   tag: z.string().trim().min(1).max(100),
   mediaId: z.string().min(1).nullable().optional(),
+  fileName: z.string().trim().min(1).max(255).nullable().optional(),
+  fileSize: z.number().int().nonnegative().max(scrapFileMaxBytes).nullable().optional(),
 });
 
 export const scrapCommentInputSchema = z.object({

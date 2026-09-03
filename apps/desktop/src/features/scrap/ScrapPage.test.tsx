@@ -95,7 +95,7 @@ describe("ScrapPage", () => {
 
   it("긴 제목을 카드에서 제한하고 상세에서는 전체 표시한다", async () => {
     const title = "아주 긴 스크랩 제목이 카드의 정해진 높이를 넘어가더라도 레이아웃을 밀어내지 않고 상세에서는 온전히 보여야 하는 자료";
-    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "long", kind: "text", title, memo: "긴 제목 검증", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [] }] }));
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "long", kind: "text", title, memo: "긴 제목 검증", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
     const card = await screen.findByRole("button", { name: new RegExp(title) });
     expect(within(card).getByTitle(title)).toBeInTheDocument();
     fireEvent.click(card);
@@ -104,7 +104,7 @@ describe("ScrapPage", () => {
 
   it("상세 헤더에서 ISO 저장 시각을 사람이 읽는 형식으로 표시한다", async () => {
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "iso", kind: "text", title: "시각 검증", memo: "", tag: "수집", savedAt: "2026-08-27T00:38:50.792Z", url: null, mediaId: null, comments: [] }] }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "iso", kind: "text", title: "시각 검증", memo: "", tag: "수집", savedAt: "2026-08-27T00:38:50.792Z", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=iso",
     );
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
@@ -116,7 +116,7 @@ describe("ScrapPage", () => {
     const url = "https://www.youtube.com/watch?v=rop5hVsowDQ&list=WL&index=3";
     const open = vi.fn(async () => {});
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "link", kind: "url", title: "링크", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, comments: [] }] }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "link", kind: "url", title: "링크", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=link",
       { open },
     );
@@ -131,7 +131,7 @@ describe("ScrapPage", () => {
 
   it("URL 스크랩 카드와 상세에 서버 링크 미리보기 이미지를 표시한다", async () => {
     const url = "https://example.com/article?id=1&lang=ko";
-    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "link-preview", kind: "url", title: "관련 사진", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, comments: [] }] }));
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "link-preview", kind: "url", title: "관련 사진", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
     const card = await screen.findByRole("button", { name: /관련 사진/ });
     expect(await within(card).findByRole("presentation")).toHaveAttribute("src", "blob:mock");
@@ -145,7 +145,7 @@ describe("ScrapPage", () => {
 
   it("링크 미리보기 이미지를 못 받으면 플레이스홀더로 남는다", async () => {
     httpClient.httpGetBlob.mockRejectedValue(new Error("401"));
-    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "no-preview", kind: "url", title: "미리보기 없음", memo: "", tag: "수집", savedAt: "오늘", url: "https://example.com/x", mediaId: null, comments: [] }] }));
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "no-preview", kind: "url", title: "미리보기 없음", memo: "", tag: "수집", savedAt: "오늘", url: "https://example.com/x", mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
     const card = await screen.findByRole("button", { name: /미리보기 없음/ });
     expect(await within(card).findByText("링크 미리보기")).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe("ScrapPage", () => {
   });
 
   it("프로토콜 없는 URL도 HTTPS로 정규화해 미리보기한다", async () => {
-    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "bare-link", kind: "url", title: "프로토콜 없는 링크", memo: "", tag: "수집", savedAt: "오늘", url: "example.com/article", mediaId: null, comments: [] }] }));
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "bare-link", kind: "url", title: "프로토콜 없는 링크", memo: "", tag: "수집", savedAt: "오늘", url: "example.com/article", mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
     await within(await screen.findByRole("button", { name: /프로토콜 없는 링크/ })).findByRole("presentation");
     expect(httpClient.httpGetBlob).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("https://example.com/article")));
@@ -161,7 +161,7 @@ describe("ScrapPage", () => {
 
   it("웹 URL이 아닌 값은 외부 링크로 만들지 않는다", async () => {
     const unsafeUrl = "javascript:alert('xss')";
-    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "unsafe", kind: "url", title: "안전하지 않은 링크", memo: "", tag: "수집", savedAt: "오늘", url: unsafeUrl, mediaId: null, comments: [] }] }), "/scrap?detail=unsafe");
+    renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "unsafe", kind: "url", title: "안전하지 않은 링크", memo: "", tag: "수집", savedAt: "오늘", url: unsafeUrl, mediaId: null, fileName: null, fileSize: null, comments: [] }] }), "/scrap?detail=unsafe");
 
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
     expect(within(drawer).getByText(unsafeUrl)).toBeInTheDocument();
@@ -174,7 +174,7 @@ describe("ScrapPage", () => {
     renderPage(
       repositoryOf({
         tags: ["수집"],
-        items: [{ id: "comment-link", kind: "text", title: "댓글 링크", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-link-1", createdAt: "오늘", text: `첫 줄\n${url}.`, file: null }] }],
+        items: [{ id: "comment-link", kind: "text", title: "댓글 링크", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [{ id: "comment-link-1", createdAt: "오늘", text: `첫 줄\n${url}.`, file: null }] }],
       }),
       "/scrap?detail=comment-link",
       { open },
@@ -195,7 +195,7 @@ describe("ScrapPage", () => {
     renderPage(
       repositoryOf({
         tags: ["수집"],
-        items: [{ id: "comment-strike", kind: "text", title: "댓글 취소선", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "comment-strike-1", createdAt: "오늘", text: "이건 ~~틀림~~ 맞음", file: null }] }],
+        items: [{ id: "comment-strike", kind: "text", title: "댓글 취소선", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [{ id: "comment-strike-1", createdAt: "오늘", text: "이건 ~~틀림~~ 맞음", file: null }] }],
       }),
       "/scrap?detail=comment-strike",
     );
@@ -209,7 +209,7 @@ describe("ScrapPage", () => {
   it("새 댓글은 Shift+Enter로 줄바꿈하고 Enter로 등록한다", async () => {
     const addComment = vi.fn(async () => {});
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "comment-keyboard", kind: "text", title: "댓글 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [] }] }, { addComment }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "comment-keyboard", kind: "text", title: "댓글 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }, { addComment }),
       "/scrap?detail=comment-keyboard",
     );
 
@@ -228,7 +228,7 @@ describe("ScrapPage", () => {
     const updateComment = vi.fn(async () => {});
     const text = "수정 전";
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "edit-keyboard", kind: "text", title: "댓글 수정 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [{ id: "edit-keyboard-comment", createdAt: "오늘", text, file: null }] }] }, { updateComment }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "edit-keyboard", kind: "text", title: "댓글 수정 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [{ id: "edit-keyboard-comment", createdAt: "오늘", text, file: null }] }] }, { updateComment }),
       "/scrap?detail=edit-keyboard",
     );
 
@@ -430,7 +430,7 @@ describe("ScrapPage", () => {
 
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
     const photo = new File(["photo"], "여름 바다.png", { type: "image/png" });
-    fireEvent.change(within(modal).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+    fireEvent.change(within(modal).getByLabelText("첨부 파일 선택"), { target: { files: [photo] } });
 
     expect(within(modal).getByRole("img", { name: "여름 바다.png 미리보기" })).toHaveAttribute("src", "blob:mock");
     expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("여름 바다");
@@ -442,17 +442,40 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "image", mediaId, title: "여름 바다" });
   });
 
+  it("이미지가 아닌 파일을 업로드하면 file 종류로 저장하고 상세에 다운로드 칩을 띄운다", async () => {
+    const repository = createMockScrapRepository();
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:doc"), delete: vi.fn(async () => {}) };
+    const mediaId = "00000000-0000-4000-8000-0000000000ab";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(mediaId);
+    renderPage(repository, "/scrap?modal=new", undefined, mediaStore);
+
+    const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
+    const doc = new File(["report"], "1분기 보고서.pdf", { type: "application/pdf" });
+    fireEvent.change(within(modal).getByLabelText("첨부 파일 선택"), { target: { files: [doc] } });
+    expect(within(modal).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(modal).getByText("1분기 보고서.pdf")).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith(mediaId, doc));
+    expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "file", mediaId, fileName: "1분기 보고서.pdf", fileSize: 6 });
+
+    fireEvent.click(await screen.findByRole("button", { name: /1분기 보고서/ }));
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const chip = within(drawer).getByRole("link", { name: /1분기 보고서\.pdf/ });
+    expect(chip).toHaveAttribute("download", "1분기 보고서.pdf");
+  });
+
   it("사진 제거 후 보이는 사진 선택 버튼으로 focus를 복귀한다", async () => {
     renderPage(createMockScrapRepository(), "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
-    const input = within(modal).getByLabelText("사진 파일 선택");
+    const input = within(modal).getByLabelText("첨부 파일 선택");
     expect(input).toHaveAttribute("tabindex", "-1");
     fireEvent.change(input, { target: { files: [new File(["photo"], "제거.png", { type: "image/png" })] } });
 
-    const removeButton = within(modal).getByRole("button", { name: "제거.png 사진 제거" });
+    const removeButton = within(modal).getByRole("button", { name: "제거.png 제거" });
     fireEvent.click(removeButton);
 
-    const picker = within(modal).getByRole("button", { name: /사진 선택/ });
+    const picker = within(modal).getByRole("button", { name: /파일 선택/ });
     await waitFor(() => expect(picker).toHaveFocus());
     expect(within(modal).queryByRole("img", { name: "제거.png 미리보기" })).not.toBeInTheDocument();
   });
@@ -467,7 +490,7 @@ describe("ScrapPage", () => {
 
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
     const photo = new File(["photo"], "보존.png", { type: "image/png" });
-    fireEvent.change(within(modal).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+    fireEvent.change(within(modal).getByLabelText("첨부 파일 선택"), { target: { files: [photo] } });
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
 
     expect(await within(modal).findByRole("alert")).toHaveTextContent("스크랩 저장 실패");
@@ -479,7 +502,7 @@ describe("ScrapPage", () => {
   it("스크랩 상세에서 사진을 교체하면 새 미디어를 올리고 저장한다", async () => {
     const snapshot: ScrapSnapshot = {
       tags: ["수집", "기타"],
-      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", comments: [] }],
+      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }],
     };
     const repository = repositoryOf(snapshot, {
       update: vi.fn(async (id, input) => {
@@ -496,7 +519,7 @@ describe("ScrapPage", () => {
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
     fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
     const photo = new File(["p"], "새포스터.png", { type: "image/png" });
-    fireEvent.change(within(drawer).getByLabelText("사진 파일 선택"), { target: { files: [photo] } });
+    fireEvent.change(within(drawer).getByLabelText("첨부 파일 선택"), { target: { files: [photo] } });
     fireEvent.click(within(within(drawer).getByRole("textbox", { name: "제목" }).closest("form")!).getByRole("button", { name: "저장" }));
 
     await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith("22222222-2222-4222-8222-222222222222", photo));
@@ -506,7 +529,7 @@ describe("ScrapPage", () => {
   it("스크랩 상세에서 사진을 제거하면 mediaId 없이 저장한다", async () => {
     const snapshot: ScrapSnapshot = {
       tags: ["수집", "기타"],
-      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", comments: [] }],
+      items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }],
     };
     const repository = repositoryOf(snapshot, { update: vi.fn(async () => {}) });
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:existing"), delete: vi.fn(async () => {}) };
@@ -514,7 +537,7 @@ describe("ScrapPage", () => {
 
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
     fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
-    fireEvent.click(within(drawer).getByRole("button", { name: "사진 제거" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "첨부 제거" }));
     fireEvent.click(within(within(drawer).getByRole("textbox", { name: "제목" }).closest("form")!).getByRole("button", { name: "저장" }));
 
     await waitFor(() => expect(repository.update).toHaveBeenCalledWith("img", expect.objectContaining({ mediaId: null })));
@@ -580,7 +603,7 @@ describe("ScrapPage", () => {
     const mediaId = "00000000-0000-4000-8000-0000000000fa";
     vi.spyOn(crypto, "randomUUID").mockReturnValue(mediaId);
     renderPage(
-      repositoryOf({ tags: ["수집"], items: [{ id: "with-file", kind: "text", title: "파일 댓글", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, comments: [] }] }, { addComment }),
+      repositoryOf({ tags: ["수집"], items: [{ id: "with-file", kind: "text", title: "파일 댓글", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }, { addComment }),
       "/scrap?detail=with-file",
       undefined,
       mediaStore,

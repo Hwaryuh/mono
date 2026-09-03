@@ -87,6 +87,8 @@ function approveItem(state: MockPlatformState, itemId: string) {
       savedAt: "방금",
       url: item.source === "url" ? item.raw : null,
       mediaId,
+      fileName: null,
+      fileSize: null,
       comments: [],
     }, ...state.scrap.items];
   }

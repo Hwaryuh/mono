@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sortItems } from "./scrap-sort";
 
 function item(over: Partial<ScrapItem>): ScrapItem {
-  return { id: "x", kind: "text", title: "", memo: "", tag: "수집", savedAt: "2026-01-01T00:00:00Z", url: null, mediaId: null, comments: [], ...over };
+  return { id: "x", kind: "text", title: "", memo: "", tag: "수집", savedAt: "2026-01-01T00:00:00Z", url: null, mediaId: null, fileName: null, fileSize: null, comments: [], ...over };
 }
 
 const a = item({ id: "a", title: "가나다", savedAt: "2026-03-01T00:00:00Z", comments: [] });

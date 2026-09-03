@@ -1,6 +1,12 @@
-import { scrapCommentInputSchema, scrapSnapshotSchema, scrapWriteInputSchema } from "@mono/contracts";
+import { scrapCommentInputSchema, scrapSnapshotSchema, scrapWriteInputSchema, type ScrapKind } from "@mono/contracts";
 import type { ScrapRepository } from "../../features/scrap/scrap-repository";
 import { createMockPlatformState, type MockPlatformState } from "./mock-platform-state";
+
+function scrapKind(parsed: { mediaId?: string | null; fileName?: string | null; url: string }): ScrapKind {
+  if (parsed.fileName) return "file";
+  if (parsed.mediaId) return "image";
+  return parsed.url ? "url" : "text";
+}
 
 function requireScrap(state: MockPlatformState, scrapId: string) {
   const scrap = state.scrap.items.find((candidate) => candidate.id === scrapId);
@@ -20,13 +26,15 @@ class MockScrapRepository implements ScrapRepository {
     if (!this.state.scrap.tags.includes(parsed.tag)) this.state.scrap.tags.push(parsed.tag);
     this.state.scrap.items = [{
       id: `scrap-${this.state.nextScrapId++}`,
-      kind: parsed.mediaId ? "image" : parsed.url ? "url" : "text",
+      kind: scrapKind(parsed),
       title: parsed.title,
       memo: parsed.memo,
       tag: parsed.tag,
       savedAt: "방금",
       url: parsed.url || null,
       mediaId: parsed.mediaId ?? null,
+      fileName: parsed.fileName ?? null,
+      fileSize: parsed.fileSize ?? null,
       comments: [],
     }, ...this.state.scrap.items];
   }
@@ -40,7 +48,9 @@ class MockScrapRepository implements ScrapRepository {
     scrap.tag = parsed.tag;
     scrap.url = parsed.url || null;
     scrap.mediaId = parsed.mediaId ?? null;
-    scrap.kind = parsed.mediaId ? "image" : parsed.url ? "url" : "text";
+    scrap.fileName = parsed.fileName ?? null;
+    scrap.fileSize = parsed.fileSize ?? null;
+    scrap.kind = scrapKind(parsed);
   }
 
   async delete(scrapId: string) {

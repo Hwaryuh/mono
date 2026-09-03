@@ -45,6 +45,8 @@ struct ScrapItem {
     saved_at: String,
     url: Option<String>,
     media_id: Option<String>,
+    file_name: Option<String>,
+    file_size: Option<i64>,
     comments: Vec<ScrapComment>,
 }
 
@@ -55,6 +57,7 @@ struct ScrapSnapshot {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ScrapWriteInput {
     title: String,
     #[serde(default)]
@@ -63,8 +66,11 @@ struct ScrapWriteInput {
     url: String,
     tag: String,
     #[serde(default)]
-    #[serde(rename = "mediaId")]
     media_id: Option<String>,
+    #[serde(default)]
+    file_name: Option<String>,
+    #[serde(default)]
+    file_size: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -155,6 +161,41 @@ fn validated_media_id(raw: Option<&str>) -> ApiResult<Option<String>> {
     Ok(Some(id.to_string()))
 }
 
+// 첨부 파일은 media_id와 짝이어야 한다. 반환: (정규화된 이름, 크기).
+fn validated_scrap_file(
+    media_id: Option<&str>,
+    name: Option<&str>,
+    size: Option<i64>,
+) -> ApiResult<Option<(String, i64)>> {
+    let Some(raw_name) = name else {
+        return Ok(None);
+    };
+    if media_id.is_none() {
+        return Err(ApiError::validation("첨부 파일에는 미디어 id가 필요합니다."));
+    }
+    let name = raw_name.trim();
+    if name.is_empty() || name.chars().count() > 255 {
+        return Err(ApiError::validation("첨부 파일 이름이 올바르지 않습니다."));
+    }
+    let size = size.unwrap_or(0);
+    if !(0..=50 * 1024 * 1024).contains(&size) {
+        return Err(ApiError::validation("첨부 파일 크기가 올바르지 않습니다."));
+    }
+    Ok(Some((name.to_string(), size)))
+}
+
+fn scrap_kind(has_file: bool, has_media: bool, url: &str) -> &'static str {
+    if has_file {
+        "file"
+    } else if has_media {
+        "image"
+    } else if url.is_empty() {
+        "text"
+    } else {
+        "url"
+    }
+}
+
 fn validated_comment(raw: &str) -> ApiResult<String> {
     let text = raw.trim();
     if text.is_empty() {
@@ -210,7 +251,8 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
 
     let mut items = conn
         .prepare(
-            "SELECT id, kind, title, memo, tag, saved_at, url, media_id FROM scrap_items ORDER BY seq DESC",
+            "SELECT id, kind, title, memo, tag, saved_at, url, media_id, file_name, file_size \
+             FROM scrap_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
             Ok(ScrapItem {
@@ -222,6 +264,8 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
                 saved_at: row.get(5)?,
                 url: row.get(6)?,
                 media_id: row.get(7)?,
+                file_name: row.get(8)?,
+                file_size: row.get(9)?,
                 comments: Vec::new(),
             })
         })?
@@ -290,21 +334,16 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     let url = validated_url(&input.url)?;
     let tag = validated_tag(&input.tag)?;
     let media_id = validated_media_id(input.media_id.as_deref())?;
-    let kind = if media_id.is_some() {
-        "image"
-    } else if url.is_empty() {
-        "text"
-    } else {
-        "url"
-    };
+    let file = validated_scrap_file(media_id.as_deref(), input.file_name.as_deref(), input.file_size)?;
+    let kind = scrap_kind(file.is_some(), media_id.is_some(), &url);
 
     let tx = conn.transaction()?;
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
     let next_seq: i64 =
         tx.query_row("SELECT COALESCE(MAX(seq), 0) FROM scrap_items", [], |row| row.get(0))?;
     tx.execute(
-        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, url, media_id) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, url, media_id, file_name, file_size) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -315,6 +354,8 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
             now_iso(),
             if url.is_empty() { None } else { Some(url) },
             media_id,
+            file.as_ref().map(|f| f.0.clone()),
+            file.as_ref().map(|f| f.1),
         ],
     )?;
     tx.commit()?;
@@ -330,19 +371,14 @@ fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiR
     let url = validated_url(&input.url)?;
     let tag = validated_tag(&input.tag)?;
     let media_id = validated_media_id(input.media_id.as_deref())?;
-    let kind = if media_id.is_some() {
-        "image"
-    } else if url.is_empty() {
-        "text"
-    } else {
-        "url"
-    };
+    let file = validated_scrap_file(media_id.as_deref(), input.file_name.as_deref(), input.file_size)?;
+    let kind = scrap_kind(file.is_some(), media_id.is_some(), &url);
 
     let tx = conn.transaction()?;
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
     tx.execute(
-        "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5, media_id = ?6 \
-         WHERE id = ?7",
+        "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5, media_id = ?6, \
+         file_name = ?7, file_size = ?8 WHERE id = ?9",
         params![
             kind,
             title,
@@ -350,6 +386,8 @@ fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiR
             tag,
             if url.is_empty() { None } else { Some(url) },
             media_id,
+            file.as_ref().map(|f| f.0.clone()),
+            file.as_ref().map(|f| f.1),
             id,
         ],
     )?;
@@ -566,6 +604,8 @@ mod tests {
             url: url.into(),
             tag: tag.into(),
             media_id: None,
+            file_name: None,
+            file_size: None,
         }
     }
 
@@ -621,6 +661,33 @@ mod tests {
         let item = &get_snapshot(&conn).unwrap().items[0];
         assert_eq!(item.kind, "image");
         assert_eq!(item.media_id.as_deref(), Some(media_id));
+    }
+
+    #[test]
+    fn create_with_file_name_makes_file_scrap() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let mut input = write_input("문서 스크랩", "", "문서");
+        input.media_id = Some("00000000-0000-4000-8000-000000000002".into());
+        input.file_name = Some("보고서.pdf".into());
+        input.file_size = Some(4096);
+
+        create_scrap(&mut conn, input).unwrap();
+
+        let item = &get_snapshot(&conn).unwrap().items[0];
+        assert_eq!(item.kind, "file");
+        assert_eq!(item.file_name.as_deref(), Some("보고서.pdf"));
+        assert_eq!(item.file_size, Some(4096));
+    }
+
+    #[test]
+    fn create_rejects_file_name_without_media_id() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        let mut input = write_input("문서 스크랩", "", "문서");
+        input.file_name = Some("보고서.pdf".into());
+
+        assert!(create_scrap(&mut conn, input).is_err());
     }
 
     #[test]

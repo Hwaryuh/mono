@@ -21,6 +21,7 @@ const scrapKindLabel = {
   url: "링크",
   text: "메모",
   video: "동영상",
+  file: "파일",
 } as const;
 
 export const mockCaptureAnalysisProvider: CaptureAnalysisProvider = {
