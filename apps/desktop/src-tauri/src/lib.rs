@@ -3,8 +3,10 @@ use std::path::PathBuf;
 use serde::Serialize;
 use tauri::Manager;
 
+mod alarm;
 mod runtime_server;
 
+use alarm::Alarm;
 use runtime_server::{RuntimeServer, ServerMode, StoredConnection};
 
 /// 실행 중인 앱이 실제로 사용하는 API 연결. `setup`에서 한 번 결정되고 바뀌지 않는다 —
@@ -128,12 +130,15 @@ pub fn run() {
     }
 
     let app = builder
+        .manage(Alarm::spawn())
         .invoke_handler(tauri::generate_handler![
             server_api_base_url,
             server_api_token,
             server_connection,
             save_server_connection,
-            restart_app
+            restart_app,
+            alarm::alarm_start,
+            alarm::alarm_stop
         ])
         .setup(|app| {
             let data_directory = app
