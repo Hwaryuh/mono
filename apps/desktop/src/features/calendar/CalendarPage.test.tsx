@@ -37,7 +37,7 @@ describe("CalendarPage", () => {
     expect(container.querySelectorAll(".calendar-cell--outside")).toHaveLength(11);
     expect(container.querySelector(".calendar-cell__day--today")).toHaveTextContent("5");
 
-    const monthTab = screen.getByRole("tab", { name: "월" });
+    const monthTab = screen.getByRole("tab", { name: "월간" });
     monthTab.focus();
     fireEvent.keyDown(monthTab, { key: "ArrowRight" });
     const agendaTab = screen.getByRole("tab", { name: "일정표" });

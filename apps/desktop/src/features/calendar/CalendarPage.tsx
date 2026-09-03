@@ -54,8 +54,11 @@ function formatDay(date: string) {
 }
 
 function formatRange(event: CalendarEvent) {
-  if (!event.startTime && !event.endTime) return translate("calendar.time.allDay");
-  if (event.startDate === event.endDate) return `${event.startTime ?? "00:00"} - ${event.endTime ?? event.startTime ?? "00:00"}`;
+  const allDay = !event.startTime && !event.endTime;
+  if (event.startDate === event.endDate) {
+    return allDay ? translate("calendar.time.allDay") : `${event.startTime ?? "00:00"} - ${event.endTime ?? event.startTime ?? "00:00"}`;
+  }
+  if (allDay) return translate("calendar.event.allDayUntil", { endDate: formatDay(event.endDate) });
   return translate("calendar.event.dateTimeRange", { startDate: formatDay(event.startDate), startTime: event.startTime ?? translate("calendar.time.allDay"), endDate: formatDay(event.endDate), endTime: event.endTime ?? translate("calendar.time.allDay") });
 }
 
@@ -124,7 +127,7 @@ function presetToRecurrence(preset: RecurrencePreset, startDate: string, prev: C
 
 function recurrenceSummary(rule: CalendarRecurrence, startDate: string): string {
   const every = rule.interval > 1 ? `${rule.interval}` : "";
-  const unit = { daily: translate("routine.weekday.sun"), weekly: translate("calendar.recurrence.unit.week"), monthly: translate("calendar.recurrence.unit.month"), yearly: translate("calendar.recurrence.unit.year") }[rule.freq];
+  const unit = { daily: translate("calendar.recurrence.unit.day"), weekly: translate("calendar.recurrence.unit.week"), monthly: translate("calendar.recurrence.unit.month"), yearly: translate("calendar.recurrence.unit.year") }[rule.freq];
   let base = every ? translate("calendar.recurrence.intervalSummary", { interval: every, unit }) : { daily: translate("routine.recurrence.daily"), weekly: translate("calendar.recurrence.weekly"), monthly: translate("calendar.recurrence.monthly"), yearly: translate("calendar.recurrence.yearly") }[rule.freq];
   if (rule.freq === "weekly") {
     const days = (rule.weekdays.length ? rule.weekdays : [weekdayOf(startDate)]).slice().sort((a, b) => a - b).map((d) => dayNames[d]);
@@ -579,7 +582,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
         <strong>{formatMonth(visibleMonth)}</strong>
         <Button onClick={showCurrentMonth} size="small">{translate("todo.filter.today")}</Button>
         <div aria-label={translate("calendar.view.label")} className="calendar-view-tabs" role="tablist">
-          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? translate("routine.weekday.mon") : translate("calendar.view.agenda")}</button>)}
+          {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? translate("calendar.view.month") : translate("calendar.view.agenda")}</button>)}
         </div>
       </div>
 
@@ -826,7 +829,7 @@ const recurrencePresetOptions: { value: RecurrencePreset; label: string }[] = [
   { value: "custom", label: translate("calendar.recurrence.custom") },
 ];
 const recurrenceFreqOptions: { value: RecurrenceFreq; label: string }[] = [
-  { value: "daily", label: translate("routine.weekday.sun") },
+  { value: "daily", label: translate("calendar.recurrence.unit.day") },
   { value: "weekly", label: translate("calendar.recurrence.unit.week") },
   { value: "monthly", label: translate("calendar.recurrence.unit.month") },
   { value: "yearly", label: translate("calendar.recurrence.unit.year") },
