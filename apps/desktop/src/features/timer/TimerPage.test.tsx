@@ -87,29 +87,29 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("집중이 끝나면 알람이 울리고, 끄기 전에는 휴식으로 넘어가지 않는다", () => {
-    const { sessionStore, alarm } = renderTimer({ focusMinutes: 1, shortBreakMinutes: 3, autoStartBreak: false });
+  it("집중이 끝나면 알람이 울리고, 끄기 전에는 새 집중으로 돌아가지 않는다", () => {
+    const { sessionStore, alarm } = renderTimer({ focusMinutes: 1 });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
 
     expect(alarm.start).toHaveBeenCalled();
     expect(sessionStore.read(currentIsoDate())).toHaveLength(1);
-    expect(screen.queryByText("03:00")).not.toBeInTheDocument();
+    expect(screen.getByText("00:00")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "알람 끄기" }));
 
     expect(alarm.stop).toHaveBeenCalled();
-    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.getByText("01:00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^시작$/ })).toBeInTheDocument();
   });
 
-  it("알람이 꺼져 있으면 곧바로 휴식으로 넘어간다", () => {
-    const { alarm } = renderTimer({ focusMinutes: 1, shortBreakMinutes: 3, autoStartBreak: false, alarmEnabled: false });
+  it("알람이 꺼져 있으면 곧바로 새 집중으로 돌아간다", () => {
+    const { alarm } = renderTimer({ focusMinutes: 1, alarmEnabled: false });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
 
     expect(alarm.start).not.toHaveBeenCalled();
-    expect(screen.getByText("03:00")).toBeInTheDocument();
+    expect(screen.getByText("01:00")).toBeInTheDocument();
   });
 
   it("건너뛰기는 세션을 기록하지 않는다", () => {

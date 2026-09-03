@@ -20,17 +20,16 @@ function storageOf(initial: Record<string, string> = {}): Storage {
 
 describe("timer settings", () => {
   it("범위를 벗어난 값은 경계로 잘라낸다", () => {
-    const settings = normalizeTimerSettings({ focusMinutes: 999, shortBreakMinutes: 0 });
-
-    expect(settings.focusMinutes).toBe(180);
-    expect(settings.shortBreakMinutes).toBe(1);
+    expect(normalizeTimerSettings({ focusMinutes: 999 }).focusMinutes).toBe(180);
+    expect(normalizeTimerSettings({ focusMinutes: 0 }).focusMinutes).toBe(1);
   });
 
-  it("예전 긴 휴식 설정은 폐기한다", () => {
-    const settings = normalizeTimerSettings({ longBreakMinutes: 15, longBreakEvery: 4 });
+  it("예전 휴식 설정은 폐기한다", () => {
+    const settings = normalizeTimerSettings({ shortBreakMinutes: 5, autoStartBreak: true, autoStartFocus: true });
 
-    expect(settings).not.toHaveProperty("longBreakMinutes");
-    expect(settings).not.toHaveProperty("longBreakEvery");
+    expect(settings).not.toHaveProperty("shortBreakMinutes");
+    expect(settings).not.toHaveProperty("autoStartBreak");
+    expect(settings).not.toHaveProperty("autoStartFocus");
   });
 
   it("빠지거나 깨진 값은 기본값으로 채운다", () => {
@@ -41,9 +40,9 @@ describe("timer settings", () => {
   it("저장한 값을 다시 읽는다", () => {
     const storage = storageOf();
     const store = LocalStorageTimerSettingsStore.of(storage);
-    store.write({ ...defaultTimerSettings, focusMinutes: 50, autoStartFocus: true, todoScope: "today" });
+    store.write({ ...defaultTimerSettings, focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
 
-    expect(store.read()).toMatchObject({ focusMinutes: 50, autoStartFocus: true, todoScope: "today" });
+    expect(store.read()).toMatchObject({ focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
   });
 
   it("깨진 저장값은 기본값으로 읽는다", () => {

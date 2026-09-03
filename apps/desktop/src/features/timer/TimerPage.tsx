@@ -24,16 +24,6 @@ import { focusAppWindow, notifySessionEnd, onNotificationClick } from "./timer-n
 const DAILY_GOAL = 8;
 const TICK_MS = 250;
 
-type Phase = "focus" | "shortBreak";
-
-function minutesOf(settings: TimerSettings, phase: Phase): number {
-  return phase === "focus" ? settings.focusMinutes : settings.shortBreakMinutes;
-}
-
-function minutesKeyOf(phase: Phase): "focusMinutes" | "shortBreakMinutes" {
-  return phase === "focus" ? "focusMinutes" : "shortBreakMinutes";
-}
-
 function formatClock(seconds: number) {
   const safe = Math.max(0, seconds);
   const minutes = String(Math.floor(safe / 60)).padStart(2, "0");
@@ -69,23 +59,22 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   const snapshotQuery = useQuery({ queryKey: ["todo"], queryFn: () => repository.getSnapshot() });
 
   const [settings, setSettings] = useState<TimerSettings>(() => preferences.read());
-  const [phase, setPhase] = useState<Phase>("focus");
   const [remaining, setRemaining] = useState(() => preferences.read().focusMinutes * 60);
   // 실행 중이면 끝나는 시각(epoch ms). 남은 초를 매 틱 다시 계산해야 setInterval 오차가 쌓이지 않는다.
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const selectedTodoIdRef = useRef<string | null>(null);
-  // 방금 끝나서 울리고 있는 페이즈. 끄기 전까지 다음 페이즈로 넘어가지 않는다.
-  const [ringing, setRinging] = useState<Phase | null>(null);
+  // 방금 집중이 끝나 울리고 있는지. 끄기 전까지 다음 세션으로 넘어가지 않는다.
+  const [ringing, setRinging] = useState(false);
   // 큰 숫자를 눌러 길이를 고치는 중인지. 입력값은 커밋(blur·Enter) 때만 숫자로 좁힌다.
   const [editingMinutes, setEditingMinutes] = useState(false);
   const [minutesDraft, setMinutesDraft] = useState<string | null>(null);
 
-  const total = minutesOf(settings, phase) * 60;
+  const total = settings.focusMinutes * 60;
   const running = endsAt !== null;
   // 카운트다운 중도, 울리는 중도 아닐 때만 길이를 고칠 수 있다(시작 전·일시정지 포함).
-  const canEditMinutes = !running && ringing === null;
+  const canEditMinutes = !running && !ringing;
 
   const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
   const candidates = [...(snapshotQuery.data?.items ?? [])]
@@ -115,14 +104,14 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
       window.clearInterval(timer);
       setEndsAt(null);
       setRemaining(0);
-      finishPhase(true);
+      finishFocus(true);
     };
     const timer = window.setInterval(tick, TICK_MS);
     tick();
     return () => window.clearInterval(timer);
-    // finishPhase 는 렌더마다 새로 만들어지므로 의존성에 넣지 않는다 — 값은 phase/settings 로 들어온다.
+    // finishFocus 는 렌더마다 새로 만들어지므로 의존성에 넣지 않는다 — 값은 settings 로 들어온다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endsAt, phase, settings]);
+  }, [endsAt, settings]);
 
   // 설정 모달은 같은 창에 있어서 storage 이벤트가 오지 않는다. 저장 시 발행되는 이벤트를 듣는다.
   useEffect(() => {
@@ -131,13 +120,13 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
       setSettings(next);
       // 돌고 있는 세션은 건드리지 않는다. 멈춰 있을 때만 새 길이로 맞춘다.
       setEndsAt((current) => {
-        if (current === null) setRemaining(minutesOf(next, phase) * 60);
+        if (current === null) setRemaining(next.focusMinutes * 60);
         return current;
       });
     };
     window.addEventListener(TIMER_SETTINGS_EVENT, reload);
     return () => window.removeEventListener(TIMER_SETTINGS_EVENT, reload);
-  }, [preferences, phase]);
+  }, [preferences]);
 
   // 페이지를 벗어나면 울리던 알람을 멈춘다.
   useEffect(() => () => alarm.stop(), [alarm]);
@@ -156,43 +145,32 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     };
   }, []);
 
-  function startPhase(next: Phase, autoStart: boolean) {
-    const seconds = minutesOf(settings, next) * 60;
-    setPhase(next);
-    setRemaining(seconds);
-    setEndsAt(autoStart ? Date.now() + seconds * 1000 : null);
+  function resetToFocus() {
+    setRemaining(settings.focusMinutes * 60);
+    setEndsAt(null);
   }
 
-  function advance(endedPhase: Phase, autoAllowed: boolean) {
-    if (endedPhase === "focus") startPhase("shortBreak", autoAllowed && settings.autoStartBreak);
-    else startPhase("focus", autoAllowed && settings.autoStartFocus);
-  }
-
-  function finishPhase(record: boolean) {
-    if (record && phase === "focus") {
+  function finishFocus(record: boolean) {
+    if (record) {
       setSessions(store.append(today, {
         startedAt: startedAtOf(new Date(Date.now() - settings.focusMinutes * 60_000)),
         todoId: selectedTodoIdRef.current,
         minutes: settings.focusMinutes,
       }));
+      if (settings.alarmEnabled) {
+        alarm.start();
+        void notifySessionEnd(translate("timer.notify.focusTitle"), translate("timer.notify.body"));
+        setRinging(true);
+        return;
+      }
     }
-    if (record && settings.alarmEnabled) {
-      alarm.start();
-      void notifySessionEnd(
-        translate(phase === "focus" ? "timer.notify.focusTitle" : "timer.notify.breakTitle"),
-        translate("timer.notify.body"),
-      );
-      setRinging(phase);
-      return;
-    }
-    advance(phase, record);
+    resetToFocus();
   }
 
   function dismissAlarm() {
     alarm.stop();
-    const ended = ringing;
-    setRinging(null);
-    if (ended) advance(ended, true);
+    setRinging(false);
+    resetToFocus();
   }
 
   function commitMinutesDraft() {
@@ -200,14 +178,14 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     setMinutesDraft(null);
     setEditingMinutes(false);
     if (raw === null || raw.trim() === "") return;
-    const next = normalizeTimerSettings({ ...settings, [minutesKeyOf(phase)]: Number(raw) });
+    const next = normalizeTimerSettings({ ...settings, focusMinutes: Number(raw) });
     setSettings(next);
     preferences.write(next);
-    setRemaining(minutesOf(next, phase) * 60);
+    setRemaining(next.focusMinutes * 60);
   }
 
   function toggle() {
-    if (ringing !== null) {
+    if (ringing) {
       dismissAlarm();
       return;
     }
@@ -225,18 +203,16 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
 
   function skip() {
     setEndsAt(null);
-    finishPhase(false);
+    finishFocus(false);
   }
 
   const toggleLabel = running ? translate("timer.action.pause") : remaining === total ? translate("timer.action.start") : translate("timer.action.resume");
-  const currentMinutes = minutesOf(settings, phase);
+  const currentMinutes = settings.focusMinutes;
 
   return (
     <div className="timer-page">
       <section className="timer-stage">
-        <div
-          className={`timer-digits ${phase === "focus" ? "" : "timer-digits--break"} ${ringing !== null ? "timer-digits--ringing" : ""}`}
-        >
+        <div className={`timer-digits ${ringing ? "timer-digits--ringing" : ""}`}>
           {editingMinutes && canEditMinutes ? (
             <input
               aria-label={translate("timer.adjust.label")}
@@ -274,7 +250,7 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
         <div className="timer-bar" hidden={editingMinutes && canEditMinutes}>
           <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
         </div>
-        <span className="timer-phase">{translate(phase === "focus" ? "timer.phase.focus" : "timer.phase.shortBreak")}</span>
+        <span className="timer-phase">{translate("timer.phase.focus")}</span>
 
         <div className="timer-tally">
           <span>{translate("todo.filter.today")}</span>
@@ -288,7 +264,7 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
         </div>
 
         <div className="timer-controls">
-          {ringing !== null ? (
+          {ringing ? (
             <Button onClick={dismissAlarm} variant="primary">
               <Icon name="bell" size={15} strokeWidth={1.8} />
               {translate("timer.action.stopAlarm")}

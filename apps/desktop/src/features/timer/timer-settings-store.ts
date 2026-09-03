@@ -6,18 +6,12 @@ export type TimerTodoScope = "all" | "today";
 
 export type TimerSettings = {
   focusMinutes: number;
-  shortBreakMinutes: number;
-  autoStartBreak: boolean;
-  autoStartFocus: boolean;
   todoScope: TimerTodoScope;
   alarmEnabled: boolean;
 };
 
 export const defaultTimerSettings: TimerSettings = {
   focusMinutes: 25,
-  shortBreakMinutes: 5,
-  autoStartBreak: true,
-  autoStartFocus: false,
   todoScope: "all",
   alarmEnabled: true,
 };
@@ -35,9 +29,6 @@ export function normalizeTimerSettings(value: unknown): TimerSettings {
   const raw = value as Partial<TimerSettings>;
   return {
     focusMinutes: clamp(raw.focusMinutes, defaultTimerSettings.focusMinutes, timerMinuteBounds),
-    shortBreakMinutes: clamp(raw.shortBreakMinutes, defaultTimerSettings.shortBreakMinutes, timerMinuteBounds),
-    autoStartBreak: typeof raw.autoStartBreak === "boolean" ? raw.autoStartBreak : defaultTimerSettings.autoStartBreak,
-    autoStartFocus: typeof raw.autoStartFocus === "boolean" ? raw.autoStartFocus : defaultTimerSettings.autoStartFocus,
     todoScope: raw.todoScope === "today" ? "today" : "all",
     alarmEnabled: typeof raw.alarmEnabled === "boolean" ? raw.alarmEnabled : defaultTimerSettings.alarmEnabled,
   };

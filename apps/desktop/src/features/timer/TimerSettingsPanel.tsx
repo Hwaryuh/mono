@@ -31,28 +31,6 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
         <header><strong>{t("settings.timer.flow.title")}</strong></header>
         <div className="settings-toggle-row">
           <div>
-            <strong>{t("settings.timer.autoBreak.title")}</strong>
-            <span>{t("settings.timer.autoBreak.description")}</span>
-          </div>
-          <Checkbox
-            checked={settings.autoStartBreak}
-            label={t("settings.timer.autoBreak.title")}
-            onCheckedChange={(checked) => commit({ ...settings, autoStartBreak: checked })}
-          />
-        </div>
-        <div className="settings-toggle-row timer-settings__row--divided">
-          <div>
-            <strong>{t("settings.timer.autoFocus.title")}</strong>
-            <span>{t("settings.timer.autoFocus.description")}</span>
-          </div>
-          <Checkbox
-            checked={settings.autoStartFocus}
-            label={t("settings.timer.autoFocus.title")}
-            onCheckedChange={(checked) => commit({ ...settings, autoStartFocus: checked })}
-          />
-        </div>
-        <div className="settings-toggle-row timer-settings__row--divided">
-          <div>
             <strong>{t("settings.timer.alarm.title")}</strong>
             <span>{t("settings.timer.alarm.description")}</span>
           </div>
