@@ -280,7 +280,6 @@ export const koMessages = {
   "routine.field.days": "반복 요일",
   "routine.field.period": "기간",
   "routine.period.endDateOption": "종료일 지정",
-  "routine.period.endlessDescription": "끝을 정하지 않습니다. 언제든 루틴 화면에서 기간을 수정할 수 있습니다.",
   "routine.field.endDate": "종료일",
   "routine.period.endDateDescription": "이 날짜까지만 지정 요일에 할 일이 생성됩니다. 이후에는 비활성 상태가 됩니다.",
   "routine.status.expired": "기간 만료",

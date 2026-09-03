@@ -225,7 +225,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
           <div className="routine-editor__group">
             <div className="routine-editor__group-title">{translate("routine.field.period")}</div>
             <div className="routine-editor__period" role="radiogroup" aria-label={translate("routine.field.period")}><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">{translate("routine.period.endDateOption")}</button></div>
-            {draft.endless ? <p>{translate("routine.period.endlessDescription")}</p> : <div className="routine-editor__end"><DatePicker align="end" label={translate("routine.field.endDate")} min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>{translate("routine.period.endDateDescription")}</span></div>}
+            {!draft.endless && <div className="routine-editor__end"><DatePicker align="end" label={translate("routine.field.endDate")} min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>{translate("routine.period.endDateDescription")}</span></div>}
           </div>
           <div className="routine-editor__label-field">
             <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={() => setLabelManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
