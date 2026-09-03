@@ -48,6 +48,25 @@ describe("RoutinePage", () => {
     expect(screen.getByText("아침 스트레칭")).toBeInTheDocument();
   });
 
+  it("루틴 수정 Modal에서 확인을 거쳐 삭제한다", async () => {
+    const { repository } = renderRoutine();
+    const vitaminCard = (await screen.findByText("비타민 먹기")).closest<HTMLElement>(".routine-card")!;
+    fireEvent.click(within(vitaminCard).getByRole("button", { name: "수정" }));
+
+    const editModal = await screen.findByRole("dialog", { name: "루틴 수정" });
+    fireEvent.click(within(editModal).getByRole("button", { name: "삭제" }));
+
+    const confirm = await screen.findByRole("dialog", { name: "이 루틴을 삭제할까요?" });
+    expect(within(confirm).getByText("비타민 먹기", { selector: "blockquote" })).toBeInTheDocument();
+    fireEvent.click(within(confirm).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => expect(screen.queryByText("비타민 먹기")).not.toBeInTheDocument());
+    const snapshot = await repository.getSnapshot();
+    expect(snapshot.items.some((routine) => routine.title === "비타민 먹기")).toBe(false);
+    expect(snapshot.occurrences.some((occurrence) => occurrence.routineId === "routine-1")).toBe(false);
+    expect(snapshot.items.some((routine) => routine.title === "운동 30분 하기")).toBe(true);
+  });
+
   it("새 루틴 종료일에 공통 날짜 선택기를 사용한다", async () => {
     renderRoutine(createMockRoutineRepository(), "/routine?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 루틴" });
@@ -79,6 +98,7 @@ describe("RoutinePage", () => {
       getSnapshot: () => base.getSnapshot(),
       create: (input) => base.create(input),
       update: (id, input) => base.update(id, input),
+      delete: (id) => base.delete(id),
       toggleToday: vi.fn((id) => id === "routine-1" ? new Promise<void>((_, reject) => { rejectToggle = reject; }) : base.toggleToday(id)),
     };
     renderRoutine(repository);

@@ -108,3 +108,8 @@
 .routine-editor__end span { color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; }
 .routine-editor__label-field > .ui-select { width: 100%; }
 .routine-mutation-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
+.routine-editor__delete { margin-right: auto; color: var(--color-danger); }
+.routine-delete-modal { width: min(420px, 100%); }
+.routine-delete-modal .ui-overlay__header > svg { color: var(--color-danger); }
+.routine-delete-modal p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.55; }
+.routine-delete-modal blockquote { margin: 10px 0 0; padding: 9px 11px; border-left: 2px solid var(--color-border-strong); background: var(--color-surface-subtle); color: var(--color-text-faint); font-size: 11px; line-height: 1.5; }

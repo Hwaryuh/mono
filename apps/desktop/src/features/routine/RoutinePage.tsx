@@ -65,6 +65,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
   const [editorItem, setEditorItem] = useState<RoutineDefinition | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>({ title: "", labelId: "", days: [], endless: true, endDate: "" });
   const [formError, setFormError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
   const handledParamRef = useRef("");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -99,6 +100,13 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
         if (version !== null) setEditorItem((current) => (current && current !== "new" ? { ...current, version } : current));
       }
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (routineId: string) => repository.delete(routineId),
+    onMutate: () => setFormError(null),
+    onSuccess: async () => { setDeleteOpen(false); await invalidateSnapshots(); closeEditor(true); },
+    onError: (error) => setFormError(errorMessage(error)),
   });
 
   useEffect(() => {
@@ -136,7 +144,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
   if (snapshotQuery.isPending) return <RoutineLoading />;
   if (snapshotQuery.isError) return <div className="routine-state" role="alert"><Icon name="alert" size={18} />{translate("routine.error.load")}</div>;
   const snapshot = snapshotQuery.data;
-  const editorBusy = createMutation.isPending || updateMutation.isPending;
+  const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   function openCreate() {
     setDraft(blankDraft(snapshot.labels));
@@ -155,6 +163,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
   function closeEditor(force = false) {
     if (editorBusy && !force) return;
     setLabelManagerOpen(false);
+    setDeleteOpen(false);
     setEditorItem(null);
     setFormError(null);
     if (searchParams.has("modal") || searchParams.has("id")) {
@@ -186,6 +195,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
   }
 
   const selectedDays = dayNames.filter((_, day) => draft.days.includes(day));
+  const activeRoutine = editorItem && editorItem !== "new" ? editorItem : null;
 
   return (
     <div className="routine-page">
@@ -196,7 +206,11 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
 
       <Modal
         className="routine-editor-modal"
-        footer={<><Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button><Button form="routine-editor-form" loading={editorBusy} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button></>}
+        footer={<>
+          {editorItem && editorItem !== "new" && <Button className="routine-editor__delete" disabled={editorBusy} onClick={() => { setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
+          <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
+          <Button form="routine-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
+        </>}
         icon="routine"
         onClose={closeEditor}
         open={editorItem !== null}
@@ -217,8 +231,21 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
             <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={() => setLabelManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
             <Select label={translate("common.field.label")} onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />
           </div>
-          {formError && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && !deleteOpen && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
+      </Modal>
+
+      <Modal
+        className="routine-delete-modal"
+        footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeRoutine && deleteMutation.mutate(activeRoutine.id)} variant="danger">{translate("common.action.delete")}</Button></>}
+        icon="alert"
+        onClose={() => { if (!deleteMutation.isPending) setDeleteOpen(false); }}
+        open={deleteOpen}
+        title={translate("routine.delete.question")}
+      >
+        <p>{translate("routine.delete.warning")}</p>
+        <blockquote>{activeRoutine?.title}</blockquote>
+        {formError && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
       <TodoLabelManagerModal

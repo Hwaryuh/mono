@@ -272,6 +272,8 @@ export const koMessages = {
   "routine.empty.description": "반복할 일을 만들면 지정 요일의 할 일에 자동으로 나타납니다.",
   "routine.action.create": "생성",
   "routine.action.edit": "루틴 수정",
+  "routine.delete.question": "이 루틴을 삭제할까요?",
+  "routine.delete.warning": "삭제하면 이 루틴과 지금까지의 완료 기록이 함께 사라지며 되돌릴 수 없습니다.",
   "routine.editor.titlePlaceholder": "예: 비타민 먹기",
   "routine.editor.daysSummaryLabel": "반복 요일",
   "routine.recurrence.daily": "매일",

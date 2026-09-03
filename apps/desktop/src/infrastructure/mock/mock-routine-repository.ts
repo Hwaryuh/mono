@@ -40,6 +40,12 @@ class MockRoutineRepository implements RoutineRepository {
       : routine);
   }
 
+  async delete(routineId: string) {
+    requireRoutine(this.state, routineId);
+    this.state.routine.items = this.state.routine.items.filter((routine) => routine.id !== routineId);
+    this.state.routine.occurrences = this.state.routine.occurrences.filter((occurrence) => occurrence.routineId !== routineId);
+  }
+
   async toggleToday(routineId: string) {
     toggleRoutineToday(this.state, routineId);
   }

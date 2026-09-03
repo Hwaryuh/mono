@@ -315,6 +315,17 @@ fn toggle_today(conn: &Connection, id: &str) -> ApiResult<()> {
     toggle(conn, &occurrence.id)
 }
 
+fn delete_routine(conn: &mut Connection, id: &str) -> ApiResult<()> {
+    require_routine(conn, id)?;
+    let tx = conn.transaction()?;
+    // occurrence는 (routineId, date) 결정 키라 FK가 없다 — routine_id로 함께 지운다.
+    // todo 경계의 루틴 행은 occurrence를 read-model로 조인만 하므로 별도 정리 불필요.
+    tx.execute("DELETE FROM routine_occurrences WHERE routine_id = ?1", [id])?;
+    tx.execute("DELETE FROM routine_items WHERE id = ?1", [id])?;
+    tx.commit()?;
+    Ok(())
+}
+
 // ---------- todo 경계 read-model join (mock-routine-occurrences.ts routineTodoItems) ----------
 
 pub(super) struct RoutineTodoRow {
@@ -362,7 +373,7 @@ pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/routine/snapshot", get(snapshot_handler))
         .route("/routine/items", post(create_handler))
-        .route("/routine/items/{id}", put(update_handler))
+        .route("/routine/items/{id}", put(update_handler).delete(delete_handler))
         .route("/routine/items/{id}/toggle-today", post(toggle_today_handler))
         .with_state(db)
 }
@@ -394,6 +405,11 @@ async fn toggle_today_handler(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     toggle_today(&db.conn(), &id)?;
+    Ok(ok())
+}
+
+async fn delete_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+    delete_routine(&mut db.conn(), &id)?;
     Ok(ok())
 }
 
@@ -512,6 +528,25 @@ mod tests {
         let conn = db.lock().unwrap();
         let err = update(&conn, "nope", write_input("x", vec![0], None), None).unwrap_err();
         assert!(matches!(err, ApiError::NotFound(m) if m.contains("찾을 수 없습니다")));
+    }
+
+    #[test]
+    fn delete_removes_routine_and_its_occurrences() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        create(&conn, write_input("루틴", vec![today_weekday()], None)).unwrap();
+        create(&conn, write_input("남길 루틴", vec![today_weekday()], None)).unwrap();
+        let target = get_snapshot(&conn).unwrap().items.iter().find(|i| i.title == "루틴").unwrap().id.clone();
+        toggle_today(&conn, &target).unwrap();
+        assert!(get_snapshot(&conn).unwrap().occurrences.iter().any(|o| o.routine_id == target));
+
+        delete_routine(&mut conn, &target).unwrap();
+
+        let after = get_snapshot(&conn).unwrap();
+        assert!(!after.items.iter().any(|i| i.id == target));
+        assert!(!after.occurrences.iter().any(|o| o.routine_id == target));
+        assert!(after.items.iter().any(|i| i.title == "남길 루틴"));
+        assert!(matches!(delete_routine(&mut conn, "nope").unwrap_err(), ApiError::NotFound(_)));
     }
 
     #[test]
