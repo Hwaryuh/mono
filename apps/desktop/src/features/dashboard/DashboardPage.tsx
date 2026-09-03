@@ -156,7 +156,7 @@ function RoutineWidget({ snapshot }: { snapshot: DashboardSnapshot }) {
 }
 
 function RecentScraps({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const kindIcon = { 사진: "image", 링크: "scrap", 메모: "note", 동영상: "video" } as const;
+  const kindIcon = { 사진: "image", 링크: "scrap", 메모: "note", 동영상: "video", 파일: "file" } as const;
   return (
     <Widget icon="scrap" title={translate("dashboard.recentScraps.title")} to="/scrap" wide>
       {snapshot.scraps.length === 0 ? <WidgetEmpty icon="scrap">{translate("scrap.empty.title")}</WidgetEmpty> : (

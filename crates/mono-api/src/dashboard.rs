@@ -125,6 +125,7 @@ fn scrap_kind_label(kind: &str) -> &'static str {
         "image" => "사진",
         "url" => "링크",
         "video" => "동영상",
+        "file" => "파일",
         _ => "메모",
     }
 }

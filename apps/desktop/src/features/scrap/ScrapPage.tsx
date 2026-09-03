@@ -441,13 +441,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
           <input aria-label={translate("scrap.comment.filePicker")} className="capture-file-input" disabled={commentBusyId === detail.id} onChange={(event) => chooseCommentFile(event.currentTarget.files?.[0])} ref={commentFileInputRef} tabIndex={-1} type="file" />
           {commentFile && (
             <div className="scrap-comment-form__file">
-              <Icon name="file" size={12} strokeWidth={1.6} />
+              <Icon name="file" size={13} strokeWidth={1.5} />
               <span title={commentFile.name}>{commentFile.name}</span>
               <IconButton aria-label={translate("scrap.comment.fileRemove")} disabled={commentBusyId === detail.id} onClick={() => setCommentFile(null)} size="small" title={translate("scrap.comment.fileRemove")} type="button" variant="ghost"><Icon name="close" size={12} /></IconButton>
             </div>
           )}
           <div className="scrap-comment-form__row">
-            <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.6} /></IconButton>
+            <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.5} /></IconButton>
             <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
             <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
           </div>
@@ -500,7 +500,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
               <div className="scrap-photo-preview">
                 {pendingPhoto.previewUrl
                   ? <img alt={translate("scrap.photo.previewLabel", { name: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
-                  : <Icon name="file" size={22} strokeWidth={1.4} />}
+                  : <i className="scrap-photo-preview__file"><Icon name="file" size={19} strokeWidth={1.5} /></i>}
                 <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
                 <Button disabled={createMutation.isPending} id={photoReplaceDomId} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("common.action.replace")}</Button>
                 <IconButton aria-label={translate("scrap.photo.removeLabel", { name: pendingPhoto.file.name })} disabled={createMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.photo.remove")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
@@ -616,11 +616,11 @@ function CommentContent({ text, urlOpener }: { text: string; urlOpener: External
 
 // ponytail: <a download>는 데스크톱 WebView2·webkitgtk에선 저장 대화상자를 띄우지만
 // macOS WKWebView에선 새 탭 열기로 떨어질 수 있다. 제대로 하려면 tauri dialog+fs 플러그인.
-function MediaFileChip({ mediaId, name, size, className = "scrap-comment__file" }: { mediaId: string; name: string; size: number; className?: string }) {
+function MediaFileChip({ mediaId, name, size, className = "scrap-comment__file", iconSize = 14 }: { mediaId: string; name: string; size: number; className?: string; iconSize?: number }) {
   const { data: href } = useMedia(mediaId);
   return (
     <a className={className} download={name} href={href ?? undefined} rel="noreferrer" target="_blank">
-      <Icon name="file" size={14} strokeWidth={1.5} />
+      <Icon name="file" size={iconSize} strokeWidth={1.5} />
       <span><strong title={name}>{name}</strong><small>{formatFileSize(size)}</small></span>
     </a>
   );
@@ -761,7 +761,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   }
 
   return <div className="scrap-detail">{item.kind === "file" && item.mediaId
-    ? <MediaFileChip className="scrap-detail__file" mediaId={item.mediaId} name={item.fileName ?? translate("scrap.kind.file")} size={item.fileSize ?? 0} />
+    ? <MediaFileChip className="scrap-detail__file" iconSize={18} mediaId={item.mediaId} name={item.fileName ?? translate("scrap.kind.file")} size={item.fileSize ?? 0} />
     : item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
     <form className="scrap-detail__editor" onSubmit={submitEdit}>
       <label><span>{translate("common.field.title")}</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
@@ -775,7 +775,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
           <div className="scrap-photo-preview">
             {pendingPhoto.previewUrl
               ? <img alt={translate("scrap.photo.previewLabel", { name: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
-              : <Icon name="file" size={22} strokeWidth={1.4} />}
+              : <i className="scrap-photo-preview__file"><Icon name="file" size={19} strokeWidth={1.5} /></i>}
             <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
             <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("common.action.replace")}</Button>
             <IconButton aria-label={translate("scrap.photo.remove")} disabled={editMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.photo.remove")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
@@ -783,7 +783,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
         ) : item.mediaId && !photoRemoved ? (
           <div className="scrap-photo-preview">
             {item.kind === "file"
-              ? <Icon name="file" size={22} strokeWidth={1.4} />
+              ? <i className="scrap-photo-preview__file"><Icon name="file" size={19} strokeWidth={1.5} /></i>
               : existingPhotoSrc && <img alt={translate("scrap.photo.current")} src={existingPhotoSrc} />}
             <span><strong title={item.fileName ?? undefined}>{item.fileName ?? translate("scrap.photo.current")}</strong></span>
             <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("common.action.replace")}</Button>
