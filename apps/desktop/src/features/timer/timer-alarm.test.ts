@@ -1,62 +1,110 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAlarm } from "./timer-alarm";
 
-class FakeAudio {
-  static instances: FakeAudio[] = [];
+class FakeSource {
+  buffer: unknown = null;
   loop = false;
-  paused = true;
-  constructor(public src: string) {
-    FakeAudio.instances.push(this);
+  started = false;
+  stopped = false;
+  connect() {}
+  disconnect() {}
+  start() {
+    this.started = true;
   }
-  play() {
-    this.paused = false;
-    return Promise.resolve();
-  }
-  pause() {
-    this.paused = true;
+  stop() {
+    if (!this.started) throw new Error("not started");
+    this.stopped = true;
   }
 }
 
+class FakeCtx {
+  static sources: FakeSource[] = [];
+  static decodeCalls = 0;
+  state: "running" | "suspended" = "suspended";
+  createBufferSource() {
+    const s = new FakeSource();
+    FakeCtx.sources.push(s);
+    return s;
+  }
+  createOscillator() {
+    return { frequency: {}, connect: () => ({ connect: () => {} }), start() {}, stop() {} };
+  }
+  createGain() {
+    return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: () => ({ connect: () => {} }) };
+  }
+  get currentTime() {
+    return 0;
+  }
+  decodeAudioData() {
+    FakeCtx.decodeCalls += 1;
+    return Promise.resolve({ sampleRate: 48000 });
+  }
+  resume() {
+    this.state = "running";
+    return Promise.resolve();
+  }
+  suspend() {
+    this.state = "suspended";
+    return Promise.resolve();
+  }
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("createAlarm", () => {
   beforeEach(() => {
-    FakeAudio.instances = [];
-    vi.stubGlobal("Audio", FakeAudio);
+    FakeCtx.sources = [];
+    FakeCtx.decodeCalls = 0;
+    vi.stubGlobal("AudioContext", FakeCtx);
+    vi.stubGlobal("fetch", () => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }));
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("네이티브 loop 로 한 번만 재생하고, stop 이 멈춘다", async () => {
+  it("디코드한 버퍼를 loop 로 재생하고 stop 이 멈춘다", async () => {
     const alarm = createAlarm();
     alarm.start();
-    await Promise.resolve();
+    await flush();
 
-    expect(FakeAudio.instances).toHaveLength(1);
-    expect(FakeAudio.instances[0].loop).toBe(true);
-    expect(FakeAudio.instances[0].paused).toBe(false);
+    expect(FakeCtx.sources).toHaveLength(1);
+    expect(FakeCtx.sources[0].loop).toBe(true);
+    expect(FakeCtx.sources[0].started).toBe(true);
 
     alarm.stop();
-    expect(FakeAudio.instances[0].paused).toBe(true);
+    expect(FakeCtx.sources[0].stopped).toBe(true);
   });
 
-  it("start 를 연달아 불러도 오디오는 하나만 만든다", async () => {
+  it("start 를 연달아 불러도 소스는 하나만 만든다", async () => {
     const alarm = createAlarm();
     alarm.start();
     alarm.start();
-    await Promise.resolve();
+    await flush();
 
-    expect(FakeAudio.instances).toHaveLength(1);
+    expect(FakeCtx.sources).toHaveLength(1);
     alarm.stop();
   });
 
-  it("stop 뒤 다시 start 하면 새로 울린다", async () => {
+  it("stop 뒤 다시 start 하면 다시 디코드 없이 새 소스로 운다", async () => {
     const alarm = createAlarm();
     alarm.start();
-    await Promise.resolve();
+    await flush();
     alarm.stop();
     alarm.start();
-    await Promise.resolve();
+    await flush();
 
-    expect(FakeAudio.instances).toHaveLength(2);
-    expect(FakeAudio.instances[1].paused).toBe(false);
+    expect(FakeCtx.decodeCalls).toBe(1);
+    expect(FakeCtx.sources).toHaveLength(2);
+    expect(FakeCtx.sources[1].started).toBe(true);
+    alarm.stop();
+  });
+
+  it("파일을 못 읽으면 비프음으로 대체한다", async () => {
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    const alarm = createAlarm();
+    alarm.start();
+    await flush();
+
+    // 버퍼 소스는 못 만들지만 죽지 않는다.
+    expect(FakeCtx.sources).toHaveLength(0);
     alarm.stop();
   });
 });
