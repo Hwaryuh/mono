@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#EFEDE8;font-family:-apple-system,"SF Pro",system-ui,sans-serif}a{color:#2B2A28}a:hover{color:#000}</style></helmet>
+<div style="padding:40px 44px 64px;display:flex;flex-direction:column;gap:34px">
+  <div style="max-width:660px;display:flex;flex-direction:column;gap:8px">
+    <h1 style="margin:0;font:700 24px/1.2 -apple-system,system-ui;color:#2B2A28">mono iOS — 전 화면 와이어프레임</h1>
+    <p style="margin:0;font:400 13.5px/1.6 -apple-system,system-ui;color:rgba(60,60,67,0.66);text-wrap:pretty">IA는 <b>안 B</b>(오늘 루트 + 상단 모듈 요약 타일 + 좌측 상단 모듈 풀다운 메뉴). 하단 내비게이션·탭바·드로어 없음. 회색 골격만 — 색·타이포·아이콘은 고충실도 단계에서 입힌다. 상태 화면은 별도 목업이 아니라 <b>같은 화면의 다른 상태</b>로 표기했다.</p>
+    <p style="margin:0;font:400 12.5px/1.6 -apple-system,system-ui;color:rgba(60,60,67,0.55)">데이터는 저장소 mock 상태(2026-08-05) 기준. 저장소에 엔드포인트가 없는 동작은 프레임 노트에 <b>API 공백</b>으로 표시했다.</p>
+  </div>
+
+  <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="4">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:baseline;gap:10px;border-bottom:1px solid rgba(60,60,67,0.14);padding-bottom:7px">
+        <span style="font:600 11px ui-monospace,Menlo,monospace;background:#2B2A28;color:#fff;padding:3px 7px;border-radius:4px">{{ sec.id }}</span>
+        <strong style="font:700 16px/1.2 -apple-system,system-ui;color:#2B2A28">{{ sec.title }}</strong>
+        <span style="font:400 12.5px/1.4 -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ sec.desc }}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+        <sc-for list="{{ sec.frames }}" as="f" hint-placeholder-count="5">
+          <div style="width:264px;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span style="font:600 10px ui-monospace,Menlo,monospace;color:rgba(60,60,67,0.55)">{{ f.id }}</span>
+              <span style="font:600 12.5px/1.3 -apple-system,system-ui;color:#2B2A28">{{ f.name }}</span>
+            </div>
+            <div style="border:1px solid rgba(60,60,67,0.22);border-radius:20px;background:#fff;min-height:520px;overflow:hidden;display:flex;flex-direction:column;padding-bottom:14px">
+              <div style="height:20px;flex:none;display:flex;align-items:center;justify-content:center"><span style="width:44px;height:9px;border-radius:6px;background:rgba(60,60,67,0.18)"></span></div>
+              <sc-for list="{{ f.rows }}" as="r" hint-placeholder-count="7">
+                <div>
+                  <sc-if value="{{ r.isNav }}">
+                    <div style="padding:6px 12px 9px;border-bottom:1px solid rgba(60,60,67,0.1);display:flex;flex-direction:column;gap:5px">
+                      <div style="display:flex;align-items:center;gap:6px;min-height:22px">
+                        <span style="flex:1;font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ r.back }}</span>
+                        <span style="font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6);text-align:right">{{ r.right }}</span>
+                      </div>
+                      <span style="font:700 19px/23px -apple-system,system-ui;color:#2B2A28">{{ r.l }}</span>
+                      <span style="font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.55)">{{ r.sub }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isNavInline }}">
+                    <div style="padding:6px 12px 8px;border-bottom:1px solid rgba(60,60,67,0.1);display:flex;align-items:center;gap:6px;min-height:30px">
+                      <span style="flex:1;font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ r.back }}</span>
+                      <span style="font:600 12px/16px -apple-system,system-ui;color:#2B2A28">{{ r.l }}</span>
+                      <span style="flex:1;font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6);text-align:right">{{ r.right }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSheet }}">
+                    <div style="padding:8px 12px;border-bottom:1px solid rgba(60,60,67,0.1);display:flex;align-items:center;gap:6px;background:rgba(60,60,67,0.03)">
+                      <span style="flex:1;font:400 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6)">취소</span>
+                      <span style="font:600 12px/16px -apple-system,system-ui;color:#2B2A28">{{ r.l }}</span>
+                      <span style="flex:1;font:600 10.5px/14px -apple-system,system-ui;color:rgba(60,60,67,0.75);text-align:right">{{ r.right }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isH }}">
+                    <div style="padding:11px 12px 4px;font:600 9.5px/13px -apple-system,system-ui;letter-spacing:0.4px;color:rgba(60,60,67,0.5);text-transform:uppercase">{{ r.l }}</div>
+                  </sc-if>
+                  <sc-if value="{{ r.isCard }}">
+                    <div style="margin:0 12px 8px;border:1px solid rgba(60,60,67,0.16);border-radius:8px;padding:8px 9px;display:flex;flex-direction:column;gap:4px">
+                      <span style="font:600 11.5px/15px -apple-system,system-ui;color:#2B2A28">{{ r.l }}</span>
+                      <span style="font:400 10px/13px -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ r.d }}</span>
+                      <sc-for list="{{ r.lines }}" as="ln" hint-placeholder-count="0">
+                        <span style="display:block;height:6px;border-radius:3px;background:rgba(60,60,67,0.1);margin-top:3px"></span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isList }}">
+                    <div style="margin:0 12px 8px;border:1px solid rgba(60,60,67,0.16);border-radius:8px;overflow:hidden">
+                      <sc-for list="{{ r.items }}" as="it" hint-placeholder-count="3">
+                        <div style="display:flex;align-items:center;gap:7px;padding:7px 9px;min-height:30px;border-top:1px solid rgba(60,60,67,0.09)">
+                          <sc-if value="{{ it.check }}"><span style="width:11px;height:11px;border-radius:6px;border:1px solid rgba(60,60,67,0.28);flex:none"></span></sc-if>
+                          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                            <span style="font:400 11px/15px -apple-system,system-ui;color:#2B2A28">{{ it.l }}</span>
+                            <span style="font:400 9.5px/13px -apple-system,system-ui;color:rgba(60,60,67,0.55)">{{ it.d }}</span>
+                          </span>
+                          <span style="font:600 9.5px/13px -apple-system,system-ui;color:rgba(60,60,67,0.6);flex:none">{{ it.b }}</span>
+                          <sc-if value="{{ it.chev }}"><span style="width:4px;height:7px;border-right:1.5px solid rgba(60,60,67,0.25);border-top:1.5px solid rgba(60,60,67,0.25);transform:rotate(45deg);flex:none"></span></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isGrid }}">
+                    <div style="margin:0 12px 8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+                      <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                        <div style="border:1px solid rgba(60,60,67,0.16);border-radius:7px;height:52px;padding:6px;display:flex;flex-direction:column;justify-content:space-between">
+                          <span style="width:13px;height:13px;border:1px solid rgba(60,60,67,0.25);border-radius:3px"></span>
+                          <span style="display:flex;flex-direction:column;gap:2px"><span style="font:600 9.5px/12px -apple-system,system-ui;color:#2B2A28">{{ c.l }}</span><span style="font:400 8.5px/11px -apple-system,system-ui;color:rgba(60,60,67,0.55)">{{ c.d }}</span></span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSeg }}">
+                    <div style="margin:0 12px 8px;display:flex;background:rgba(60,60,67,0.07);border-radius:7px;padding:2px">
+                      <sc-for list="{{ r.items }}" as="it" hint-placeholder-count="2">
+                        <span style="flex:1;text-align:center;font:600 10px/22px -apple-system,system-ui;color:#2B2A28">{{ it.l }}</span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isChips }}">
+                    <div style="margin:0 12px 8px;display:flex;flex-wrap:wrap;gap:5px">
+                      <sc-for list="{{ r.items }}" as="it" hint-placeholder-count="3">
+                        <span style="border:1px solid rgba(60,60,67,0.2);border-radius:11px;padding:2px 8px;font:400 10px/15px -apple-system,system-ui;color:rgba(60,60,67,0.75)">{{ it.l }}</span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isField }}">
+                    <div style="margin:0 12px 6px;border:1px solid rgba(60,60,67,0.16);border-radius:7px;padding:6px 9px;display:flex;align-items:center;gap:8px;min-height:30px">
+                      <span style="font:400 10px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6);flex:none;min-width:52px">{{ r.l }}</span>
+                      <span style="flex:1;text-align:right;font:400 11px/15px -apple-system,system-ui;color:#2B2A28">{{ r.v }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isBtn }}">
+                    <div style="margin:6px 12px 8px;border-radius:8px;padding:8px;text-align:center;font:600 11px/15px -apple-system,system-ui;background:rgba(60,60,67,0.85);color:#fff">{{ r.l }}</div>
+                  </sc-if>
+                  <sc-if value="{{ r.isBtnPlain }}">
+                    <div style="margin:4px 12px 8px;border:1px solid rgba(60,60,67,0.22);border-radius:8px;padding:8px;text-align:center;font:600 11px/15px -apple-system,system-ui;color:rgba(60,60,67,0.8)">{{ r.l }}</div>
+                  </sc-if>
+                  <sc-if value="{{ r.isBanner }}">
+                    <div style="margin:0 12px 8px;border:1px dashed rgba(60,60,67,0.35);border-radius:7px;padding:7px 9px;font:400 10px/14px -apple-system,system-ui;color:rgba(60,60,67,0.75)">{{ r.l }}</div>
+                  </sc-if>
+                  <sc-if value="{{ r.isAmt }}">
+                    <div style="margin:0 12px 10px;display:flex;flex-direction:column;gap:3px">
+                      <span style="font:700 22px/26px -apple-system,system-ui;color:#2B2A28;font-variant-numeric:tabular-nums">{{ r.l }}</span>
+                      <span style="font:400 10px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ r.d }}</span>
+                      <span style="display:flex;height:7px;border-radius:4px;overflow:hidden;gap:1.5px;margin-top:4px"><span style="flex:9;background:rgba(60,60,67,0.5)"></span><span style="flex:0.7;background:rgba(60,60,67,0.3)"></span><span style="flex:0.3;background:rgba(60,60,67,0.18)"></span></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isMonth }}">
+                    <div style="margin:0 12px 8px">
+                      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px">
+                        <sc-for list="{{ r.weekdays }}" as="w" hint-placeholder-count="7"><span style="text-align:center;font:600 8px/12px -apple-system,system-ui;color:rgba(60,60,67,0.45)">{{ w.l }}</span></sc-for>
+                      </div>
+                      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+                        <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="35">
+                          <span style="height:30px;border:1px solid rgba(60,60,67,0.09);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2px;gap:2px">
+                            <span style="font:400 8px/10px -apple-system,system-ui;color:rgba(60,60,67,0.55);font-variant-numeric:tabular-nums">{{ c.d }}</span>
+                            <span style="width:70%;height:3px;border-radius:2px;background:rgba(60,60,67,0.16)"></span>
+                          </span>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isTiles }}">
+                    <div style="margin:0 12px 8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                      <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="4">
+                        <div style="border:1px solid rgba(60,60,67,0.16);border-radius:7px;overflow:hidden">
+                          <span style="display:block;height:52px;background:repeating-linear-gradient(135deg,rgba(60,60,67,0.07) 0 6px,rgba(60,60,67,0.03) 6px 12px)"></span>
+                          <span style="display:block;padding:5px 6px 6px;font:400 9.5px/13px -apple-system,system-ui;color:#2B2A28">{{ c.l }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isSkel }}">
+                    <div style="margin:0 12px 8px;display:flex;flex-direction:column;gap:7px">
+                      <sc-for list="{{ r.lines }}" as="ln" hint-placeholder-count="3">
+                        <span style="display:block;height:34px;border-radius:7px;background:rgba(60,60,67,0.08)"></span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isEmpty }}">
+                    <div style="margin:14px 12px;padding:26px 14px;border:1px dashed rgba(60,60,67,0.25);border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center">
+                      <span style="width:22px;height:22px;border:1px solid rgba(60,60,67,0.25);border-radius:5px"></span>
+                      <span style="font:600 11.5px/15px -apple-system,system-ui;color:#2B2A28">{{ r.l }}</span>
+                      <span style="font:400 10px/14px -apple-system,system-ui;color:rgba(60,60,67,0.6)">{{ r.d }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isKb }}">
+                    <div style="margin:auto 0 0;padding:10px 8px;background:rgba(60,60,67,0.06);border-top:1px solid rgba(60,60,67,0.12);display:flex;flex-direction:column;gap:5px">
+                      <span style="font:400 9px/12px -apple-system,system-ui;color:rgba(60,60,67,0.5);text-align:center">키보드 — 입력 중 스크롤 영역이 밀려 올라간다</span>
+                      <span style="display:block;height:58px;border-radius:6px;background:rgba(60,60,67,0.1)"></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isNote }}">
+                    <div style="margin:2px 12px 8px;font:400 9.5px/13.5px -apple-system,system-ui;color:rgba(60,60,67,0.5)">{{ r.l }}</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <p style="margin:0;font:400 10.5px/1.5 -apple-system,system-ui;color:rgba(60,60,67,0.62);text-wrap:pretty">{{ f.note }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1000}}">
+const NAV = (l, o = {}) => ({ k: "Nav", l, sub: o.sub || "", back: o.back || "", right: o.right || "" });
+const INL = (l, o = {}) => ({ k: "NavInline", l, back: o.back || "‹ 오늘", right: o.right || "" });
+const SHEET = (l, right = "저장") => ({ k: "Sheet", l, right });
+const H = (l) => ({ k: "H", l });
+const CARD = (l, d = "", n = 0) => ({ k: "Card", l, d, lines: Array.from({ length: n }, (_, i) => ({ i })) });
+const LIST = (items, o = {}) => ({
+  k: "List",
+  items: items.map((x) => {
+    const a = typeof x === "string" ? [x] : x;
+    return { l: a[0], d: a[1] || "", b: a[2] || "", check: !!o.check, chev: o.chev !== false };
+  }),
+});
+const GRID = (cells) => ({ k: "Grid", cells: cells.map((c) => ({ l: c[0], d: c[1] || "" })) });
+const SEG = (items) => ({ k: "Seg", items: items.map((l) => ({ l })) });
+const CHIPS = (items) => ({ k: "Chips", items: items.map((l) => ({ l })) });
+const F = (l, v) => ({ k: "Field", l, v });
+const BTN = (l) => ({ k: "Btn", l });
+const BTN2 = (l) => ({ k: "BtnPlain", l });
+const BANNER = (l) => ({ k: "Banner", l });
+const AMT = (l, d) => ({ k: "Amt", l, d });
+const MONTH = () => ({
+  k: "Month",
+  weekdays: ["일", "월", "화", "수", "목", "금", "토"].map((l) => ({ l })),
+  // 2026-08-01은 토요일 → 토요일 시작 오프셋 6, 31일이 들어가려면 6주(42칸)
+  cells: Array.from({ length: 42 }, (_, i) => ({ d: i >= 6 && i < 37 ? String(i - 5) : "" })),
+});
+const TILES = (cells) => ({ k: "Tiles", cells: cells.map((l) => ({ l })) });
+const SKEL = (n) => ({ k: "Skel", lines: Array.from({ length: n }, (_, i) => ({ i })) });
+const EMPTY = (l, d) => ({ k: "Empty", l, d });
+const KB = () => ({ k: "Kb" });
+const NOTE = (l) => ({ k: "Note", l });
+
+const MODULE_TILES = GRID([["할 일", "남은 3"], ["루틴", "오늘 2"], ["일정", "오늘 3"], ["스크랩", "6개"], ["가계부", "8월"], ["수집함", "대기 4"]]);
+
+const SECTIONS = [
+  {
+    id: "A", title: "첫 실행 · 서버 연결", desc: "원격 mono-api 한 곳만 연결한다(iOS는 임베드 서버 모드 없음).",
+    frames: [
+      { id: "A1", name: "연결 입력", note: "URL 규칙은 저장소와 동일 — http는 4174, https는 443·4174. 토큰은 선택.", rows: [NAV("mono 서버 연결", { sub: "이 기기가 어느 mono 서버와 데이터를 주고받을지 정한다" }), F("서버 주소", "https://mono.example.com"), F("API 토큰", "선택 · 입력 시 가려짐"), NOTE("토큰은 Keychain에 저장되고 화면에 다시 표시하지 않는다."), BTN("연결 테스트"), NOTE("성공해야 '시작하기'가 활성화된다.")] },
+      { id: "A2", name: "연결 중", note: "probe = GET /health + 인증 필요 엔드포인트 1회. 취소 가능.", rows: [NAV("mono 서버 연결"), F("서버 주소", "https://mono.example.com"), F("API 토큰", "••••••••"), BANNER("확인 중 — 서버에 응답을 기다린다"), BTN2("취소")] },
+      { id: "A3", name: "주소 형식 오류", note: "인라인 검증. 서버 왕복 없이 즉시 표시.", rows: [NAV("mono 서버 연결"), F("서버 주소", "mono.example.com:8080"), BANNER("HTTP는 4174, HTTPS는 443·4174 포트만 됩니다"), F("API 토큰", ""), BTN("연결 테스트")] },
+      { id: "A4", name: "응답 없음 / 타임아웃", note: "저장소 문구 재사용: 'API 서버(주소)에 연결할 수 없습니다.' Tailscale 힌트 추가.", rows: [NAV("mono 서버 연결"), F("서버 주소", "https://mono.example.com"), BANNER("서버에 연결할 수 없습니다 — 주소와 네트워크(Tailscale)를 확인하세요"), BTN2("다시 시도"), NOTE("타임아웃도 같은 화면·같은 문구, 재시도 버튼만 유지.")] },
+      { id: "A5", name: "토큰 오류 (401)", note: "토큰 필요/불일치를 구분해 문구를 다르게. 입력값은 지우지 않는다.", rows: [NAV("mono 서버 연결"), F("서버 주소", "https://mono.example.com"), F("API 토큰", "••••••••"), BANNER("API 토큰이 올바르지 않습니다"), BTN2("다시 시도")] },
+      { id: "A6", name: "서버 버전 낮음", note: "GET /version 비교. 차단이 아니라 경고 후 계속 진행 허용(데스크톱과 동일).", rows: [NAV("mono 서버 연결"), BANNER("서버 0.1.0 · 앱 0.1.2 — 서버를 재배포하세요"), CARD("계속 진행할 수 있습니다", "일부 기능이 조용히 동작하지 않을 수 있습니다", 0), BTN("계속"), BTN2("연결 수정")] },
+      { id: "A7", name: "연결 성공", note: "성공 시 곧바로 오늘로 이동. 다음 실행부터는 이 화면을 건너뛴다.", rows: [NAV("연결됨", { sub: "https://mono.example.com" }), CARD("서버 0.1.2 · 앱 0.1.2", "호환됩니다", 0), BTN("시작하기")] },
+      { id: "A8", name: "연결 편집 (설정 안)", note: "재설치 없이 주소·토큰 교체. 저장 즉시 적용(iOS는 데스크톱의 '재시작 후 적용'이 없다).", rows: [INL("서버 연결", { back: "‹ 설정" }), H("현재"), CARD("연결됨 · https://mono.example.com", "서버 0.1.2 · 앱 0.1.2", 0), H("변경"), F("서버 주소", "https://mono.example.com"), F("API 토큰", "저장됨 · 교체만 가능"), BTN2("연결 테스트"), BTN("저장")] },
+    ],
+  },
+  {
+    id: "B", title: "오늘 (루트)", desc: "안 B 확정. 좌측 상단 모듈 메뉴, 우측 상단 빠른 캡처·설정.",
+    frames: [
+      { id: "B1", name: "populated", note: "상단 타일 6개는 스크롤 없이 전부 1탭. 그 아래는 오늘 실행 정보 순서.", rows: [NAV("오늘", { sub: "2026년 8월 5일 수요일", back: "▦ ⌄", right: "✦   ⚙" }), MODULE_TILES, CARD("AI가 분류한 4건이 승인을 기다린다", "일정 1 · 할 일 1 · 가계부 1 · 스크랩 1 · 실패 1", 0), H("오늘 일정"), LIST([["팀 회의", "10:00–11:00 · 회의실 B"], ["저녁 약속", "19:30–21:00 · 을지로"], ["가계부 정리", "22:00–22:30"]]), H("오늘 할 일"), LIST([["설거지 하기", "집안일"], ["전기세 이체 확인", "2일 지남 · 8월 3일"]], { check: true }), H("오늘 루틴"), LIST([["비타민 먹기", "월·수·금 · 8월 19일까지"], ["운동 30분 하기", "매일 · 기한 없음"]], { check: true }), AMT("₩609,200", "8월 지출 · 지난달보다 8% 적음"), H("최근 스크랩"), TILES(["들기름 파스타 레시피", "카메라 무빙 레퍼런스"])] },
+      { id: "B2", name: "초기 로딩", note: "스켈레톤은 타일과 첫 두 섹션까지만 — 공간 연속성이 있는 곳에만 쓴다.", rows: [NAV("오늘", { sub: "2026년 8월 5일 수요일", back: "▦ ⌄", right: "✦   ⚙" }), MODULE_TILES, SKEL(4), NOTE("타일 숫자는 값이 오기 전 빈칸으로 두고 자리는 유지한다.")] },
+      { id: "B3", name: "새로고침 중", note: "pull-to-refresh. 기존 내용은 유지하고 상단 스피너만.", rows: [NAV("오늘", { sub: "2026년 8월 5일 수요일", back: "▦ ⌄", right: "✦   ⚙" }), BANNER("새로고침 중"), MODULE_TILES, LIST([["팀 회의", "10:00–11:00"], ["설거지 하기", "집안일"]])] },
+      { id: "B4", name: "빈 / 부분 데이터", note: "섹션별 빈 상태는 한 줄로. 데이터가 아예 없는 섹션은 접어서 숨기지 않고 남긴다.", rows: [NAV("오늘", { sub: "2026년 8월 5일 수요일", back: "▦ ⌄", right: "✦   ⚙" }), MODULE_TILES, H("오늘 일정"), EMPTY("오늘 일정 없음", "일정 추가"), H("오늘 할 일"), LIST([["설거지 하기", "집안일"]]), H("오늘 루틴"), EMPTY("오늘 해당하는 루틴 없음", ""), AMT("₩0", "8월 지출 · 기록 없음")] },
+      { id: "B5", name: "오프라인 / 오류", note: "캐시된 마지막 스냅샷을 유지하고 상단에 상태 배너 + 재시도. 쓰기 동작은 비활성.", rows: [NAV("오늘", { sub: "2026년 8월 5일 수요일", back: "▦ ⌄", right: "✦   ⚙" }), BANNER("서버에 연결할 수 없습니다 · 10:42 기준 · 다시 시도"), MODULE_TILES, LIST([["팀 회의", "10:00–11:00 · 회의실 B"], ["설거지 하기", "집안일 · 완료 불가"]]), NOTE("401이면 배너 문구가 '다시 로그인'으로 바뀌고 설정 > 서버로 보낸다.")] },
+    ],
+  },
+  {
+    id: "C", title: "빠른 캡처", desc: "상단 툴바 → sheet. 텍스트 2,000자 / 사진 4장 / 영상 1개(계약 상한).",
+    frames: [
+      { id: "C1", name: "입력", note: "sheet가 열리면 바로 포커스. 키보드 위로 미디어 툴바가 붙는다.", rows: [SHEET("빠른 캡처", "보내기"), CARD("무엇이든 적는다", "예: 담주 일요일 홍대에서 합주함", 2), CHIPS(["사진", "영상"]), NOTE("텍스트·사진·영상 중 하나는 있어야 보내기가 활성."), KB()] },
+      { id: "C2", name: "미디어 첨부", note: "PhotosPicker. 사진 4장·영상 1개 도달 시 해당 버튼 비활성 + 이유 표시.", rows: [SHEET("빠른 캡처", "보내기"), CARD("합주 녹화본 0801", "", 1), TILES(["사진 1 ×", "사진 2 ×"]), CHIPS(["사진 2/4", "영상 1/1 ×"]), NOTE("각 항목 우상단 × 로 제출 전 제거. 용량 초과는 인라인 오류.")] },
+      { id: "C3", name: "업로드 중", note: "미디어는 POST /media 로 먼저 올려 mediaId를 얻고, 그다음 캡처를 보낸다.", rows: [SHEET("빠른 캡처", "보내는 중"), CARD("합주 녹화본 0801", "", 1), BANNER("영상 업로드 62% — 취소"), NOTE("업로드 중 sheet를 닫으려 하면 '작성 중 내용을 버릴까요?' 확인.")] },
+      { id: "C4", name: "AI 분석 중 → 성공", note: "분석은 서버가 한다. 성공 시 sheet를 닫고 오늘의 수집함 배너 숫자가 올라간다.", rows: [SHEET("빠른 캡처", ""), BANNER("AI가 분류하는 중"), CARD("수집함으로 보냈습니다", "일정 후보 · 확신 높음 — 수집함에서 승인", 0), BTN2("수집함 열기")] },
+      { id: "C5", name: "실패 · 재시도", note: "분석 실패도 항목은 수집함에 failed로 남는다(저장소 동작). 입력 내용은 사라지지 않는다.", rows: [SHEET("빠른 캡처", "다시 시도"), CARD("담주 일요일 홍대에서 합주함", "", 1), BANNER("AI 분석에 실패했습니다 — AI 설정과 네트워크를 확인하세요"), BTN2("수집함에 그대로 두기"), NOTE("업로드 실패는 미디어 항목별로 재시도.")] },
+    ],
+  },
+  {
+    id: "D", title: "수집함", desc: "AI 후보를 사람이 승인해 각 모듈로 보낸다. 신뢰도는 있는 그대로 보여준다.",
+    frames: [
+      { id: "D1", name: "목록", note: "상태별 섹션. 고정 항목이 위. 스와이프: 승인 / 버리기(확인 필요).", rows: [NAV("수집함", { back: "‹ 오늘", right: "⋯", sub: "승인 대기 4 · 실패 1" }), CHIPS(["전체", "대기", "처리 중", "승인됨", "실패"]), H("고정"), LIST([["기획안 검토하기", "할 일 · 확신 매우 높음 · 6분 전", "📌"]]), H("대기"), LIST([["홍대 합주", "일정 · 확신 높음 · 2분 전"], ["점심", "가계부 · ₩16,000 · 20분 전"], ["카메라 무빙 레퍼런스", "스크랩 · 확신 보통 · 3시간 전"]]), H("실패"), LIST([["스크린샷 · 흐릿한 손글씨 메모", "읽을 수 있는 텍스트를 찾지 못했습니다 · 어제"]]), BTN2("확신 높은 항목 일괄 승인")] },
+      { id: "D2", name: "항목 상세", note: "확신은 숫자(0.92)가 아니라 등급 + 근거 필드로. 숫자는 보조로만 노출.", rows: [INL("수집함 항목", { back: "‹ 수집함", right: "승인" }), CARD("원문", "담주 일요일 홍대에서 합주함", 0), H("대상 모듈"), F("일정", "변경"), H("추출된 필드"), F("제목", "홍대 합주"), F("일시", "8월 9일 12:00–14:00"), F("장소", "홍대"), F("라벨", "취미"), NOTE("확신이 낮은 필드는 '확인 필요' 표시 + 색 외 텍스트 병기."), BTN("승인하고 일정에 추가"), BTN2("버리기")] },
+      { id: "D3", name: "대상 모듈 변경", note: "PUT /inbox/items/:id 는 target + fields를 함께 보낸다 — 모듈을 바꾸면 필드 폼도 바뀐다.", rows: [INL("대상 모듈", { back: "‹ 항목", right: "" }), LIST([["할 일", "제목 · 라벨 · 마감"], ["일정", "제목 · 일시 · 장소 · 라벨"], ["가계부", "항목 · 금액 · 날짜 · 라벨"], ["스크랩", "제목 · 메모 · 태그"]], { chev: false }), NOTE("바꾸면 기존 필드 중 매칭되는 것만 옮기고 나머지는 비운다 — 저장 전 확인.")] },
+      { id: "D4", name: "필드 편집", note: "필드는 계약상 label/value 문자열 — 금액·날짜는 승인 시 서버가 파싱한다.", rows: [SHEET("필드 편집"), F("제목", "홍대 합주"), F("일시", "2026-08-09 12:00"), F("장소", "홍대"), F("라벨", "취미"), BANNER("일시 형식을 확인하세요 (YYYY-MM-DD HH:mm)"), KB()] },
+      { id: "D5", name: "일괄 승인 확인", note: "POST /inbox/approve-high-confidence { minimum }. 임계값을 사용자가 본다.", rows: [INL("일괄 승인", { back: "‹ 수집함" }), CARD("확신 높은 3건을 승인합니다", "임계값 0.85 이상", 0), LIST([["기획안 검토하기", "할 일"], ["홍대 합주", "일정"], ["점심", "가계부"]]), BTN("3건 승인"), BTN2("취소"), NOTE("승인은 되돌릴 수 없다 — 확인 대화상자 필수.")] },
+      { id: "D6", name: "실패 재시도 / 빈 상태", note: "API 공백: 재분석 전용 엔드포인트가 없다 → 같은 원문으로 다시 캡처하거나 직접 편집 후 승인.", rows: [INL("실패한 항목", { back: "‹ 수집함" }), CARD("스크린샷 · 흐릿한 손글씨 메모", "원인: 읽을 수 있는 텍스트를 찾지 못했습니다", 0), BTN2("직접 채워서 승인"), BTN2("버리기"), EMPTY("승인 대기 항목이 없습니다", "빠른 캡처로 무엇이든 적어 두세요")] },
+    ],
+  },
+  {
+    id: "E", title: "할 일", desc: "상태·라벨 필터, 마감 날짜/시간, 메모, 라벨 관리와 순서.",
+    frames: [
+      { id: "E1", name: "목록", note: "검색은 searchable. 스와이프: 완료 / 삭제(빨강, 확인). 컨텍스트 메뉴에 같은 동작 노출.", rows: [NAV("할 일", { back: "‹ 오늘", right: "＋", sub: "남은 3 · 완료 1" }), SEG(["남은 것", "완료", "전체"]), CHIPS(["전체 라벨", "집안일", "업무", "건강", "재무"]), H("지남"), LIST([["전기세 이체 확인", "재무 · 8월 3일 · 2일 지남"]], { check: true }), H("오늘"), LIST([["설거지 하기", "집안일"]], { check: true }), H("예정"), LIST([["기획안 검토하기", "업무 · 8월 7일 18:00 · 메모 있음"], ["렌즈 주문", "집안일 · 8월 11일"]], { check: true }), H("완료"), LIST([["빨래 정리하기", "집안일 · 3시간 전"]], { check: true })] },
+      { id: "E2", name: "생성", note: "POST /todo/items. 라벨은 필수(계약상 labelId 문자열).", rows: [SHEET("새 할 일"), F("제목", "필수"), F("라벨", "집안일"), F("마감 날짜", "없음"), F("마감 시간", "없음"), CARD("메모", "", 2), NOTE("날짜 없이 시간만은 저장할 수 없다 — 시간 선택 시 날짜를 먼저 요구."), KB()] },
+      { id: "E3", name: "상세 · 편집", note: "완료/재개는 POST /todo/items/:id/toggle 하나로. 삭제는 확인 후 DELETE.", rows: [INL("할 일", { back: "‹ 할 일", right: "편집" }), CARD("기획안 검토하기", "업무 · 8월 7일 18:00", 0), F("상태", "진행 중"), F("메모", "3장 예산표 숫자 다시 확인하기"), BTN("완료로 표시"), BTN2("삭제")] },
+      { id: "E4", name: "라벨 관리 · 순서", note: "PUT /todo/labels/order. 삭제는 대체 라벨을 반드시 고르게 한다(DELETE 바디의 replacementLabelId).", rows: [INL("라벨", { back: "‹ 할 일", right: "편집" }), LIST([["집안일", "3개 항목", "≡"], ["업무", "1개 항목", "≡"], ["건강", "루틴 2개", "≡"], ["재무", "1개 항목", "≡"], ["기타", "0개", "≡"]], { chev: false }), BTN2("라벨 추가"), NOTE("삭제 시: '업무를 지우면 1개 항목을 어디로 옮길까요?' → 대체 라벨 선택.")] },
+      { id: "E5", name: "빈 / 로딩 / 오류", note: "필터 때문에 비었을 때와 데이터가 없을 때 문구를 구분한다.", rows: [NAV("할 일", { back: "‹ 오늘", right: "＋" }), SEG(["남은 것", "완료", "전체"]), EMPTY("이 필터에 맞는 할 일이 없습니다", "필터 지우기"), SKEL(3), BANNER("불러오지 못했습니다 · 다시 시도")] },
+    ],
+  },
+  {
+    id: "F", title: "루틴", desc: "요일 반복 + 선택 종료일. 오늘 완료와 최근 기록.",
+    frames: [
+      { id: "F1", name: "목록", note: "요일 점은 데스크톱 시각 언어를 그대로 옮긴 유일한 커스텀 요소.", rows: [NAV("루틴", { back: "‹ 오늘", right: "＋", sub: "오늘 해당 2개" }), H("오늘"), LIST([["비타민 먹기", "월·수·금 · 8월 19일까지"], ["운동 30분 하기", "매일 · 기한 없음"]], { check: true }), H("최근 7일"), CARD("비타민 먹기", "○ ● ○ ● ○ ● ○ — 3/3 완료", 0), CARD("운동 30분 하기", "● ● ● ● ● ● ○ — 6/7 완료", 0), H("종료됨"), LIST([["주간 회고 쓰기", "일요일 · 8월 3일 종료"]])] },
+      { id: "F2", name: "생성 · 편집", note: "요일 최소 1개(계약). 시작일은 서버가 오늘로 잡는다 — 생성 폼에 없음.", rows: [SHEET("새 루틴"), F("제목", "필수"), F("라벨", "건강"), H("반복 요일"), CHIPS(["일", "월", "화", "수", "목", "금", "토"]), F("종료일", "없음"), NOTE("요일을 하나도 안 고르면 저장 불가 — 인라인 오류."), KB()] },
+      { id: "F3", name: "상세", note: "오늘 완료는 POST /routine/items/:id/toggle-today. 과거 날짜 수정 API는 없다.", rows: [INL("루틴", { back: "‹ 루틴", right: "편집" }), CARD("비타민 먹기", "월·수·금 · 7월 6일 ~ 8월 19일", 0), BTN("오늘 완료로 표시"), H("최근 기록"), LIST([["8월 3일", "완료"], ["7월 31일", "완료"], ["7월 29일", "완료"], ["7월 27일", "완료"]], { chev: false }), NOTE("과거 기록은 읽기 전용 — 서버에 해당 mutation이 없다.")] },
+      { id: "F4", name: "삭제 (API 공백)", note: "API 공백: 루틴 DELETE 엔드포인트가 없다. 임시로 '종료일 = 오늘'로 중단, 삭제는 서버 추가 후.", rows: [INL("루틴 편집", { back: "‹ 루틴", right: "저장" }), F("종료일", "오늘(8월 5일)로 설정"), CARD("루틴 중단", "오늘 이후 새 발생이 생기지 않습니다. 기존 기록은 남습니다.", 0), BTN2("중단하기"), BANNER("완전 삭제는 서버에 DELETE /routine/items/:id 가 추가되면 제공")] },
+    ],
+  },
+  {
+    id: "G", title: "일정", desc: "월/아젠다 로컬 세그먼트, 반복·종일·여러 날 일정, 카테고리.",
+    frames: [
+      { id: "G1", name: "월", note: "월 그리드는 커스텀 구현이 필요한 부분(SwiftUI에 월 캘린더 컴포넌트가 없다).", rows: [NAV("일정", { back: "‹ 오늘", right: "＋", sub: "2026년 8월" }), SEG(["월", "아젠다"]), MONTH(), H("8월 5일 수요일"), LIST([["팀 회의", "10:00–11:00 · 업무"], ["저녁 약속", "19:30–21:00 · 약속"], ["가계부 정리", "22:00–22:30 · 재무"]])] },
+      { id: "G2", name: "아젠다", note: "여러 날 일정은 시작·중간·끝 표시를 다르게. 종일은 시간 대신 '종일'.", rows: [NAV("일정", { back: "‹ 오늘", right: "＋", sub: "2026년 8월" }), SEG(["월", "아젠다"]), H("8월 5일 수요일 · 오늘"), LIST([["팀 회의", "10:00–11:00 · 회의실 B"], ["저녁 약속", "19:30–21:00"]]), H("8월 9일 일요일"), LIST([["홍대 합주", "12:00–14:00 · 홍대 합주실"]]), H("8월 12일 ~ 14일"), LIST([["제주 워크샵", "3일 일정 · 1일차"]]), H("8월 22일 ~ 24일"), LIST([["부산 여행", "종일 · 3일"]])] },
+      { id: "G3", name: "일정 상세", note: "반복 일정은 시리즈 규칙을 문장으로. 편집·삭제 시 범위를 묻는다.", rows: [INL("일정", { back: "‹ 일정", right: "편집" }), CARD("홍대 합주", "8월 9일 일요일 12:00–14:00", 0), F("장소", "홍대 합주실"), F("라벨", "취미"), F("반복", "없음"), CARD("메모", "합주 전 셋리스트 공유하기", 0), BTN2("삭제")] },
+      { id: "G4", name: "생성", note: "종일 토글이 시간 필드를 없앤다. 종료일 < 시작일이면 인라인 오류.", rows: [SHEET("새 일정"), F("제목", "필수"), F("종일", "꺼짐"), F("시작", "8월 5일 10:00"), F("종료", "8월 5일 11:00"), F("장소", ""), F("라벨", "업무"), F("반복", "없음"), CARD("메모", "", 1)] },
+      { id: "G5", name: "반복 편집 범위", note: "계약의 scope: this / future / all 을 그대로 노출한다. 저장·삭제 모두 물어본다.", rows: [INL("반복 일정 저장", { back: "‹ 편집" }), CARD("이 일정만", "8월 9일 하나만 바꿉니다", 0), CARD("이후 모든 일정", "8월 9일부터 뒤 전체", 0), CARD("모든 일정", "시리즈 전체", 0), BTN2("취소")] },
+      { id: "G6", name: "카테고리 관리", note: "PUT /calendar/categories/order · 삭제 시 대체 카테고리 필수(replacementCategoryId).", rows: [INL("라벨", { back: "‹ 일정", right: "편집" }), LIST([["업무", "일정 2개", "≡"], ["약속", "3개", "≡"], ["취미", "1개", "≡"], ["개인", "2개", "≡"], ["재무", "1개", "≡"], ["기타", "0개", "≡"]], { chev: false }), BTN2("라벨 추가")] },
+    ],
+  },
+  {
+    id: "H", title: "스크랩", desc: "메모·링크·사진·영상 혼합. 태그 필터와 정렬, 항목별 댓글.",
+    frames: [
+      { id: "H1", name: "목록 (하이브리드)", note: "사진·영상은 2열 타일, 메모·링크는 목록 행 — 실제 내용 구성(사진 2 / 링크 2 / 메모 1 / 영상 1)에 맞춘 선택.", rows: [NAV("스크랩", { back: "‹ 오늘", right: "＋", sub: "6개" }), CHIPS(["전체", "요리", "레퍼런스", "음악", "전시", "수집"]), SEG(["최근 저장", "제목순"]), H("사진 · 영상"), TILES(["들기름 파스타 레시피", "전시 포스터", "합주 녹화본 0801", "＋"]), H("메모 · 링크"), LIST([["카메라 무빙 레퍼런스", "링크 · 레퍼런스 · 댓글 1"], ["합주실 후보 정리", "메모 · 음악"], ["좋아하는 밴드 인터뷰", "링크 · 레퍼런스"]])] },
+      { id: "H2", name: "상세 · 댓글", note: "댓글은 계약상 별도 리소스 — 추가/수정/삭제 모두 있다.", rows: [INL("스크랩", { back: "‹ 스크랩", right: "편집" }), CARD("들기름 파스타 레시피", "사진 · 요리 · 7월 6일 저장", 0), TILES(["원본 사진"]), CARD("메모", "트위터에서 본 캡처. 마늘 6쪽, 국간장 반 스푼.", 0), H("댓글 2"), LIST([["만들어봄. 마늘은 반으로 줄이는 게 낫다.", "7월 12일"], ["면은 1분 덜 삶기. 들기름은 불 끄고 넣을 것.", "7월 28일"]], { chev: false }), F("댓글 입력", "＋")] },
+      { id: "H3", name: "생성", note: "태그는 필수(계약). 사진·영상은 mediaId 1개만 붙는다 — 여러 장은 불가.", rows: [SHEET("새 스크랩"), F("제목", "필수"), F("태그", "요리"), F("링크", "선택"), CARD("메모", "", 2), CHIPS(["사진 선택", "영상 선택"]), NOTE("링크를 넣으면 종류가 자동으로 링크가 된다 — 저장소 판정 규칙과 동일.")] },
+      { id: "H4", name: "미디어 교체 · 업로드", note: "교체는 새 mediaId로 PUT. 이전 파일은 서버 GC가 정리한다(설정 > 저장공간).", rows: [SHEET("사진 교체"), TILES(["현재 사진"]), BANNER("새 사진 업로드 38% — 취소"), BTN2("사진 제거"), NOTE("업로드 완료 전에는 저장 비활성.")] },
+      { id: "H5", name: "미디어 없음 / 링크 실패", note: "GET /media/:id 가 404면 파일이 사라진 것 — 항목은 남기고 자리표시로 알린다.", rows: [INL("스크랩", { back: "‹ 스크랩", right: "편집" }), CARD("전시 포스터", "사진 · 전시 · 8월 1일", 0), EMPTY("사진을 찾을 수 없습니다", "파일이 삭제되었거나 저장공간 정리로 사라졌습니다"), BTN2("사진 다시 첨부"), CARD("좋아하는 밴드 인터뷰", "링크 미리보기를 불러오지 못했습니다 — 주소는 그대로 열 수 있습니다", 0)] },
+      { id: "H6", name: "빈 / 오프라인", note: "태그 필터로 비었을 때는 필터 해제를 제안한다.", rows: [NAV("스크랩", { back: "‹ 오늘", right: "＋" }), BANNER("서버에 연결할 수 없습니다 · 저장된 목록 표시 중 · 다시 시도"), EMPTY("'전시' 태그에 스크랩이 없습니다", "필터 지우기"), NOTE("오프라인에서 새 스크랩 생성은 비활성 — 업로드가 필요하다.")] },
+    ],
+  },
+  {
+    id: "I", title: "가계부", desc: "월 합계·카테고리 구성·내역. 금액은 원 단위 정수(계약).",
+    frames: [
+      { id: "I1", name: "월 요약 + 내역", note: "숫자는 tabular. 비교값(direction·percentage)은 계약에 있는 그대로.", rows: [NAV("가계부", { back: "‹ 오늘", right: "＋", sub: "2026년 8월" }), SEG(["8월", "7월", "전체"]), AMT("₩609,200", "지난달보다 8% 적음"), LIST([["주거", "1건", "₩550,000"], ["생활", "1건", "₩43,200"], ["식비", "1건", "₩16,000"]], { chev: false }), H("내역"), LIST([["점심값", "식비 · 8월 5일", "₩16,000"], ["장보기", "생활 · 8월 3일", "₩43,200"], ["월세", "주거 · 8월 1일", "₩550,000"]])] },
+      { id: "I2", name: "지출 추가", note: "금액 입력은 숫자 키패드 + 천단위 구분. '₩ 원 ,' 는 서버가 벗겨낸다.", rows: [SHEET("지출 추가"), F("금액", "₩ 16,000"), F("항목", "필수"), F("날짜", "8월 5일"), F("라벨", "식비"), CARD("메모", "", 1), BANNER("금액은 1원 이상 정수여야 합니다"), KB()] },
+      { id: "I3", name: "편집 · 삭제", note: "스와이프 삭제는 확인 후 실행. 목록에서 되돌리기(undo) 토스트 제공.", rows: [INL("지출", { back: "‹ 가계부", right: "저장" }), F("금액", "₩550,000"), F("항목", "월세"), F("날짜", "8월 1일"), F("라벨", "주거"), BTN2("삭제")] },
+      { id: "I4", name: "카테고리 관리", note: "PUT /ledger/categories/order. 삭제는 대체 지정이 없다 — 사용 중이면 서버가 거절할 수 있어 오류를 그대로 보여준다.", rows: [INL("라벨", { back: "‹ 가계부", right: "편집" }), LIST([["식비", "₩16,000", "≡"], ["생활", "₩43,200", "≡"], ["주거", "₩550,000", "≡"], ["공과금", "0", "≡"], ["취미", "0", "≡"], ["기타", "0", "≡"]], { chev: false }), BTN2("라벨 추가")] },
+      { id: "I5", name: "빈 / 오프라인", note: "이번 달 기록이 없으면 합계 0과 함께 첫 지출 추가를 권한다.", rows: [NAV("가계부", { back: "‹ 오늘", right: "＋", sub: "2026년 9월" }), AMT("₩0", "9월 기록 없음"), EMPTY("이번 달 지출이 없습니다", "지출 추가"), BANNER("오프라인 — 저장된 8월 요약만 표시")] },
+    ],
+  },
+  {
+    id: "J", title: "설정", desc: "네이티브 inset-grouped. 데스크톱의 좌측 섹션 목록을 push 계층으로 바꿨다.",
+    frames: [
+      { id: "J1", name: "루트", note: "상단 툴바에서 진입. 데스크톱의 모달+사이드 목록 대신 표준 설정 목록.", rows: [INL("설정", { back: "‹ 오늘", right: "" }), LIST([["화면", "라이트 · 강조색"], ["언어 및 지역", "한국어"], ["서버 연결", "연결됨"], ["AI", "Gemini"], ["저장공간", "미사용 미디어"], ["정보", "0.1.2"]])] },
+      { id: "J2", name: "화면", note: "강조색은 큐레이션된 스와치 + 사용자 지정. tint로 앱 전체에 적용.", rows: [INL("화면", { back: "‹ 설정" }), H("모양"), LIST([["시스템", ""], ["라이트", ""], ["다크", ""]], { chev: false }), H("강조색"), CHIPS(["파랑", "남색", "초록", "주황", "보라", "사용자 지정"]), CARD("미리보기", "버튼 · 선택 상태 · 포커스에 적용됩니다", 0), NOTE("색만으로 상태를 알리지 않는다 — 아이콘·텍스트 병기.")] },
+      { id: "J3", name: "서버 연결", note: "iOS는 원격 모드만 — '이 기기' 모드는 없다. 토큰은 저장 여부만 보여준다.", rows: [INL("서버 연결", { back: "‹ 설정" }), CARD("연결됨", "https://mono.example.com · 서버 0.1.2", 0), F("서버 주소", "편집"), F("API 토큰", "저장됨 · 교체"), BTN2("연결 테스트"), BTN2("토큰 삭제"), NOTE("토큰은 Keychain. 삭제 시 이후 요청이 401이 되면 연결 화면으로 되돌린다.")] },
+      { id: "J4", name: "AI", note: "키는 서버에 암호화 저장 — 앱은 저장 여부만 안다(GET /ai/keys/:provider).", rows: [INL("AI", { back: "‹ 설정" }), H("사용 모델"), LIST([["Gemini", "gemini-2.5-flash-lite · 키 저장됨"], ["OpenAI", "gpt-5-nano · 키 없음"]]), F("API 키", "새 키로 교체"), BTN2("연결 테스트"), BTN2("키 삭제"), NOTE("전송 데이터 고지문은 저장소 문구 그대로 노출.")] },
+      { id: "J5", name: "저장공간", note: "파괴적 동작 — 확인 대화상자 + 되돌릴 수 없음 명시.", rows: [INL("저장공간", { back: "‹ 설정" }), CARD("미사용 미디어", "수집함·스크랩이 참조하지 않는 사진·영상", 0), F("정리 대상", "확인 필요"), BTN2("확인"), BTN("정리"), BANNER("삭제한 파일은 되돌릴 수 없습니다"), NOTE("R2 자격증명 입력은 iOS에서 제외 — 서버 관리 작업(데스크톱/서버에서 처리).")] },
+      { id: "J6", name: "정보 · 호환성", note: "GET /version 과 앱 버전 비교. 서버가 낮으면 여기와 오늘 배너에 표시.", rows: [INL("정보", { back: "‹ 설정" }), F("앱 버전", "0.1.2"), F("서버 버전", "0.1.2"), CARD("호환됩니다", "", 0), NOTE("서버가 낮을 때: '서버 0.1.0 · 앱 0.1.2 — 서버를 재배포하세요'"), BTN2("라이선스")] },
+    ],
+  },
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const sections = SECTIONS.map((sec) => ({
+      ...sec,
+      frames: sec.frames.map((f) => ({
+        ...f,
+        rows: f.rows.map((r) => ({ ...r, ["is" + r.k]: true })),
+      })),
+    }));
+    return { sections };
+  }
+}
+</script>
+</body>
+</html>

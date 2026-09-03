@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#E9E7E2;font-family:-apple-system,"SF Pro",system-ui,sans-serif}a{color:#007AFF}a:hover{color:#0062cc}</style></helmet>
+<div style="padding:36px 40px 48px;display:flex;flex-direction:column;gap:18px;align-items:flex-start">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:520px">
+    <div style="display:flex;align-items:baseline;gap:9px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;background:#2B2A28;color:#fff;padding:3px 7px;border-radius:4px">안 B</span><strong style="font:700 17px/1.2 -apple-system,system-ui;color:#2B2A28">오늘 + 상단 모듈 요약 — 진입은 항상 첫 화면에</strong></div>
+    <p style="margin:0;font:400 13px/1.55 -apple-system,system-ui;color:rgba(60,60,67,0.62);text-wrap:pretty">큰 제목 바로 아래에 6개 모듈 타일이 살아 있는 숫자와 함께 고정된다(스크롤 없이 전부 1탭). 그 아래는 오늘의 실행 정보 — 수집함 한 줄 배너, 시간 레일로 읽는 오늘 일정, 할 일과 루틴은 <b>분리된 카드</b>(루틴은 주간 요일 점을 그대로 유지), 지출 한 줄, 스크랩 썸네일 가로 스크롤.</p>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="402" height="874" hint-size="402px,874px">
+    <div style="min-height:100%;background:#F7F6F3;padding-bottom:44px;box-sizing:border-box">
+
+      <sc-if value="{{ atToday }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="position:sticky;top:0;z-index:6;padding:52px 12px 6px;background:rgba(247,246,243,0.86);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;align-items:center;justify-content:space-between;gap:2px">
+          <button onClick="{{ openMenu }}" aria-label="모듈 메뉴" aria-haspopup="menu" style="height:44px;min-width:44px;border:0;background:transparent;display:flex;align-items:center;gap:4px;padding:0 6px;color:#007AFF;font:400 17px/22px -apple-system,system-ui;cursor:pointer">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>
+            <svg width="11" height="7" viewBox="0 0 12 8" fill="none"><path d="M1 1.5L6 6l5-4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <span style="display:flex;align-items:center;gap:2px">
+          <button onClick="{{ openCapture }}" aria-label="빠른 캡처" style="width:44px;height:44px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#007AFF;cursor:pointer">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.8 4.7L18.5 10l-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.3zM18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z"></path></svg>
+          </button>
+          <button onClick="{{ openSettings }}" aria-label="설정" style="width:44px;height:44px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#007AFF;cursor:pointer">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h6M14 7h6M12 5v4M4 12h10M18 12h2M16 10v4M4 17h2M10 17h10M8 15v4"></path></svg>
+          </button>
+          </span>
+        </div>
+
+        <sc-if value="{{ menuOpen }}">
+        <div style="position:sticky;top:0;z-index:30;height:0;overflow:visible">
+          <button onClick="{{ closeMenu }}" aria-label="메뉴 닫기" style="position:absolute;top:0;left:0;width:402px;height:874px;border:0;background:transparent;padding:0;cursor:default"></button>
+          <div role="menu" style="position:absolute;top:92px;left:12px;width:246px;background:rgba(255,255,255,0.86);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:0.5px solid rgba(60,60,67,0.14);border-radius:14px;box-shadow:0 10px 40px rgba(43,42,40,0.18);overflow:hidden;transform-origin:top left">
+            <button onClick="{{ openTodo }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">할 일</span>
+              <span style="font:400 15px/20px -apple-system,system-ui;color:rgba(60,60,67,0.5);font-variant-numeric:tabular-nums">3</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM8 12l2.5 2.5L16 9"></path></svg></span>
+            </button>
+            <div style="height:0.5px;background:rgba(60,60,67,0.13)"></div>
+            <button onClick="{{ openRoutine }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">루틴</span>
+              <span style="font:400 15px/20px -apple-system,system-ui;color:rgba(60,60,67,0.5);font-variant-numeric:tabular-nums">2</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7M18 4v4h-4M6 20v-4h4"></path></svg></span>
+            </button>
+            <div style="height:0.5px;background:rgba(60,60,67,0.13)"></div>
+            <button onClick="{{ openCalendar }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">일정</span>
+              <span style="font:400 15px/20px -apple-system,system-ui;color:rgba(60,60,67,0.5);font-variant-numeric:tabular-nums">3</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v14H4zM8 3v4M16 3v4M4 10h16"></path></svg></span>
+            </button>
+            <div style="height:0.5px;background:rgba(60,60,67,0.13)"></div>
+            <button onClick="{{ openScrap }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">스크랩</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6M10 6h5a3 3 0 010 6h-1M14 18H9a3 3 0 010-6h1"></path></svg></span>
+            </button>
+            <div style="height:0.5px;background:rgba(60,60,67,0.13)"></div>
+            <button onClick="{{ openLedger }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">가계부</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3zM3 11h6a2 2 0 000 4H3"></path></svg></span>
+            </button>
+            <div style="height:0.5px;background:rgba(60,60,67,0.13)"></div>
+            <button onClick="{{ openInbox }}" role="menuitem" style="width:100%;border:0;background:transparent;display:flex;align-items:center;gap:10px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left">
+              <span style="flex:1;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">수집함</span>
+              <span style="font:600 13px/17px -apple-system,system-ui;color:#fff;background:#FF3B30;border-radius:9px;padding:0 6px;font-variant-numeric:tabular-nums">4</span>
+              <span style="color:rgba(60,60,67,0.8);display:flex"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 13h5l1 3h4l1-3h5"></path></svg></span>
+            </button>
+          </div>
+        </div>
+        </sc-if>
+
+        <div style="padding:2px 20px 14px">
+          <h1 style="margin:0;font:700 34px/41px -apple-system,system-ui;letter-spacing:0.37px;color:#2B2A28">오늘</h1>
+          <p style="margin:2px 0 0;font:400 15px/20px -apple-system,system-ui;color:rgba(60,60,67,0.6)">2026년 8월 5일 수요일</p>
+        </div>
+
+        <div style="margin:0 20px 20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <button onClick="{{ openTodo }}" style="border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left">
+            <span style="color:rgba(60,60,67,0.7);display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM8 12l2.5 2.5L16 9"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">할 일</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">남은 3</span></span>
+          </button>
+          <button onClick="{{ openRoutine }}" style="border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left">
+            <span style="color:rgba(60,60,67,0.7);display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7M18 4v4h-4M6 20v-4h4"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">루틴</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">오늘 2</span></span>
+          </button>
+          <button onClick="{{ openCalendar }}" style="border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left">
+            <span style="color:rgba(60,60,67,0.7);display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v14H4zM8 3v4M16 3v4M4 10h16"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">일정</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">오늘 3</span></span>
+          </button>
+          <button onClick="{{ openScrap }}" style="border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left">
+            <span style="color:rgba(60,60,67,0.7);display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6M10 6h5a3 3 0 010 6h-1M14 18H9a3 3 0 010-6h1"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">스크랩</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">6개</span></span>
+          </button>
+          <button onClick="{{ openLedger }}" style="border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left">
+            <span style="color:rgba(60,60,67,0.7);display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3zM3 11h6a2 2 0 000 4H3"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">가계부</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">8월</span></span>
+          </button>
+          <button onClick="{{ openInbox }}" style="border:0.5px solid rgba(0,122,255,0.3);background:#fff;border-radius:12px;padding:10px 10px 9px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer;text-align:left;position:relative">
+            <span style="color:#007AFF;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 13h5l1 3h4l1-3h5"></path></svg></span>
+            <span style="display:flex;flex-direction:column;gap:0"><span style="font:600 15px/20px -apple-system,system-ui;color:#2B2A28;letter-spacing:-0.24px">수집함</span><span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">대기 4</span></span>
+            <span style="position:absolute;top:8px;right:8px;font:600 13px/17px -apple-system,system-ui;color:#fff;background:#FF3B30;border-radius:9px;padding:0 6px;font-variant-numeric:tabular-nums">4</span>
+          </button>
+        </div>
+
+        <button onClick="{{ openInbox }}" style="width:calc(100% - 40px);margin:0 20px 22px;border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:14px;display:flex;align-items:center;gap:10px;padding:12px 14px;min-height:44px;text-align:left;cursor:pointer">
+          <span style="color:#007AFF;display:flex;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l1.8 4.7L18.5 10l-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.3zM18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z"></path></svg></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+            <span style="font:400 15px/20px -apple-system,system-ui;color:#2B2A28">AI가 분류한 4건이 승인을 기다린다</span>
+            <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">일정 1 · 할 일 1 · 가계부 1 · 스크랩 1 · 실패 1</span>
+          </span>
+          <svg width="8" height="13" viewBox="0 0 8 13" style="flex:none"><path d="M1 1l6 5.5-6 5.5" stroke="rgba(60,60,67,0.3)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+
+        <div style="padding:0 20px 6px;display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">오늘 일정</span>
+          <button onClick="{{ openCalendar }}" style="border:0;background:transparent;padding:0;font:400 15px/20px -apple-system,system-ui;color:#007AFF;cursor:pointer">전체</button>
+        </div>
+        <div style="margin:0 20px 22px;padding:4px 0 2px;display:flex;flex-direction:column">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="width:46px;flex:none;text-align:right;font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums;padding-top:12px">10:00</span>
+            <span style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center;align-self:stretch"><span style="width:9px;height:9px;border-radius:5px;background:oklch(0.604 0.149 260.322);margin-top:15px;flex:none"></span><span style="width:1.5px;flex:1;background:rgba(60,60,67,0.12)"></span></span>
+            <span style="flex:1;min-width:0;background:#fff;border:0.5px solid rgba(60,60,67,0.13);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:2px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">팀 회의</span>
+              <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">10:00–11:00 · 회의실 B</span>
+            </span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="width:46px;flex:none;text-align:right;font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums;padding-top:12px">19:30</span>
+            <span style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center;align-self:stretch"><span style="width:9px;height:9px;border-radius:5px;background:oklch(0.759 0.145 80.298);margin-top:15px;flex:none"></span><span style="width:1.5px;flex:1;background:rgba(60,60,67,0.12)"></span></span>
+            <span style="flex:1;min-width:0;background:#fff;border:0.5px solid rgba(60,60,67,0.13);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:2px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">저녁 약속</span>
+              <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">19:30–21:00 · 을지로</span>
+            </span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="width:46px;flex:none;text-align:right;font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums;padding-top:12px">22:00</span>
+            <span style="width:9px;flex:none;display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:5px;background:oklch(0.603 0.109 75.876);margin-top:15px;flex:none"></span></span>
+            <span style="flex:1;min-width:0;background:#fff;border:0.5px solid rgba(60,60,67,0.13);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">가계부 정리</span>
+              <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6);font-variant-numeric:tabular-nums">22:00–22:30 · 재무</span>
+            </span>
+          </div>
+        </div>
+
+        <div style="padding:0 20px 6px;display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">오늘 할 일</span>
+          <button onClick="{{ openTodo }}" style="border:0;background:transparent;padding:0;font:400 15px/20px -apple-system,system-ui;color:#007AFF;cursor:pointer">전체</button>
+        </div>
+        <div style="margin:0 20px 18px;background:#fff;border:0.5px solid rgba(60,60,67,0.13);border-radius:14px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;min-height:44px">
+            <button onClick="{{ toggle1 }}" aria-label="설거지 하기 완료" style="width:26px;height:26px;flex:none;border:0;background:transparent;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <sc-if value="{{ done1 }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#007AFF"></circle><path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ open1 }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="none" stroke="rgba(60,60,67,0.28)" stroke-width="1.6"></circle></svg></sc-if>
+            </button>
+            <span style="flex:1;min-width:0;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">설거지 하기</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:4px;background:oklch(0.539 0.082 160.129)"></span><span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">집안일</span></span>
+          </div>
+          <div style="height:0.5px;background:rgba(60,60,67,0.13);margin-left:52px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;min-height:44px">
+            <button onClick="{{ toggle4 }}" aria-label="전기세 이체 확인 완료" style="width:26px;height:26px;flex:none;border:0;background:transparent;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <sc-if value="{{ done4 }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#007AFF"></circle><path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ open4 }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="none" stroke="rgba(60,60,67,0.28)" stroke-width="1.6"></circle></svg></sc-if>
+            </button>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">전기세 이체 확인</span>
+              <span style="display:flex;align-items:center;gap:4px;font:400 13px/18px -apple-system,system-ui;color:#B3261E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3zM12 10v4.5M12 17.4v.4"></path></svg>2일 지남 · 8월 3일</span>
+            </span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:4px;background:oklch(0.502 0.132 309.199)"></span><span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">재무</span></span>
+          </div>
+          <div style="height:0.5px;background:rgba(60,60,67,0.13);margin-left:52px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;min-height:44px;opacity:0.55">
+            <svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10" fill="rgba(60,60,67,0.3)"></circle><path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span style="flex:1;min-width:0;font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:rgba(60,60,67,0.6);text-decoration:line-through">빨래 정리하기</span>
+            <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.45)">3시간 전</span>
+          </div>
+        </div>
+
+        <div style="padding:0 20px 6px;display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">오늘 루틴</span>
+          <button onClick="{{ openRoutine }}" style="border:0;background:transparent;padding:0;font:400 15px/20px -apple-system,system-ui;color:#007AFF;cursor:pointer">전체</button>
+        </div>
+        <div style="margin:0 20px 22px;background:#fff;border:0.5px solid rgba(60,60,67,0.13);border-radius:14px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:44px">
+            <button onClick="{{ toggleR1 }}" aria-label="비타민 먹기 오늘 완료" style="width:26px;height:26px;flex:none;border:0;background:transparent;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <sc-if value="{{ doneR1 }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#007AFF"></circle><path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ openR1 }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="none" stroke="rgba(60,60,67,0.28)" stroke-width="1.6"></circle></svg></sc-if>
+            </button>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">비타민 먹기</span>
+              <span style="display:flex;align-items:center;gap:4px;font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">
+                <span style="width:16px;height:16px;border-radius:8px;background:rgba(60,60,67,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:rgba(60,60,67,0.45)">일</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">월</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:rgba(60,60,67,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:rgba(60,60,67,0.45)">화</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">수</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:rgba(60,60,67,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:rgba(60,60,67,0.45)">목</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">금</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:rgba(60,60,67,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:rgba(60,60,67,0.45)">토</span>
+                <span style="margin-left:4px">8월 19일까지</span>
+              </span>
+            </span>
+          </div>
+          <div style="height:0.5px;background:rgba(60,60,67,0.13);margin-left:52px"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:44px">
+            <button onClick="{{ toggleR2 }}" aria-label="운동 30분 하기 오늘 완료" style="width:26px;height:26px;flex:none;border:0;background:transparent;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <sc-if value="{{ doneR2 }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#007AFF"></circle><path d="M7.5 12.4l3 3 6-6.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+              <sc-if value="{{ openR2 }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="none" stroke="rgba(60,60,67,0.28)" stroke-width="1.6"></circle></svg></sc-if>
+            </button>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font:400 17px/22px -apple-system,system-ui;letter-spacing:-0.43px;color:#2B2A28">운동 30분 하기</span>
+              <span style="display:flex;align-items:center;gap:4px;font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">일</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">월</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">화</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">수</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">목</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">금</span>
+                <span style="width:16px;height:16px;border-radius:8px;background:#2B2A28;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px">토</span>
+                <span style="margin-left:4px">기한 없음</span>
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <button onClick="{{ openLedger }}" style="width:calc(100% - 40px);margin:0 20px 22px;border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:14px;display:flex;align-items:center;gap:12px;padding:13px 14px;min-height:44px;text-align:left;cursor:pointer">
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span style="font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">8월 지출</span>
+            <span style="display:flex;align-items:baseline;gap:7px"><strong style="font:700 22px/28px -apple-system,system-ui;color:#2B2A28;font-variant-numeric:tabular-nums">₩609,200</strong><span style="font:400 13px/18px -apple-system,system-ui;color:oklch(0.539 0.082 160.129)">8% 적음</span></span>
+          </span>
+          <span style="width:96px;flex:none;display:flex;flex-direction:column;gap:5px">
+            <span style="display:flex;height:7px;border-radius:4px;overflow:hidden;gap:1.5px"><span style="flex:550200;background:oklch(0.604 0.149 260.322)"></span><span style="flex:43200;background:oklch(0.539 0.082 160.129)"></span><span style="flex:16000;background:oklch(0.603 0.109 75.876)"></span></span>
+            <span style="font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">주거 90%</span>
+          </span>
+          <svg width="8" height="13" viewBox="0 0 8 13" style="flex:none"><path d="M1 1l6 5.5-6 5.5" stroke="rgba(60,60,67,0.3)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+
+        <div style="padding:0 20px 8px;display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font:600 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.6)">최근 스크랩</span>
+          <button onClick="{{ openScrap }}" style="border:0;background:transparent;padding:0;font:400 15px/20px -apple-system,system-ui;color:#007AFF;cursor:pointer">전체</button>
+        </div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding:0 20px 30px;scrollbar-width:none">
+          <button onClick="{{ openScrap }}" style="width:140px;flex:none;border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:0;overflow:hidden;text-align:left;cursor:pointer">
+            <span style="display:block;height:88px;background:repeating-linear-gradient(135deg,rgba(60,60,67,0.06) 0 8px,rgba(60,60,67,0.03) 8px 16px);position:relative">
+              <span style="position:absolute;bottom:6px;left:6px;display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.9);border-radius:6px;padding:1px 5px;font:400 11px/15px -apple-system,system-ui;color:rgba(60,60,67,0.7)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"></path></svg>사진</span>
+            </span>
+            <span style="display:block;padding:8px 10px 10px">
+              <span style="display:block;font:400 15px/20px -apple-system,system-ui;color:#2B2A28;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">들기름 파스타 레시피</span>
+              <span style="display:block;font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">요리 · 댓글 2</span>
+            </span>
+          </button>
+          <button onClick="{{ openScrap }}" style="width:140px;flex:none;border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:0;overflow:hidden;text-align:left;cursor:pointer">
+            <span style="display:block;height:88px;background:rgba(60,60,67,0.05);display:flex;align-items:center;justify-content:center;color:rgba(60,60,67,0.35)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6M10 6h5a3 3 0 010 6h-1M14 18H9a3 3 0 010-6h1"></path></svg></span>
+            <span style="display:block;padding:8px 10px 10px">
+              <span style="display:block;font:400 15px/20px -apple-system,system-ui;color:#2B2A28;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">카메라 무빙 레퍼런스</span>
+              <span style="display:block;font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">레퍼런스 · 댓글 1</span>
+            </span>
+          </button>
+          <button onClick="{{ openScrap }}" style="width:140px;flex:none;border:0.5px solid rgba(60,60,67,0.13);background:#fff;border-radius:12px;padding:0;overflow:hidden;text-align:left;cursor:pointer">
+            <span style="display:block;height:88px;background:rgba(60,60,67,0.05);display:flex;align-items:center;justify-content:center;color:rgba(60,60,67,0.35)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h10l4 4v12H5zM15 4v4h4"></path></svg></span>
+            <span style="display:block;padding:8px 10px 10px">
+              <span style="display:block;font:400 15px/20px -apple-system,system-ui;color:#2B2A28;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">합주실 후보 정리</span>
+              <span style="display:block;font:400 12px/16px -apple-system,system-ui;color:rgba(60,60,67,0.55)">음악 · 7월 28일</span>
+            </span>
+          </button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ atPushed }}">
+      <div>
+        <div style="position:sticky;top:0;z-index:6;padding:52px 8px 8px;background:rgba(247,246,243,0.86);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;align-items:center;gap:2px;border-bottom:0.5px solid rgba(60,60,67,0.13)">
+          <button onClick="{{ back }}" style="height:44px;border:0;background:transparent;display:flex;align-items:center;gap:4px;padding:0 8px;color:#007AFF;font:400 17px/22px -apple-system,system-ui;cursor:pointer">
+            <svg width="12" height="20" viewBox="0 0 12 20" fill="none"><path d="M9.5 2L2 10l7.5 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>오늘
+          </button>
+          <strong style="flex:1;text-align:center;font:600 17px/22px -apple-system,system-ui;color:#2B2A28;margin-right:60px">{{ pushedTitle }}</strong>
+        </div>
+        <div style="padding:28px 20px;display:flex;flex-direction:column;gap:10px">
+          <p style="margin:0;font:400 15px/21px -apple-system,system-ui;color:rgba(60,60,67,0.7);text-wrap:pretty">NavigationStack push — 왼쪽 에지 스와이프로 오늘로 돌아온다. 모듈 화면은 다음 단계(와이어프레임 → 고충실도)에서 만든다.</p>
+          <p style="margin:0;font:400 13px/18px -apple-system,system-ui;color:rgba(60,60,67,0.5)">이 안의 검증 대상: 상단 모듈 타일이 오늘 정보를 얼마나 밀어내도 괜찮은가.</p>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ sheetOpen }}">
+      <div style="position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,0.28)">
+        <div style="background:#F7F6F3;border-radius:14px 14px 0 0;padding-bottom:34px;max-height:88%">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:0.5px solid rgba(60,60,67,0.13)">
+            <button onClick="{{ closeSheet }}" style="border:0;background:transparent;font:400 17px/22px -apple-system,system-ui;color:#007AFF;cursor:pointer;min-height:44px;padding:0 4px">취소</button>
+            <strong style="font:600 17px/22px -apple-system,system-ui;color:#2B2A28">빠른 캡처</strong>
+            <span style="font:600 17px/22px -apple-system,system-ui;color:rgba(60,60,67,0.3);min-width:44px;text-align:right">보내기</span>
+          </div>
+          <div style="padding:18px 20px 26px">
+            <p style="margin:0;font:400 15px/21px -apple-system,system-ui;color:rgba(60,60,67,0.7);text-wrap:pretty">상단 툴바에서 sheet로 올라온다 — 하단 고정 버튼이 아니다. 텍스트·사진 4장·영상 1개, 업로드와 AI 분석 진행 상태는 다음 단계에서 채운다.</p>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+
+  <div style="max-width:520px;display:flex;flex-direction:column;gap:5px;font:400 12.5px/1.5 -apple-system,system-ui;color:rgba(60,60,67,0.62)">
+    <div><b style="color:#2B2A28">탭 수</b> — 모든 모듈 1탭, 스크롤 없이. 오늘 할 일 완료 0탭. 빠른 캡처 1탭 · 설정 1탭. 대신 첫 화면에서 실제로 보이는 오늘 정보는 수집함 배너와 일정 1~2건 정도.</div>
+    <div><b style="color:#2B2A28">작은 iPhone / 큰 글씨</b> — 3열 타일은 SE 폭(320pt)에서 글자가 두 줄로 접힌다. 접근성 글씨 크기에서는 타일을 2열, 그다음 목록 행으로 떨어뜨려야 한다(레이아웃 전환 규칙 필요).</div>
+    <div><b style="color:#2B2A28">트레이드오프</b> — 발견성과 이동 속도는 최고. 대신 첫 화면 상단 1/3이 런처가 되어 "오늘 무엇이 급한가"가 접힌 아래로 내려간다.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:600,&quot;height&quot;:1120}}">
+class Component extends DCLogic {
+  state = { screen: "today", pushed: "", sheet: false, menu: false, done: { t1: false, t4: false, r1: false, r2: false } };
+
+  push(title) { this.setState({ screen: "pushed", pushed: title, menu: false }); }
+  toggle(key) { this.setState((s) => ({ done: { ...s.done, [key]: !s.done[key] } })); }
+
+  renderVals() {
+    const d = this.state.done;
+    return {
+      atToday: this.state.screen === "today",
+      atPushed: this.state.screen === "pushed",
+      pushedTitle: this.state.pushed,
+      sheetOpen: this.state.sheet,
+      menuOpen: this.state.menu,
+      openMenu: () => this.setState((s) => ({ menu: !s.menu })),
+      closeMenu: () => this.setState({ menu: false }),
+      back: () => this.setState({ screen: "today" }),
+      openCapture: () => this.setState({ sheet: true }),
+      closeSheet: () => this.setState({ sheet: false }),
+      openSettings: () => this.push("설정"),
+      openInbox: () => this.push("수집함"),
+      openTodo: () => this.push("할 일"),
+      openRoutine: () => this.push("루틴"),
+      openCalendar: () => this.push("일정"),
+      openScrap: () => this.push("스크랩"),
+      openLedger: () => this.push("가계부"),
+      done1: d.t1, open1: !d.t1, toggle1: () => this.toggle("t1"),
+      done4: d.t4, open4: !d.t4, toggle4: () => this.toggle("t4"),
+      doneR1: d.r1, openR1: !d.r1, toggleR1: () => this.toggle("r1"),
+      doneR2: d.r2, openR2: !d.r2, toggleR2: () => this.toggle("r2"),
+    };
+  }
+}
+</script>
+</body>
+</html>
