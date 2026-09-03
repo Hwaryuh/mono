@@ -1,0 +1,4 @@
+#!/bin/sh
+# 새 소스가 들어오면(pull·merge) 다음 cargo 빌드가 새 해시 아티팩트를 만든다.
+# 오래된 워크스페이스 아티팩트를 미리 쓸어 target/ 축적을 막는다. fs 조작뿐이라 빠르다.
+exec node "$(git rev-parse --show-toplevel)/scripts/clean-target.mjs" --quiet

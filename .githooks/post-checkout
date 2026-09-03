@@ -1,0 +1,5 @@
+#!/bin/sh
+# 브랜치 전환 시에도 소스가 바뀌므로 post-merge 와 같은 이유로 정리한다.
+# $3 == 1 이면 브랜치 체크아웃, 0 이면 파일 체크아웃(무시).
+[ "$3" = "1" ] || exit 0
+exec node "$(git rev-parse --show-toplevel)/scripts/clean-target.mjs" --quiet

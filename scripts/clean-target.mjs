@@ -73,13 +73,19 @@ if (process.argv.includes("--full")) {
   process.exit(0);
 }
 
+const quiet = process.argv.includes("--quiet");
 let totalRemoved = 0;
 let totalBytes = 0;
 for (const profile of ["debug", "release"]) {
   const { removed, bytes } = sweepProfile(profile);
   totalRemoved += removed;
   totalBytes += bytes;
-  if (removed > 0) console.log(`${profile}: 오래된 워크스페이스 아티팩트 ${removed}개 삭제 (${humanBytes(bytes)})`);
+  if (removed > 0 && !quiet) console.log(`${profile}: 오래된 워크스페이스 아티팩트 ${removed}개 삭제 (${humanBytes(bytes)})`);
 }
-if (totalRemoved === 0) console.log("정리할 오래된 워크스페이스 아티팩트가 없습니다.");
-else console.log(`총 ${humanBytes(totalBytes)} 회수. 의존성 캐시까지 비우려면 npm run clean -- --full`);
+if (quiet) {
+  if (totalRemoved > 0) console.log(`clean-target: ${humanBytes(totalBytes)} 회수 (${totalRemoved}개)`);
+} else if (totalRemoved === 0) {
+  console.log("정리할 오래된 워크스페이스 아티팩트가 없습니다.");
+} else {
+  console.log(`총 ${humanBytes(totalBytes)} 회수. 의존성 캐시까지 비우려면 npm run clean -- --full`);
+}
