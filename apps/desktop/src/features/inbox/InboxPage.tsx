@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import type { CalendarCategory, InboxField, InboxItem, InboxSnapshot, InboxUpdateInput, LedgerCategory, TodoLabel } from "@mono/contracts";
 import { formatTimestamp, inboxTargetModuleIds, type InboxTargetModuleId } from "@mono/domain";
 import {
@@ -102,10 +103,6 @@ function defaultFields(target: InboxTargetModuleId, raw: string): InboxField[] {
     label,
     value: index === 0 ? raw : label === translate("common.field.note") || label === translate("inbox.field.original") ? raw : label === translate("inbox.field.due") ? translate("common.date.noDueDate") : translate("routine.label.unassigned"),
   }));
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 type ModuleTargetPickerProps = {

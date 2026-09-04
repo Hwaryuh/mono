@@ -1,12 +1,7 @@
 import { translate } from "../i18n/i18n";
+import { errorMessage } from "../i18n/error-message";
 import { StatusIndicator } from "@mono/ui";
 import { useRouteError } from "react-router";
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return translate("routeError.unknown");
-}
 
 export function RouteErrorScreen() {
   const error = useRouteError();
@@ -16,7 +11,7 @@ export function RouteErrorScreen() {
   return (
     <div className="route-error" role="alert">
       <StatusIndicator icon="alert" label={translate("routeError.title")} tone="danger" />
-      <p>{errorMessage(error)}</p>
+      <p>{errorMessage(error, "routeError.unknown")}</p>
       <button onClick={() => window.location.reload()} type="button">{translate("routeError.retry")}</button>
     </div>
   );

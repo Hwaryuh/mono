@@ -158,4 +158,38 @@ mod tests {
         assert!(modules_for_path("/media/gc").is_empty());
         assert!(modules_for_path("/settings/ai").is_empty());
     }
+
+    // 클라이언트 realtimeChangeEventSchema(packages/contracts 의 realtimeModuleIds)와 반드시 같아야
+    // 하는 정식 모듈 집합. Rust가 이 밖의 이름을 publish하면 SSE 이벤트가 클라이언트 Zod parse에서
+    // 조용히 드롭돼 화면이 stale해진다. 두 언어의 유일한 계약 지점이라 이 테스트로 drift를 막는다.
+    const REALTIME_MODULE_IDS: [&str; 7] =
+        ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger"];
+
+    #[test]
+    fn published_modules_match_client_realtime_set() {
+        // 각 모듈의 대표 mutating 경로. modules_for_path는 prefix 매칭이라 대표 하나면 충분하다.
+        let mutating_paths = [
+            "/todo/items",
+            "/routine/items",
+            "/calendar/events",
+            "/scrap/items",
+            "/ledger/expenses",
+            "/inbox/items/1/approve",
+            "/dashboard/capture",
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for path in mutating_paths {
+            for module in modules_for_path(path) {
+                assert!(
+                    REALTIME_MODULE_IDS.contains(module),
+                    "modules_for_path({path:?})가 realtime 집합에 없는 모듈 {module:?}을 publish함 — 클라이언트가 이벤트를 드롭한다"
+                );
+                seen.insert(*module);
+            }
+        }
+        // 반대 방향: 모든 realtime 모듈이 최소 한 경로에서 실제 갱신 신호를 받는지도 확인한다.
+        for id in REALTIME_MODULE_IDS {
+            assert!(seen.contains(id), "realtime 모듈 {id:?}이 어떤 경로에서도 publish되지 않음");
+        }
+    }
 }

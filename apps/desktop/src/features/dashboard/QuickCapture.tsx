@@ -1,6 +1,6 @@
 import { translate } from "../../i18n/i18n";
 import type { DashboardSnapshot } from "@mono/contracts";
-import type { PlatformModuleId } from "@mono/domain";
+import { formatByteSize, type PlatformModuleId } from "@mono/domain";
 import { Button, Icon, Input, SectionHeader, type IconName } from "@mono/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
@@ -83,10 +83,8 @@ function captureVideoOf(file: File) {
   });
 }
 
-export function formatMediaSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
+// 첨부 크기 표기는 도메인 공용 포매터를 쓴다. 이름은 기존 import 호환을 위해 유지.
+export const formatMediaSize = formatByteSize;
 
 export function QuickCapture({ autoFocus = false, repository, showHeading = false, snapshot }: QuickCaptureProps) {
   const [captureText, setCaptureText] = useState("");

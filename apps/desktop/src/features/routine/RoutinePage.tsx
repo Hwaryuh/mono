@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import type { RoutineDefinition, RoutineOccurrence, RoutineSnapshot, RoutineWriteInput, TodoLabel } from "@mono/contracts";
 import { Button, DatePicker, Icon, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,10 +28,6 @@ function blankDraft(labels: TodoLabel[]): Draft {
 
 function draftOf(routine: RoutineDefinition): Draft {
   return { title: routine.title, labelId: routine.labelId, days: [...routine.days], endless: !routine.endDate, endDate: routine.endDate ?? "" };
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 function parseDate(date: string) {

@@ -1,11 +1,13 @@
 import { translate } from "../../i18n/i18n";
-import { calendarCategoryWriteInputSchema, type CalendarCategory, type CalendarCategoryWriteInput, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
-import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
+import { errorMessage } from "../../i18n/error-message";
+import { type CalendarCategory, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
+import { Button, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import type { CalendarRepository } from "./calendar-repository";
+import { CalendarCategoryManager } from "./CalendarCategoryManager";
 import { calendarViewStateStoreOf, type CalendarView, type CalendarViewStateStore } from "./calendar-view-state-store";
 import { addDays, weekdayOf } from "./recurrence";
 
@@ -19,17 +21,6 @@ type EditorItem = CalendarEvent | "new" | null;
 type Draft = Omit<CalendarWriteInput, "startTime" | "endTime" | "recurrence"> & { startTime: string; endTime: string; recurrence: CalendarRecurrence | null };
 type RecurrencePreset = "none" | "daily" | "weekly" | "weekdays" | "biweekly" | "monthly" | "yearly" | "custom";
 type RecurrenceEnd = "never" | "until" | "count";
-type CategoryCommand =
-  | { type: "create"; input: CalendarCategoryWriteInput }
-  | { type: "update"; categoryId: string; input: CalendarCategoryWriteInput; expectedVersion: number }
-  | { type: "reorder"; categoryIds: string[] }
-  | { type: "delete"; categoryId: string; replacementCategoryId: string };
-
-const blankCategoryDraft: CalendarCategoryWriteInput = { name: "", color: "oklch(0.604 0.149 260.322)" };
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
-}
 
 function dateOf(year: number, month: number, day: number) {
   return new Date(Date.UTC(year, month, day));
@@ -245,12 +236,6 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
   const [scopePrompt, setScopePrompt] = useState<{ mode: "save" | "delete"; event: CalendarEvent; input?: CalendarWriteInput } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [editingCategoryVersion, setEditingCategoryVersion] = useState(1);
-  const [categoryDraft, setCategoryDraft] = useState<CalendarCategoryWriteInput>(blankCategoryDraft);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
-  const [replacementCategoryId, setReplacementCategoryId] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const handledParamRef = useRef("");
   const viewRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -343,44 +328,6 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     onSuccess: async () => { await invalidateSnapshots(); setScopePrompt(null); setDeleteConfirm(false); closeEditor(true); },
     onError: (error) => setFormError(errorMessage(error)),
   });
-  const categoryMutation = useMutation({
-    mutationFn: async (command: CategoryCommand) => {
-      if (command.type === "create") await repository.createCategory(command.input);
-      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input, command.expectedVersion);
-      else if (command.type === "reorder") await repository.reorderCategories(command.categoryIds);
-      else await repository.deleteCategory(command.categoryId, command.replacementCategoryId);
-    },
-    onMutate: () => setCategoryError(null),
-    onSuccess: async (_, command) => {
-      if (command.type === "create") setCategoryDraft(blankCategoryDraft);
-      if (command.type === "update") {
-        setEditingCategoryId(null);
-        setCategoryDraft(blankCategoryDraft);
-      }
-      if (command.type === "delete") {
-        setDeleteCategoryId(null);
-        setEditingCategoryId((current) => current === command.categoryId ? null : current);
-        setDraft((current) => current.categoryId === command.categoryId ? { ...current, categoryId: command.replacementCategoryId } : current);
-      }
-      await invalidateSnapshots();
-      if (command.type === "create") {
-        // ponytail: createCategory returns void; name is unique (dupes rejected), so match by name after the refetch above.
-        const created = queryClient.getQueriesData<CalendarSnapshot>({ queryKey: calendarQueryKey })
-          .map(([, snapshot]) => snapshot?.categories.find((category) => category.name === command.input.name))
-          .find(Boolean);
-        if (created) setDraft((current) => ({ ...current, categoryId: created.id }));
-      }
-      requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#calendar-category-editor input")?.focus());
-    },
-    onError: async (error) => {
-      setCategoryError(errorMessage(error));
-      if (isConflictError(error) && editingCategoryId) {
-        const version = await resyncCalendarVersion((snapshot) => snapshot.categories.find((candidate) => candidate.id === editingCategoryId));
-        if (version !== null) setEditingCategoryVersion(version);
-      }
-    },
-  });
-
   useEffect(() => {
     const snapshot = snapshotQuery.data;
     const modal = searchParams.get("modal");
@@ -435,55 +382,6 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     setFormError(null);
     setDeleteConfirm(false);
     if (searchParams.has("modal")) setSearchParams({}, { replace: true });
-  }
-
-  function openCategoryManager() {
-    setEditingCategoryId(null);
-    setCategoryDraft(blankCategoryDraft);
-    setCategoryError(null);
-    setCategoryManagerOpen(true);
-  }
-
-  function closeCategoryManager() {
-    if (categoryMutation.isPending) return;
-    setCategoryManagerOpen(false);
-    setEditingCategoryId(null);
-    setDeleteCategoryId(null);
-    setCategoryError(null);
-  }
-
-  function editCategory(category: CalendarCategory) {
-    setEditingCategoryId(category.id);
-    setEditingCategoryVersion(category.version ?? 1);
-    setCategoryDraft({ name: category.name, color: category.color });
-    setCategoryError(null);
-  }
-
-  function submitCategory(event: FormEvent) {
-    event.preventDefault();
-    const parsed = calendarCategoryWriteInputSchema.safeParse(categoryDraft);
-    if (!parsed.success) {
-      setCategoryError(parsed.error.issues[0]?.message ?? translate("common.validation.labelInvalid"));
-      return;
-    }
-    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
-    else categoryMutation.mutate({ type: "create", input: parsed.data });
-  }
-
-  function moveCategory(index: number, offset: -1 | 1) {
-    const targetIndex = index + offset;
-    if (targetIndex < 0 || targetIndex >= snapshot.categories.length) return;
-    const categoryIds = snapshot.categories.map((category) => category.id);
-    [categoryIds[index], categoryIds[targetIndex]] = [categoryIds[targetIndex], categoryIds[index]];
-    categoryMutation.mutate({ type: "reorder", categoryIds });
-  }
-
-  function openDeleteCategory(categoryId: string) {
-    const replacement = snapshot.categories.find((category) => category.id !== categoryId);
-    if (!replacement) return;
-    setDeleteCategoryId(categoryId);
-    setReplacementCategoryId(replacement.id);
-    setCategoryError(null);
   }
 
   function setDraftField<Key extends keyof Draft>(key: Key, value: Draft[Key]) {
@@ -675,7 +573,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
           <fieldset aria-labelledby="calendar-event-category-label" className="calendar-event-form__category">
             <div className="calendar-event-form__category-header">
               <span id="calendar-event-category-label">{translate("common.field.label")}</span>
-              <button disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("common.action.manage")}</button>
+              <button disabled={editorBusy} onClick={() => setCategoryManagerOpen(true)} type="button">{translate("common.action.manage")}</button>
             </div>
             <Select align="end" label={translate("common.field.label")} onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
           </fieldset>
@@ -723,59 +621,14 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
         </div>
       </Modal>
 
-      <Modal className="calendar-category-modal" icon="calendar" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("common.labels.manage")}>
-        <div className="calendar-category-manager">
-          <div aria-label={translate("inbox.labels.calendar")} className="calendar-category-manager__list">
-            {snapshot.categories.map((category, index) => {
-              const usageCount = snapshot.events.filter((event) => event.categoryId === category.id).length;
-              return (
-                <div className="calendar-category-manager__row" key={category.id}>
-                  <i style={{ backgroundColor: category.color }} />
-                  <strong>{category.name}</strong>
-                  <span>{usageCount}{translate("common.unit.items")}</span>
-                  <div>
-                    <IconButton aria-label={translate("common.action.moveUpLabel", { name: category.name })} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title={translate("common.action.moveUp")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                    <IconButton aria-label={translate("common.action.moveDownLabel", { name: category.name })} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title={translate("common.action.moveDown")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                    <IconButton aria-label={translate("common.action.editLabel", { name: category.name })} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                    <IconButton aria-label={snapshot.categories.length === 1 ? translate("common.action.deleteDisabledLabel", { name: category.name }) : translate("common.action.deleteLabel", { name: category.name })} disabled={categoryMutation.isPending || snapshot.categories.length === 1} onClick={() => openDeleteCategory(category.id)} size="small" title={snapshot.categories.length === 1 ? translate("common.labels.lastDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <form aria-busy={categoryMutation.isPending} className="calendar-category-editor" id="calendar-category-editor" onSubmit={submitCategory}>
-            <div className="calendar-category-editor__header">
-              <strong>{editingCategoryId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
-              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("common.action.cancel")}</button>}
-            </div>
-            <div className="calendar-category-editor__controls">
-              <ColorPicker disabled={categoryMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
-              <Input aria-label={translate("common.labels.name")} autoFocus disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={categoryDraft.name} />
-              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("common.action.save") : translate("common.action.add")}</Button>
-            </div>
-            {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
-          </form>
-        </div>
-      </Modal>
-
-      <Modal
-        className="calendar-category-delete-modal"
-        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("common.action.cancel")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && replacementCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId, replacementCategoryId })} variant="danger">{translate("common.action.delete")}</Button></>}
-        icon="alert"
-        onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
-        open={deleteCategoryId !== null}
-        title={translate("common.labels.deleteTitle")}
-      >
-        <div className="calendar-category-delete">
-          <p>{translate("common.labels.deleteQuestion", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "" })}</p>
-          <label>
-            <span>{translate("calendar.labels.moveExisting")}</span>
-            <Select disabled={categoryMutation.isPending} label={translate("common.labels.moveTarget")} onChange={setReplacementCategoryId} options={snapshot.categories.filter((category) => category.id !== deleteCategoryId).map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={replacementCategoryId} />
-          </label>
-          <small>{translate("calendar.labels.moveExistingDescription")}</small>
-          {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
-        </div>
-      </Modal>
+      <CalendarCategoryManager
+        onCategoryCreated={(category) => setDraft((current) => ({ ...current, categoryId: category.id }))}
+        onCategoryDeleted={(categoryId, replacementCategoryId) => setDraft((current) => current.categoryId === categoryId ? { ...current, categoryId: replacementCategoryId } : current)}
+        onClose={() => setCategoryManagerOpen(false)}
+        open={categoryManagerOpen}
+        repository={repository}
+        snapshot={snapshot}
+      />
     </div>
   );
 }

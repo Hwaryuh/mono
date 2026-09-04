@@ -14,6 +14,8 @@ export {
   type WeekdayStyle,
 } from "./date.ts";
 
+export { formatByteSize } from "./format.ts";
+
 export {
   hexToOklch,
   normalizeColorToOklch,

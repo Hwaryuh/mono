@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import { todoLabelWriteInputSchema, type TodoLabel, type TodoLabelWriteInput, type TodoSnapshot } from "@mono/contracts";
 import { Button, ColorPicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,10 +24,6 @@ interface TodoLabelManagerModalProps {
   open: boolean;
   repository: TodoLabelRepository;
   usageCountOf?: (labelId: string) => number;
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabelDeleted, open, repository, usageCountOf }: TodoLabelManagerModalProps) {

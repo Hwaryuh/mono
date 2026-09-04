@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerSnapshot, type LedgerWriteInput } from "@mono/contracts";
 import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,10 +35,6 @@ function blankDraft(today: string, categories: LedgerCategory[]): Draft {
   return { title: "", amountWon: "", date: today, categoryId: categories[0]?.id ?? "", note: "" };
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("ledger.error.save");
-}
-
 export function LedgerPage({ repository, viewStateStore }: { repository: LedgerRepository; viewStateStore?: LedgerViewStateStore }) {
   const [store] = useState(() => viewStateStore ?? ledgerViewStateStoreOf());
   const [viewState, setViewState] = useState(() => store.read());
@@ -71,7 +68,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       closeModal(true);
     },
     onError: (error) => {
-      setFormError(errorMessage(error));
+      setFormError(errorMessage(error, "ledger.error.save"));
       requestAnimationFrame(() => document.querySelector<HTMLInputElement>("#ledger-expense-form input")?.focus());
     },
   });
@@ -82,7 +79,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       await invalidateSnapshots();
       closeModal(true);
     },
-    onError: (error) => setFormError(errorMessage(error)),
+    onError: (error) => setFormError(errorMessage(error, "ledger.error.save")),
   });
   const deleteExpenseMutation = useMutation({
     mutationFn: (expenseId: string) => repository.remove(expenseId),
@@ -91,7 +88,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       await invalidateSnapshots();
       closeModal(true);
     },
-    onError: (error) => setFormError(errorMessage(error)),
+    onError: (error) => setFormError(errorMessage(error, "ledger.error.save")),
   });
   const categoryMutation = useMutation({
     mutationFn: async (command: CategoryCommand) => {
@@ -120,7 +117,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       }
     },
     onError: async (error) => {
-      setCategoryError(errorMessage(error));
+      setCategoryError(errorMessage(error, "ledger.error.save"));
       if (isConflictError(error) && editingCategoryId) {
         const version = await resyncConflictVersion<LedgerSnapshot>(
           queryClient, ledgerQueryKey, invalidateSnapshots,

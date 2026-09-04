@@ -1,6 +1,7 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import type { ScrapComment, ScrapCommentFile, ScrapItem, ScrapKind, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
-import { formatTimestamp } from "@mono/domain";
+import { formatByteSize, formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
@@ -15,6 +16,7 @@ import { saveObjectUrlToDisk } from "../../infrastructure/media/save-file";
 import { scrapQueryKey, type ScrapRepository } from "./scrap-repository";
 import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type SortKey } from "./scrap-sort";
 import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
+import { ScrapTagManager } from "./ScrapTagManager";
 
 export { scrapQueryKey };
 
@@ -56,10 +58,6 @@ function splitCommentStrike(text: string): CommentTextSegment[] {
   return segments;
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
-}
-
 function commentTextSegmentsOf(text: string): CommentTextSegment[] {
   const segments: CommentTextSegment[] = [];
   let cursor = 0;
@@ -91,11 +89,6 @@ function submitFormOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
 
 function photoTitle(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").trim() || translate("common.media.photo");
-}
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 function isImageName(name: string) {
@@ -131,14 +124,6 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
-  const [tagSaving, setTagSaving] = useState(false);
-  const [tagInput, setTagInput] = useState("");
-  const [tagError, setTagError] = useState<string | null>(null);
-  const [editingTag, setEditingTag] = useState<string | null>(null);
-  const [deleteTagName, setDeleteTagName] = useState<string | null>(null);
-  const [replacementTag, setReplacementTag] = useState("");
-  const [tagDeletePending, setTagDeletePending] = useState(false);
-  const [tagDeleteError, setTagDeleteError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const handledModalRef = useRef(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -243,7 +228,6 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     setDraft({ ...blankDraft, tag: snapshot.tags.includes(translate("scrap.label.inbox")) ? translate("scrap.label.inbox") : snapshot.tags[0] ?? translate("scrap.label.inbox") });
     setFormError(null);
     setTagManagerOpen(false);
-    setTagError(null);
     setSearchParams({ modal: "new" }, { replace: true });
   }
 
@@ -253,8 +237,6 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     replacePhoto();
     setFormError(null);
     setTagManagerOpen(false);
-    setTagInput("");
-    setTagError(null);
     if (searchParams.has("modal")) setSearchParams({}, { replace: true });
   }
 
@@ -330,82 +312,6 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       setCommentErrors((current) => ({ ...current, [scrapId]: errorMessage(error) }));
     } finally {
       setCommentBusyId((current) => current === scrapId ? null : current);
-    }
-  }
-
-  function openTagManager() {
-    setTagInput("");
-    setTagError(null);
-    setEditingTag(null);
-    setTagManagerOpen(true);
-  }
-
-  function closeTagManager() {
-    if (tagSaving) return;
-    setTagManagerOpen(false);
-    setTagInput("");
-    setTagError(null);
-    setEditingTag(null);
-    setDeleteTagName(null);
-  }
-
-  function openDeleteTag(tag: string) {
-    const replacement = snapshot.tags.find((candidate) => candidate !== tag);
-    if (!replacement) return;
-    setDeleteTagName(tag);
-    setReplacementTag(replacement);
-    setTagDeleteError(null);
-  }
-
-  async function confirmDeleteTag() {
-    if (!deleteTagName || !replacementTag) return;
-    setTagDeletePending(true);
-    setTagDeleteError(null);
-    try {
-      await repository.deleteTag(deleteTagName, replacementTag);
-      await invalidateSnapshots();
-      changeActiveTag((current) => current === deleteTagName ? null : current);
-      setDraft((current) => current.tag === deleteTagName ? { ...current, tag: replacementTag } : current);
-      setEditingTag((current) => current === deleteTagName ? null : current);
-      setDeleteTagName(null);
-    } catch (error) {
-      setTagDeleteError(errorMessage(error));
-    } finally {
-      setTagDeletePending(false);
-    }
-  }
-
-  function editTag(tag: string) {
-    setEditingTag(tag);
-    setTagInput(tag);
-    setTagError(null);
-  }
-
-  async function commitTag() {
-    const tag = tagInput.trim();
-    if (!tag) {
-      setTagError(translate("common.validation.labelNameRequired"));
-      return;
-    }
-    setTagError(null);
-    setTagSaving(true);
-    try {
-      if (editingTag) {
-        await repository.renameTag(editingTag, tag);
-        await invalidateSnapshots();
-        changeActiveTag((current) => current === editingTag ? tag : current);
-        setDraft((current) => current.tag === editingTag ? { ...current, tag } : current);
-        setEditingTag(null);
-      } else {
-        await repository.addTag(tag);
-        await queryClient.invalidateQueries({ queryKey: scrapQueryKey });
-        setDraft((current) => ({ ...current, tag }));
-      }
-      setTagInput("");
-    } catch (error) {
-      setTagError(errorMessage(error));
-    } finally {
-      setTagSaving(false);
     }
   }
 
@@ -496,7 +402,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
         open={detail !== null}
         title={<span className="scrap-detail-title">{translate("app.navigation.scrap")}{detail && <small>{formatTimestamp(detail.savedAt)}</small>}</span>}
       >
-        {detail && <ScrapDetail item={detail} onManageTags={openTagManager} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
+        {detail && <ScrapDetail item={detail} onManageTags={() => setTagManagerOpen(true)} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
 
       <Modal
@@ -539,7 +445,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
                 {pendingPhoto.previewUrl
                   ? <img alt={translate("scrap.photo.previewLabel", { name: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
                   : <i className="scrap-photo-preview__file"><Icon name="file" size={19} strokeWidth={1.5} /></i>}
-                <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
+                <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatByteSize(pendingPhoto.file.size)}</small></span>
                 <Button disabled={createMutation.isPending} id={photoReplaceDomId} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("common.action.replace")}</Button>
                 <IconButton aria-label={translate("scrap.photo.removeLabel", { name: pendingPhoto.file.name })} disabled={createMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.photo.remove")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
               </div>
@@ -551,63 +457,28 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
             )}
           </div>
           <div className="scrap-create-form__label-field">
-            <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={createMutation.isPending} onClick={openTagManager} type="button">{translate("common.action.manage")}</button></div>
+            <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={createMutation.isPending} onClick={() => setTagManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
             <Select disabled={createMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
           </div>
           {formError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
-      <Modal className="scrap-label-manager-modal" icon="label" onClose={closeTagManager} open={tagManagerOpen} title={translate("common.labels.manage")}>
-        <div className="scrap-label-manager">
-          <div aria-label={translate("common.labels.current")} className="scrap-label-manager__list">
-            {snapshot.tags.map((tag) => (
-              <div className="scrap-label-manager__row" key={tag}>
-                <strong>{tag}</strong>
-                <span>{snapshot.items.filter((item) => item.tag === tag).length}{translate("common.unit.items")}</span>
-                <IconButton aria-label={translate("common.action.editLabel", { name: tag })} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                <IconButton aria-label={tag === translate("common.label.other") ? translate("common.action.deleteDisabledLabel", { name: tag }) : translate("common.action.deleteLabel", { name: tag })} disabled={tagSaving || tag === translate("common.label.other")} onClick={() => openDeleteTag(tag)} size="small" title={tag === translate("common.label.other") ? translate("common.labels.otherDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
-              </div>
-            ))}
-          </div>
-          <form aria-busy={tagSaving} className="scrap-label-create" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
-            <div className="scrap-label-create__header">
-              <strong>{editingTag ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
-              {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">{translate("common.action.cancel")}</button>}
-            </div>
-            <div className="scrap-label-create__controls">
-              <Input aria-label={translate("common.labels.name")} autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder={translate("common.labels.name")} value={tagInput} />
-              <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? translate("common.action.save") : translate("common.action.add")}</Button>
-            </div>
-            {tagError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
-          </form>
-        </div>
-      </Modal>
-
-      <Modal
-        className="scrap-label-delete-modal"
-        footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>{translate("common.action.cancel")}</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">{translate("common.action.delete")}</Button></>}
-        icon="alert"
-        onClose={() => { if (!tagDeletePending) setDeleteTagName(null); }}
-        open={deleteTagName !== null}
-        title={translate("common.labels.deleteTitle")}
-      >
-        <div className="scrap-label-delete">
-          <p>{translate("common.labels.deleteQuestion", { name: deleteTagName ?? "" })}</p>
-          <label>
-            <span>{translate("scrap.labels.moveExisting")}</span>
-            <Select
-              disabled={tagDeletePending}
-              label={translate("common.labels.moveTarget")}
-              onChange={setReplacementTag}
-              options={snapshot.tags.filter((tag) => tag !== deleteTagName).map((tag) => ({ value: tag, label: tag }))}
-              value={replacementTag}
-            />
-          </label>
-          <small>{translate("scrap.labels.moveDescription")}</small>
-          {tagDeleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
-        </div>
-      </Modal>
+      <ScrapTagManager
+        onClose={() => setTagManagerOpen(false)}
+        onTagAdded={(tag) => setDraft((current) => ({ ...current, tag }))}
+        onTagDeleted={(from, replacement) => {
+          changeActiveTag((current) => current === from ? null : current);
+          setDraft((current) => current.tag === from ? { ...current, tag: replacement } : current);
+        }}
+        onTagRenamed={(from, to) => {
+          changeActiveTag((current) => current === from ? to : current);
+          setDraft((current) => current.tag === from ? { ...current, tag: to } : current);
+        }}
+        open={tagManagerOpen}
+        repository={repository}
+        snapshot={snapshot}
+      />
     </div>
   );
 }
@@ -659,7 +530,7 @@ function MediaFileChip({ mediaId, name, size, className = "scrap-comment__file",
   return (
     <a className={className} download={name} href={href ?? undefined} rel="noreferrer" target="_blank">
       <Icon name="file" size={iconSize} strokeWidth={1.5} />
-      <span><strong title={name}>{name}</strong><small>{formatFileSize(size)}</small></span>
+      <span><strong title={name}>{name}</strong><small>{formatByteSize(size)}</small></span>
     </a>
   );
 }
@@ -820,7 +691,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onMan
             {pendingPhoto.previewUrl
               ? <img alt={translate("scrap.photo.previewLabel", { name: pendingPhoto.file.name })} src={pendingPhoto.previewUrl} />
               : <i className="scrap-photo-preview__file"><Icon name="file" size={19} strokeWidth={1.5} /></i>}
-            <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatFileSize(pendingPhoto.file.size)}</small></span>
+            <span><strong title={pendingPhoto.file.name}>{pendingPhoto.file.name}</strong><small>{formatByteSize(pendingPhoto.file.size)}</small></span>
             <Button disabled={editMutation.isPending} onClick={() => photoInputRef.current?.click()} size="small" type="button" variant="ghost">{translate("common.action.replace")}</Button>
             <IconButton aria-label={translate("scrap.photo.remove")} disabled={editMutation.isPending} onClick={removePhoto} size="small" title={translate("scrap.photo.remove")} type="button" variant="ghost"><Icon name="close" size={13} /></IconButton>
           </div>

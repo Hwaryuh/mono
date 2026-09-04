@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import { errorMessage } from "../../i18n/error-message";
 import { type TodoItem, type TodoLabel, type TodoSnapshot, type TodoWriteInput } from "@mono/contracts";
 import { Button, Checkbox, DatePicker, Icon, Modal, Select, TimePicker, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -63,10 +64,6 @@ function draftOf(item: TodoItem): Draft {
     dueTime: item.dueTime ?? "",
     note: item.note,
   };
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
 export function TodoPage({ repository, scrapRepository, viewStateStore }: { repository: TodoRepository; scrapRepository: ScrapRepository; viewStateStore?: TodoViewStateStore }) {
