@@ -618,4 +618,55 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(mediaStore.save).toHaveBeenCalledWith(mediaId, file));
     expect(addComment).toHaveBeenCalledWith("with-file", { text: "", file: { mediaId, name: "보고서.pdf", size: 5 } });
   });
+
+  it("댓글 입력에 클립보드 파일을 붙여넣으면 첨부로 잡힌다", async () => {
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "paste", kind: "text", title: "붙여넣기", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
+      "/scrap?detail=paste",
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const file = new File(["x"], "clip.png", { type: "image/png" });
+    fireEvent.paste(within(drawer).getByRole("textbox", { name: "새 댓글" }), { clipboardData: { files: [file], items: [] } });
+    expect(await within(drawer).findByText("clip.png")).toBeInTheDocument();
+    expect(within(drawer).getByAltText("첨부 이미지 미리보기")).toBeInTheDocument();
+  });
+
+  it("댓글 폼에 파일을 드롭하면 첨부로 잡힌다", async () => {
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "drop", kind: "text", title: "드롭", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
+      "/scrap?detail=drop",
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const file = new File(["x"], "dropped.pdf", { type: "application/pdf" });
+    const form = within(drawer).getByRole("textbox", { name: "새 댓글" }).closest("form")!;
+    fireEvent.drop(form, { dataTransfer: { files: [file], items: [], types: ["Files"] } });
+    expect(await within(drawer).findByText("dropped.pdf")).toBeInTheDocument();
+  });
+
+  it("스크랩 편집 모드에도 라벨 관리 버튼이 있다", async () => {
+    renderPage(
+      repositoryOf({ tags: ["수집", "기타"], items: [{ id: "edit-tag", kind: "text", title: "편집 라벨", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
+      "/scrap?detail=edit-tag",
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: "스크랩 수정" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "관리" }));
+    expect(await screen.findByRole("dialog", { name: "라벨 관리" })).toBeInTheDocument();
+  });
+
+  it("스크랩 사진을 클릭하면 라이트박스로 크게 열고 다운로드 링크를 준다", async () => {
+    const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:poster"), delete: vi.fn(async () => {}) };
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "poster", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }] }),
+      "/scrap?detail=poster",
+      undefined,
+      mediaStore,
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(await within(drawer).findByRole("button", { name: "크게 보기" }));
+    const lightbox = await screen.findByRole("dialog", { name: "포스터" });
+    expect(within(lightbox).getByRole("link", { name: "다운로드" })).toHaveAttribute("href", "blob:poster");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "포스터" })).not.toBeInTheDocument());
+  });
 });

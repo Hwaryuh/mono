@@ -41,6 +41,14 @@ const queryClient = new QueryClient({
   },
 });
 
+// 웹뷰 기본 컨텍스트 메뉴(이미지 새 창으로 열기, 뒤로 가기 등)는 설치형 앱에서 어울리지 않는다.
+// 텍스트 편집 필드와 선택된 텍스트 위에서만 남겨 복사·붙여넣기를 방해하지 않는다.
+document.addEventListener("contextmenu", (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("input, textarea, [contenteditable]") || window.getSelection()?.toString()) return;
+  event.preventDefault();
+});
+
 async function start() {
   const endpoint = PlatformApiEndpointProvider.of();
   configureApiBaseUrl(await endpoint.resolve());

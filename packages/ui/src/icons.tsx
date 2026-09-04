@@ -30,6 +30,7 @@ const paths = {
   arrowLeft: "M14 6l-6 6 6 6",
   arrowUp: "M12 19V5M6 11l6-6 6 6",
   arrowDown: "M12 5v14M6 13l6 6 6-6",
+  download: "M12 4v10M7 11l5 5 5-5M5 20h14",
   send: "M12 19V5M6 11l6-6 6 6",
   sparkles: "M12 4l1.8 4.7L18.5 10l-4.7 1.8L12 16.5l-1.8-4.7L5.5 10l4.7-1.3zM18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z",
   moon: "M20 15.2A8 8 0 018.8 4 8.5 8.5 0 1020 15.2z",

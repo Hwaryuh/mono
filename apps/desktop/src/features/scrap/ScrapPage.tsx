@@ -3,7 +3,8 @@ import type { ScrapComment, ScrapCommentFile, ScrapItem, ScrapKind, ScrapSnapsho
 import { formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
 import { httpGetBlob, isConflictError } from "../../infrastructure/http/http-client";
@@ -96,6 +97,20 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+function isImageName(name: string) {
+  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(name);
+}
+
+// dataTransfer / clipboard에서 첫 파일을 꺼낸다.
+function firstFileFrom(list: FileList | null | undefined, items?: DataTransferItemList): File | null {
+  if (list && list.length > 0) return list[0];
+  for (let index = 0; index < (items?.length ?? 0); index += 1) {
+    const file = items?.[index]?.kind === "file" ? items[index].getAsFile() : null;
+    if (file) return file;
+  }
+  return null;
+}
+
 export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewStateStore }: { repository: ScrapRepository; urlOpener?: ExternalUrlOpener; viewStateStore?: ScrapViewStateStore }) {
   const [store] = useState(() => viewStateStore ?? scrapViewStateStoreOf());
   const [viewState, setViewState] = useState(() => store.read());
@@ -104,6 +119,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   const [detailId, setDetailId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentFile, setCommentFile] = useState<File | null>(null);
+  const [commentPreviewUrl, setCommentPreviewUrl] = useState<string | null>(null);
+  const [commentDragging, setCommentDragging] = useState(false);
   const [commentBusyId, setCommentBusyId] = useState<string | null>(null);
   const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
   const commentFileInputRef = useRef<HTMLInputElement>(null);
@@ -190,6 +207,17 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
   }, []);
 
+  // 첨부가 이미지면 미리보기 object URL을 만들고, 첨부가 바뀌거나 사라지면 회수한다.
+  useEffect(() => {
+    if (!commentFile || !commentFile.type.startsWith("image/")) {
+      setCommentPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(commentFile);
+    setCommentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [commentFile]);
+
   useEffect(() => {
     const requestedId = searchParams.get("detail");
     if (requestedId && snapshotQuery.data?.items.some((item) => item.id === requestedId)) setDetailId(requestedId);
@@ -267,7 +295,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     requestAnimationFrame(() => document.getElementById(photoPickerDomId)?.focus());
   }
 
-  function chooseCommentFile(file: File | undefined) {
+  function chooseCommentFile(file: File | null | undefined) {
     if (commentFileInputRef.current) commentFileInputRef.current.value = "";
     if (!file) return;
     if (file.size === 0) { setCommentErrors((current) => detail ? { ...current, [detail.id]: translate("scrap.photo.readFailed") } : current); return; }
@@ -437,28 +465,37 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
 
       <Drawer
         className="scrap-detail-drawer"
-        footer={detail ? <form className="scrap-comment-form" onSubmit={submitComment}>
+        footer={detail ? <form
+          className={commentDragging ? "scrap-comment-form scrap-comment-form--dragging" : "scrap-comment-form"}
+          onDragOver={(event: DragEvent<HTMLFormElement>) => { if (commentBusyId !== detail.id && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setCommentDragging(true); } }}
+          onDragLeave={(event: DragEvent<HTMLFormElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCommentDragging(false); }}
+          onDrop={(event: DragEvent<HTMLFormElement>) => { event.preventDefault(); setCommentDragging(false); if (commentBusyId !== detail.id) chooseCommentFile(firstFileFrom(event.dataTransfer.files, event.dataTransfer.items)); }}
+          onSubmit={submitComment}
+        >
           <input aria-label={translate("scrap.comment.filePicker")} className="capture-file-input" disabled={commentBusyId === detail.id} onChange={(event) => chooseCommentFile(event.currentTarget.files?.[0])} ref={commentFileInputRef} tabIndex={-1} type="file" />
           {commentFile && (
             <div className="scrap-comment-form__file">
-              <Icon name="file" size={13} strokeWidth={1.5} />
+              {commentPreviewUrl
+                ? <img alt={translate("scrap.comment.imagePreview")} className="scrap-comment-form__thumb" src={commentPreviewUrl} />
+                : <Icon name="file" size={13} strokeWidth={1.5} />}
               <span title={commentFile.name}>{commentFile.name}</span>
               <IconButton aria-label={translate("scrap.comment.fileRemove")} disabled={commentBusyId === detail.id} onClick={() => setCommentFile(null)} size="small" title={translate("scrap.comment.fileRemove")} type="button" variant="ghost"><Icon name="close" size={12} /></IconButton>
             </div>
           )}
           <div className="scrap-comment-form__row">
-            <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
+            <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => { const file = firstFileFrom(event.clipboardData.files, event.clipboardData.items); if (file) { event.preventDefault(); chooseCommentFile(file); } }} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
             <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.5} /></IconButton>
             <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
           </div>
           {commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}
+          {commentDragging && <div className="scrap-comment-form__drop" aria-hidden="true"><Icon name="download" size={16} />{translate("scrap.comment.dropHint")}</div>}
         </form> : undefined}
         icon="scrap"
-        onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); setCommentFile(null); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
+        onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); setCommentFile(null); setCommentDragging(false); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
         title={<span className="scrap-detail-title">{translate("app.navigation.scrap")}{detail && <small>{formatTimestamp(detail.savedAt)}</small>}</span>}
       >
-        {detail && <ScrapDetail item={detail} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
+        {detail && <ScrapDetail item={detail} onManageTags={openTagManager} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
 
       <Modal
@@ -644,7 +681,7 @@ function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
   return <button className="scrap-list-card" onClick={onOpen} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div className="scrap-list-card__footer"><span>{item.tag}</span><span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
 }
 
-function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void }) {
+function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onManageTags }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void; onManageTags: () => void }) {
   const meta = kindMeta[item.kind];
   const externalUrl = item.url ? externalUrlOf(item.url) : null;
   const [editing, setEditing] = useState(false);
@@ -652,6 +689,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
   const [editError, setEditError] = useState<string | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoPreviewUrlRef = useRef<string | null>(null);
   const photoFileRef = useRef<File | null>(null);
@@ -762,12 +800,17 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
 
   return <div className="scrap-detail">{item.kind === "file" && item.mediaId
     ? <MediaFileChip className="scrap-detail__file" iconSize={18} mediaId={item.mediaId} name={item.fileName ?? translate("scrap.kind.file")} size={item.fileSize ?? 0} />
-    : item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
+    : item.kind === "image" && existingPhotoSrc
+      ? <button aria-label={translate("scrap.photo.zoom")} className="scrap-detail__media scrap-detail__media--zoomable" onClick={() => setLightboxSrc(existingPhotoSrc)} type="button"><img alt={item.title} src={existingPhotoSrc} /></button>
+      : item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
     <form className="scrap-detail__editor" onSubmit={submitEdit}>
       <label><span>{translate("common.field.title")}</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
       <label><span>{translate("common.field.note")}</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
       <label><span>{translate("scrap.field.optionalLink")}</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
-      <label><span>{translate("common.field.label")}</span><Select disabled={editMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} /></label>
+      <div className="scrap-create-form__label-field">
+        <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={editMutation.isPending} onClick={onManageTags} type="button">{translate("common.action.manage")}</button></div>
+        <Select disabled={editMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} />
+      </div>
       <div className="scrap-detail__editor-photo">
         <span className="scrap-detail__editor-photo-legend">{translate("scrap.field.optionalPhoto")}</span>
         <input aria-label={translate("scrap.photo.filePicker")} className="capture-file-input" disabled={editMutation.isPending} onChange={(event) => choosePhoto(event.currentTarget.files?.[0])} ref={photoInputRef} tabIndex={-1} type="file" />
@@ -803,10 +846,20 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete }: { i
       {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
     </form>
   ) : (<>
-    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label={translate("scrap.action.edit")} onClick={startEditing} size="small" title={translate("scrap.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label={translate("scrap.delete.title")} onClick={onRequestDelete} size="small" title={translate("scrap.delete.title")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={translate("common.link.openNewWindow", { url: item.url })}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>{translate("scrap.comment.title")}</strong><span>{item.comments.length}{translate("common.unit.items")}</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div></div>;
+    <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label={translate("scrap.action.edit")} onClick={startEditing} size="small" title={translate("scrap.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label={translate("scrap.delete.title")} onClick={onRequestDelete} size="small" title={translate("scrap.delete.title")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={translate("common.link.openNewWindow", { url: item.url })}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>{translate("scrap.comment.title")}</strong><span>{item.comments.length}{translate("common.unit.items")}</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} onZoom={setLightboxSrc} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div>{lightboxSrc && <ScrapImageLightbox name={item.title} onClose={() => setLightboxSrc(null)} src={lightboxSrc} />}</div>;
 }
 
-function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string; urlOpener: ExternalUrlOpener }) {
+function CommentImageAttachment({ file, onZoom }: { file: ScrapCommentFile; onZoom: (src: string) => void }) {
+  const { data: src } = useMedia(file.mediaId);
+  if (!src) return <MediaFileChip mediaId={file.mediaId} name={file.name} size={file.size} />;
+  return (
+    <button className="scrap-comment__image" onClick={() => onZoom(src)} title={translate("scrap.photo.zoom")} type="button">
+      <img alt={file.name} decoding="async" loading="lazy" src={src} />
+    </button>
+  );
+}
+
+function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { comment: ScrapComment; repository: ScrapRepository; scrapId: string; urlOpener: ExternalUrlOpener; onZoom: (src: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState(comment.text);
@@ -920,11 +973,38 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener }: { comment:
       ) : (
         <>
           {comment.text && <CommentContent text={comment.text} urlOpener={urlOpener} />}
-          {comment.file && <MediaFileChip mediaId={comment.file.mediaId} name={comment.file.name} size={comment.file.size} />}
+          {comment.file && (isImageName(comment.file.name)
+            ? <CommentImageAttachment file={comment.file} onZoom={onZoom} />
+            : <MediaFileChip mediaId={comment.file.mediaId} name={comment.file.name} size={comment.file.size} />)}
         </>
       )}
       {deleteError && <span className="scrap-comment__edit-error" role="alert">{deleteError}</span>}
     </article>
+  );
+}
+
+// 이미지 크게 보기. src는 이미 만들어 둔 blob: object URL이라 다운로드도 <a download>로 붙인다.
+// ponytail: <a download>는 WebView2·webkitgtk에선 저장 대화상자, macOS WKWebView에선 새 탭으로
+// 떨어질 수 있다 — MediaFileChip과 같은 한계. 제대로 하려면 tauri dialog+fs 플러그인.
+function ScrapImageLightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  const downloadName = isImageName(name) ? name : `${name || translate("common.media.photo")}.png`;
+
+  return createPortal(
+    <div aria-label={name} aria-modal="true" className="scrap-lightbox" onClick={onClose} role="dialog">
+      <div className="scrap-lightbox__bar" onClick={(event) => event.stopPropagation()}>
+        <span title={name}>{name}</span>
+        <a className="scrap-lightbox__action" download={downloadName} href={src} rel="noreferrer" target="_blank" title={translate("common.action.download")}><Icon name="download" size={16} /></a>
+        <button className="scrap-lightbox__action" onClick={onClose} title={translate("app.action.close")} type="button"><Icon name="close" size={16} /></button>
+      </div>
+      <img alt={name} onClick={(event) => event.stopPropagation()} src={src} />
+    </div>,
+    document.body,
   );
 }
 
