@@ -424,18 +424,27 @@ describe("AppShell", () => {
   }
 
   it("저장공간 설정에서 미사용 미디어를 확인한 뒤 정리한다", async () => {
-    const mediaMaintenance = new InMemoryMediaMaintenance({ count: 2, bytes: 1024 });
+    const mediaMaintenance = new InMemoryMediaMaintenance({ count: 2, bytes: 1024, totalCount: 5, totalBytes: 4096 });
     const section = await openStoragePanel(mediaMaintenance);
     expect(within(section).getByText("확인 필요")).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
     expect(await within(section).findByText("2개 · 1KB")).toBeInTheDocument();
+    expect(within(section).getByText(/5개/)).toBeInTheDocument();
     // 확인 단계는 아무것도 지우지 않는다.
-    expect(await mediaMaintenance.orphanUsage()).toEqual({ count: 2, bytes: 1024 });
+    expect(await mediaMaintenance.orphanUsage()).toEqual({ count: 2, bytes: 1024, totalCount: 5, totalBytes: 4096 });
 
     fireEvent.click(within(section).getByRole("button", { name: "정리" }));
     expect(await within(section).findByText("미디어 2개를 삭제했습니다.")).toBeInTheDocument();
-    expect(await mediaMaintenance.orphanUsage()).toEqual({ count: 0, bytes: 0 });
+    expect((await mediaMaintenance.orphanUsage()).count).toBe(0);
+  });
+
+  it("저장 사용량이 R2 무료 한도의 80%를 넘으면 경고한다", async () => {
+    const nineGb = 9 * 1024 * 1024 * 1024;
+    const mediaMaintenance = new InMemoryMediaMaintenance({ count: 0, bytes: 0, totalCount: 1200, totalBytes: nineGb });
+    const section = await openStoragePanel(mediaMaintenance);
+    fireEvent.click(within(section).getByRole("button", { name: "확인" }));
+    expect(await within(section).findByRole("alert")).toHaveTextContent("무료 저장 한도의 90%");
   });
 
   it("확인이 실패하면 오류만 알리고 정리 버튼을 비활성 상태로 둔다", async () => {

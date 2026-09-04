@@ -271,21 +271,42 @@ impl R2Client {
         Ok(())
     }
 
-    // ponytail: 페이지네이션 미구현 — R2 ListObjectsV2는 페이지당 1000개, 미디어 수가
-    // 그보다 적으면 무의미. 넘어가면 continuation-token 루프 추가.
+    // ListObjectsV2는 페이지당 최대 1000개 — IsTruncated면 continuation-token으로 이어 받는다.
+    // 미디어가 수천 개 쌓여도 전량을 세야 저장 용량 경고가 정확하다.
     async fn list_all(&self) -> ApiResult<Vec<(String, i64)>> {
         let uri = format!("/{}", uri_encode(&self.bucket, true));
-        let res = self
-            .signed(reqwest::Method::GET, &uri, "list-type=2", EMPTY_SHA256)
-            .send()
-            .await
-            .map_err(net_err)?;
-        if !res.status().is_success() {
-            return Err(status_err(res, "미디어 목록 조회").await);
+        let mut out = Vec::new();
+        let mut token: Option<String> = None;
+        loop {
+            let query = match &token {
+                Some(t) => format!("continuation-token={}&list-type=2", uri_encode(t, true)),
+                None => "list-type=2".to_string(),
+            };
+            let res = self
+                .signed(reqwest::Method::GET, &uri, &query, EMPTY_SHA256)
+                .send()
+                .await
+                .map_err(net_err)?;
+            if !res.status().is_success() {
+                return Err(status_err(res, "미디어 목록 조회").await);
+            }
+            let xml = res.text().await.map_err(net_err)?;
+            out.extend(parse_list_objects(&xml));
+            match next_continuation_token(&xml) {
+                Some(next) => token = Some(next),
+                None => break,
+            }
         }
-        let xml = res.text().await.map_err(net_err)?;
-        Ok(parse_list_objects(&xml))
+        Ok(out)
     }
+}
+
+// ListObjectsV2 응답이 잘렸으면 다음 페이지 토큰을 돌려준다. base64 토큰이라 XML escape 없음.
+fn next_continuation_token(xml: &str) -> Option<String> {
+    if tag_text(xml, "IsTruncated").map(str::trim) != Some("true") {
+        return None;
+    }
+    tag_text(xml, "NextContinuationToken").map(|t| t.trim().to_string())
 }
 
 fn net_err(error: reqwest::Error) -> ApiError {
@@ -529,9 +550,15 @@ async fn orphan_stats_handler(State(state): State<SecretState>) -> ApiResult<Jso
         referenced_media_ids(&conn)?
     };
     let objects = client_from(&state)?.list_all().await?;
+    let total_bytes: i64 = objects.iter().map(|(_, size)| size).sum();
     let orphans = orphans_of(&objects, &referenced);
-    let bytes: i64 = orphans.iter().map(|(_, size)| size).sum();
-    Ok(Json(json!({ "count": orphans.len(), "bytes": bytes })))
+    let orphan_bytes: i64 = orphans.iter().map(|(_, size)| size).sum();
+    Ok(Json(json!({
+        "count": orphans.len(),
+        "bytes": orphan_bytes,
+        "totalCount": objects.len(),
+        "totalBytes": total_bytes,
+    })))
 }
 
 async fn credentials_test_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> {
@@ -624,6 +651,14 @@ mod tests {
             parse_list_objects(xml),
             vec![("a".to_string(), 10), ("b".to_string(), 20)]
         );
+    }
+
+    #[test]
+    fn continuation_token_only_when_truncated() {
+        let truncated = "<Result><IsTruncated>true</IsTruncated><NextContinuationToken>abc/def+123=</NextContinuationToken></Result>";
+        assert_eq!(next_continuation_token(truncated).as_deref(), Some("abc/def+123="));
+        let done = "<Result><IsTruncated>false</IsTruncated></Result>";
+        assert_eq!(next_continuation_token(done), None);
     }
 
     #[test]

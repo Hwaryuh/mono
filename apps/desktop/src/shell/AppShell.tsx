@@ -12,7 +12,7 @@ import { useNavigate } from "react-router";
 import { currentIsoDate } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
-import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
+import { InMemoryMediaMaintenance, R2_FREE_STORAGE_BYTES, type MediaMaintenance, type OrphanMediaUsage } from "../infrastructure/media/media-maintenance";
 import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
 import {
   looksLikeRemoteApiUrl,
@@ -539,7 +539,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
  * 확인·정리 버튼만 누르면 된다 — keepIds를 직접 모아 넘기던 예전 방식은 없앴다.
  */
 function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMaintenance }) {
-  const [usage, setUsage] = useState<{ count: number; bytes: number } | null>(null);
+  const [usage, setUsage] = useState<OrphanMediaUsage | null>(null);
   const [pending, setPending] = useState<"scan" | "clean" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -565,6 +565,22 @@ function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMai
           <strong>{translate("settings.storage.unusedMedia")}</strong>
           <span>{translate("settings.storage.unusedMediaDescription")}</span>
         </header>
+        {usage !== null && usage.totalCount > 0 && (
+          <div className="settings-ai__status">
+            <span>{translate("settings.storage.totalUsage")}</span>
+            <strong>{translate("settings.storage.totalUsageSummary", {
+              size: formatMediaSize(usage.totalBytes),
+              limit: formatMediaSize(R2_FREE_STORAGE_BYTES),
+              percent: Math.round((usage.totalBytes / R2_FREE_STORAGE_BYTES) * 100),
+              count: usage.totalCount,
+            })}</strong>
+          </div>
+        )}
+        {usage !== null && usage.totalCount > 0 && usage.totalBytes >= R2_FREE_STORAGE_BYTES * 0.8 && (
+          <p className="settings-ai__error" role="alert">
+            {translate("settings.storage.limitWarning", { percent: Math.round((usage.totalBytes / R2_FREE_STORAGE_BYTES) * 100) })}
+          </p>
+        )}
         <div className="settings-ai__status">
           <span>{translate("settings.storage.cleanupTarget")}</span>
           <strong>
@@ -580,7 +596,7 @@ function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMai
             loading={pending === "clean"}
             onClick={() => void run("clean", async () => {
               const deleted = await mediaMaintenance.gc();
-              setUsage({ count: 0, bytes: 0 });
+              setUsage((prev) => prev ? { ...prev, count: 0, bytes: 0, totalCount: prev.totalCount - prev.count, totalBytes: prev.totalBytes - prev.bytes } : prev);
               setMessage(translate("settings.storage.cleanupResult", { count: deleted }));
             })}
             type="button"
