@@ -111,6 +111,24 @@ fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
+/// 미디어(사진·파일)를 사용자가 고른 경로에 저장한다. 취소하면 false.
+/// 웹뷰의 <a download>는 macOS에서 경로 선택 없이 다운로드 폴더로만 떨어져서, 여기서 처리한다.
+#[tauri::command]
+async fn save_media_file(
+    app: tauri::AppHandle,
+    name: String,
+    bytes: Vec<u8>,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    // async 커맨드는 메인 스레드가 아니므로 blocking 대화상자를 써도 된다.
+    let Some(target) = app.dialog().file().set_file_name(&name).blocking_save_file() else {
+        return Ok(false);
+    };
+    let path = target.into_path().map_err(|error| error.to_string())?;
+    std::fs::write(&path, &bytes).map_err(|error| format!("파일 저장 실패: {error}"))?;
+    Ok(true)
+}
+
 // 앱 상태 원본은 API 서버의 SQLite다(architecture-decisions.md §9).
 // 임베드 모드: mono_api::spawn이 127.0.0.1:4174를 점유한다 — 서버 없이도 단독 실행.
 // 멀티 기기 공유: crates/mono-api의 standalone 바이너리를 홈서버/VPS에서 돌리고
@@ -119,7 +137,8 @@ fn restart_app(app: tauri::AppHandle) {
 pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init());
 
     // 자동 업데이트는 데스크톱 전용. 모바일 타깃에는 updater/process 플러그인이 없다.
     #[cfg(desktop)]
@@ -137,6 +156,7 @@ pub fn run() {
             server_connection,
             save_server_connection,
             restart_app,
+            save_media_file,
             alarm::alarm_start,
             alarm::alarm_stop
         ])

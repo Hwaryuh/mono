@@ -20,6 +20,7 @@ serde_json = "1"
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
 url = "2"
 
 # 타이머 알람 — 웹뷰 밖 OS 오디오에 직접 재생해 창이 가려져도 울린다.

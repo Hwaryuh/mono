@@ -11,6 +11,7 @@ import { httpGetBlob, isConflictError } from "../../infrastructure/http/http-cli
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
 import { newMediaId } from "../../infrastructure/media/media-store";
+import { saveObjectUrlToDisk } from "../../infrastructure/media/save-file";
 import { scrapQueryKey, type ScrapRepository } from "./scrap-repository";
 import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type SortKey } from "./scrap-sort";
 import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
@@ -983,10 +984,11 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
   );
 }
 
-// 이미지 크게 보기. src는 이미 만들어 둔 blob: object URL이라 다운로드도 <a download>로 붙인다.
-// ponytail: <a download>는 WebView2·webkitgtk에선 저장 대화상자, macOS WKWebView에선 새 탭으로
-// 떨어질 수 있다 — MediaFileChip과 같은 한계. 제대로 하려면 tauri dialog+fs 플러그인.
+// 이미지 크게 보기. 다운로드는 blob: object URL에서 원본을 되찾아 네이티브 저장 대화상자로.
 function ScrapImageLightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } };
     document.addEventListener("keydown", onKey, true);
@@ -995,11 +997,23 @@ function ScrapImageLightbox({ src, name, onClose }: { src: string; name: string;
 
   const downloadName = isImageName(name) ? name : `${name || translate("common.media.photo")}.png`;
 
+  async function download() {
+    setSaving(true);
+    setSaveError(false);
+    try {
+      await saveObjectUrlToDisk(src, downloadName);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return createPortal(
     <div aria-label={name} aria-modal="true" className="scrap-lightbox" onClick={onClose} role="dialog">
       <div className="scrap-lightbox__bar" onClick={(event) => event.stopPropagation()}>
-        <span title={name}>{name}</span>
-        <a className="scrap-lightbox__action" download={downloadName} href={src} rel="noreferrer" target="_blank" title={translate("common.action.download")}><Icon name="download" size={16} /></a>
+        <span title={name}>{saveError ? translate("common.error.actionFailed") : name}</span>
+        <button className="scrap-lightbox__action" disabled={saving} onClick={download} title={translate("common.action.download")} type="button"><Icon name="download" size={16} /></button>
         <button className="scrap-lightbox__action" onClick={onClose} title={translate("app.action.close")} type="button"><Icon name="close" size={16} /></button>
       </div>
       <img alt={name} onClick={(event) => event.stopPropagation()} src={src} />

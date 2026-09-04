@@ -654,7 +654,7 @@ describe("ScrapPage", () => {
     expect(await screen.findByRole("dialog", { name: "라벨 관리" })).toBeInTheDocument();
   });
 
-  it("스크랩 사진을 클릭하면 라이트박스로 크게 열고 다운로드 링크를 준다", async () => {
+  it("스크랩 사진을 클릭하면 라이트박스로 크게 열고 다운로드·닫기를 준다", async () => {
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:poster"), delete: vi.fn(async () => {}) };
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "poster", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }] }),
@@ -665,7 +665,7 @@ describe("ScrapPage", () => {
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
     fireEvent.click(await within(drawer).findByRole("button", { name: "크게 보기" }));
     const lightbox = await screen.findByRole("dialog", { name: "포스터" });
-    expect(within(lightbox).getByRole("link", { name: "다운로드" })).toHaveAttribute("href", "blob:poster");
+    expect(within(lightbox).getByRole("button", { name: "다운로드" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "포스터" })).not.toBeInTheDocument());
   });
