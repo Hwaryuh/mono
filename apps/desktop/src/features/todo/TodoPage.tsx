@@ -353,7 +353,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
         title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.action.edit")}
       >
         <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
-          <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><ScrapMentionInput ariaLabel={translate("todo.field.title")} autoFocus maxLength={500} onChange={(title) => setDraft((current) => ({ ...current, title }))} onNavigateMention={navigateToScrap} placeholder={translate("todo.mention.hint")} scraps={scraps} value={draft.title} /></label>
+          <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><ScrapMentionInput ariaLabel={translate("todo.field.title")} autoFocus maxLength={500} onChange={(title) => setDraft((current) => ({ ...current, title }))} onNavigateMention={navigateToScrap} scraps={scraps} value={draft.title} /></label>
           <div className="todo-editor__field">
             <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={openLabelManager} type="button">{translate("common.action.manage")}</button></div>
             <Select

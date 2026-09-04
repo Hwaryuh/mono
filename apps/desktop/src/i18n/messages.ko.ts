@@ -429,7 +429,6 @@ export const koMessages = {
   "todo.status.dueAt": "기한: {date}{time}",
   "todo.action.editLabel": "{title} 수정",
   "todo.note.present": "메모 있음",
-  "todo.mention.hint": "#로 스크랩 연결",
   "todo.mention.missing": "(삭제된 스크랩)",
   "todo.mention.untitled": "제목 없음",
   "todo.mention.openLabel": "스크랩 열기: {title}",
