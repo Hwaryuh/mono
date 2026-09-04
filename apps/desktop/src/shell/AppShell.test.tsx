@@ -40,7 +40,7 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
             <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />}>
               <Route path="dashboard" element={<div>대시보드 경로</div>} />
               <Route path="inbox" element={<div>수집함 경로</div>} />
-              <Route path="todo" element={<TodoPage repository={todoRepository} viewStateStore={todoViewStateStore} />} />
+              <Route path="todo" element={<TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} />} />
               <Route path="calendar" element={<CalendarPage repository={calendarRepository} />} />
               <Route path="scrap" element={<ScrapPage repository={scrapRepository} />} />
               <Route path="ledger" element={<LedgerPage repository={ledgerRepository} />} />

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { createMockDashboardRepository } from "../../infrastructure/mock/mock-dashboard-repository";
+import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import type { DashboardRepository } from "./dashboard-repository";
 import { DashboardPage } from "./DashboardPage";
 
@@ -10,7 +11,7 @@ function renderDashboard(repository: DashboardRepository = createMockDashboardRe
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter><DashboardPage repository={repository} /></MemoryRouter>
+      <MemoryRouter><DashboardPage repository={repository} scrapRepository={createMockScrapRepository()} /></MemoryRouter>
     </QueryClientProvider>,
   );
   return { repository };

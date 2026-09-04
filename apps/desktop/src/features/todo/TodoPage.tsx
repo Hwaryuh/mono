@@ -1,11 +1,15 @@
 import { translate } from "../../i18n/i18n";
 import { type TodoItem, type TodoLabel, type TodoSnapshot, type TodoWriteInput } from "@mono/contracts";
-import { Button, Checkbox, DatePicker, Icon, Input, Modal, Select, TextArea, TimePicker, type IconName } from "@mono/ui";
+import { Button, Checkbox, DatePicker, Icon, Modal, Select, TimePicker, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
+import { scrapQueryKey, type ScrapRepository } from "../scrap/scrap-repository";
+import { ScrapMentionInput } from "./ScrapMentionInput";
+import { ScrapText } from "./ScrapText";
+import { resolveScrapMentions, type ScrapRef } from "./scrap-mention";
 import { TodoLabelManagerModal } from "./TodoLabelManagerModal";
 import type { TodoRepository } from "./todo-repository";
 import {
@@ -65,7 +69,7 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : translate("common.error.actionFailed");
 }
 
-export function TodoPage({ repository, viewStateStore }: { repository: TodoRepository; viewStateStore?: TodoViewStateStore }) {
+export function TodoPage({ repository, scrapRepository, viewStateStore }: { repository: TodoRepository; scrapRepository: ScrapRepository; viewStateStore?: TodoViewStateStore }) {
   const [store] = useState(() => viewStateStore ?? todoViewStateStoreOf());
   const [viewState, setViewState] = useState(() => store.read());
   const { status, labelIds } = viewState;
@@ -73,6 +77,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   const [draft, setDraft] = useState<Draft>({ title: "", labelId: "", dueDate: "", dueTime: "", note: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pendingMention, setPendingMention] = useState<string | null>(null);
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
   const handledNewParamRef = useRef(false);
   const focusAfterDeleteRef = useRef(false);
@@ -80,6 +85,8 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const snapshotQuery = useQuery({ queryKey: todoQueryKey, queryFn: () => repository.getSnapshot() });
+  const scrapQuery = useQuery({ queryKey: scrapQueryKey, queryFn: () => scrapRepository.getSnapshot() });
+  const scraps: ScrapRef[] = (scrapQuery.data?.items ?? []).map((item) => ({ id: item.id, title: item.title }));
 
   const invalidateSnapshots = async () => {
     await Promise.all([
@@ -160,6 +167,14 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
   const title = labelIds.length > 0 ? translate("todo.list.filteredLabel") : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const savedDraft = editorItem === "new" ? blankDraft(snapshot.labels) : activeEditorItem ? draftOf(activeEditorItem) : null;
+  const editorDirty = savedDraft !== null && (Object.keys(savedDraft) as (keyof Draft)[]).some((key) => draft[key] !== savedDraft[key]);
+
+  function navigateToScrap(scrapId: string) {
+    if (editorDirty) { setPendingMention(scrapId); return; }
+    closeEditor(true);
+    navigate(`/scrap?detail=${encodeURIComponent(scrapId)}`);
+  }
 
   function selectStatus(nextStatus: TodoStatus, focus = false) {
     setViewState((current) => {
@@ -314,7 +329,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
         <div className="todo-list">
           {visibleItems.map((item) => {
             const label = snapshot.labels.find((candidate) => candidate.id === item.labelId) ?? snapshot.labels[0];
-            return <TodoRow item={item} key={item.id} label={label} onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)} repository={repository} snapshot={snapshot} />;
+            return <TodoRow item={item} key={item.id} label={label} onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)} repository={repository} scraps={scraps} snapshot={snapshot} />;
           })}
           {visibleItems.length === 0 && snapshot.items.length > 0 && (
             <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.filteredTitle")}</strong><span>{translate("todo.empty.filteredDescription")}</span></div>
@@ -338,7 +353,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
         title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.action.edit")}
       >
         <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
-          <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} /></label>
+          <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><ScrapMentionInput ariaLabel={translate("todo.field.title")} autoFocus maxLength={500} onChange={(title) => setDraft((current) => ({ ...current, title }))} onNavigateMention={navigateToScrap} placeholder={translate("todo.mention.hint")} scraps={scraps} value={draft.title} /></label>
           <div className="todo-editor__field">
             <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={openLabelManager} type="button">{translate("common.action.manage")}</button></div>
             <Select
@@ -352,7 +367,7 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
             <fieldset><legend>{translate("todo.field.dueDate")}</legend><DatePicker label={translate("todo.field.dueDate")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
             <label><span>{translate("todo.field.time")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.field.dueTime")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
           </div>
-          <label><span>{translate("common.field.note")}</span><TextArea onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} rows={4} value={draft.note} /></label>
+          <label><span>{translate("common.field.note")}</span><ScrapMentionInput ariaLabel={translate("common.field.note")} maxLength={4000} multiline onChange={(note) => setDraft((current) => ({ ...current, note }))} onNavigateMention={navigateToScrap} placeholder={translate("common.field.notePlaceholder")} scraps={scraps} value={draft.note} /></label>
           {formError && !deleteOpen && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
@@ -383,14 +398,39 @@ export function TodoPage({ repository, viewStateStore }: { repository: TodoRepos
         title={translate("todo.delete.question")}
       >
         <p>{translate("todo.delete.warning")}</p>
-        <blockquote>{activeEditorItem?.title}</blockquote>
+        <blockquote>{activeEditorItem ? resolveScrapMentions(activeEditorItem.title, scraps) : null}</blockquote>
         {formError && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+      </Modal>
+
+      <Modal
+        className="todo-delete-modal"
+        footer={<>
+          <Button autoFocus onClick={() => setPendingMention(null)}>{translate("common.action.cancel")}</Button>
+          <Button
+            onClick={() => {
+              const scrapId = pendingMention;
+              setPendingMention(null);
+              closeEditor(true);
+              if (scrapId) navigate(`/scrap?detail=${encodeURIComponent(scrapId)}`);
+            }}
+            variant="primary"
+          >
+            {translate("todo.mention.leaveConfirm")}
+          </Button>
+        </>}
+        icon="scrap"
+        onClose={() => setPendingMention(null)}
+        open={pendingMention !== null}
+        title={translate("todo.mention.leaveTitle")}
+      >
+        <p>{translate("todo.mention.leaveWarning")}</p>
       </Modal>
     </div>
   );
 }
 
-function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem; label: TodoLabel; snapshot: TodoSnapshot; repository: TodoRepository; onOpen: () => void }) {
+function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: TodoItem; label: TodoLabel; snapshot: TodoSnapshot; repository: TodoRepository; scraps: ScrapRef[]; onOpen: () => void }) {
+  const displayTitle = resolveScrapMentions(item.title, scraps);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const rowRef = useRef<HTMLElement>(null);
   const previousTopRef = useRef<number | null>(null);
@@ -444,11 +484,12 @@ function TodoRow({ item, label, snapshot, repository, onOpen }: { item: TodoItem
       className={`todo-item ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
       ref={rowRef}
     >
-      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: item.title, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
-      <button aria-label={translate("todo.action.editLabel", { title: item.title })} className="todo-item__open" disabled={toggleMutation.isPending} onClick={onOpen} type="button">
-        <span className="todo-item__copy"><strong>{item.title}</strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
+      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
+      <div className="todo-item__open">
+        <span className="todo-item__copy"><strong><ScrapText scraps={scraps} text={item.title} /></strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
         <Icon name="chevronRight" size={13} />
-      </button>
+        <button aria-label={translate("todo.action.editLabel", { title: displayTitle })} className="todo-item__hit" disabled={toggleMutation.isPending} onClick={onOpen} type="button" />
+      </div>
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
     </article>
   );

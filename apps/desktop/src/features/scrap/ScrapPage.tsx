@@ -10,11 +10,11 @@ import { httpGetBlob, isConflictError } from "../../infrastructure/http/http-cli
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import { useMedia, useMediaStore } from "../../infrastructure/media/media-store-context";
 import { newMediaId } from "../../infrastructure/media/media-store";
-import type { ScrapRepository } from "./scrap-repository";
+import { scrapQueryKey, type ScrapRepository } from "./scrap-repository";
 import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type SortKey } from "./scrap-sort";
 import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
 
-export const scrapQueryKey = ["scrap"] as const;
+export { scrapQueryKey };
 
 const kindMeta: Record<ScrapKind, { icon: IconName; label: string }> = {
   image: { icon: "image", label: translate("scrap.kind.image") },

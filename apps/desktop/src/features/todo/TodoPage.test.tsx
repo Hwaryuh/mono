@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
+import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import type { TodoRepository } from "./todo-repository";
 import { TodoPage } from "./TodoPage";
 
@@ -10,10 +11,17 @@ function renderTodo(repository: TodoRepository = createMockTodoRepository(), ini
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}><TodoPage repository={repository} /></MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}><TodoPage repository={repository} scrapRepository={createMockScrapRepository()} /></MemoryRouter>
     </QueryClientProvider>,
   );
   return { repository };
+}
+
+// 제목·메모는 contenteditable(ScrapMentionInput)이라 fireEvent.change 대신 textContent + input.
+function typeInto(field: HTMLElement, value: string) {
+  field.focus();
+  field.textContent = value;
+  fireEvent.input(field);
 }
 
 function repositoryOf(base: TodoRepository, overrides: Partial<TodoRepository> = {}): TodoRepository {
@@ -49,7 +57,7 @@ describe("TodoPage", () => {
     renderTodo(createMockTodoRepository(), "/todo?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 할 일" });
     expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
-    fireEvent.change(within(modal).getByRole("textbox", { name: /제목/ }), { target: { value: "분기 보고서 제출" } });
+    typeInto(within(modal).getByRole("textbox", { name: "제목" }), "분기 보고서 제출");
     fireEvent.click(within(modal).getByRole("combobox", { name: "라벨" }));
     fireEvent.click(screen.getByRole("option", { name: "업무" }));
     fireEvent.click(within(modal).getByRole("button", { name: "생성" }));
@@ -57,11 +65,60 @@ describe("TodoPage", () => {
     const editButton = await screen.findByRole("button", { name: "분기 보고서 제출 수정" });
     fireEvent.click(editButton);
     modal = screen.getByRole("dialog", { name: "할 일 수정" });
-    fireEvent.change(within(modal).getByRole("textbox", { name: /제목/ }), { target: { value: "분기 보고서 최종 제출" } });
+    typeInto(within(modal).getByRole("textbox", { name: "제목" }), "분기 보고서 최종 제출");
     fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
 
     expect(await screen.findByText("분기 보고서 최종 제출")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "할 일 수정" })).not.toBeInTheDocument());
+  });
+
+  it("제목의 스크랩 토큰을 목록에서 현재 이름의 링크로 보여준다", async () => {
+    const base = createMockTodoRepository();
+    const snapshot = await base.getSnapshot();
+    const repository = repositoryOf(base, {
+      getSnapshot: async () => ({
+        ...snapshot,
+        items: snapshot.items.map((item, index) =>
+          index === 0
+            ? { ...item, title: "장소 확정 @[scrap:scrap-3]", done: false, routineId: null, occurrenceDate: null }
+            : item,
+        ),
+      }),
+    });
+    renderTodo(repository);
+    const link = await screen.findByRole("link", { name: "스크랩 열기: 합주실 후보 정리" });
+    expect(link).toHaveTextContent("#합주실 후보 정리");
+    expect(link).toHaveAttribute("href", expect.stringContaining("detail=scrap-3"));
+  });
+
+  it("편집한 상태에서 멘션 칩을 누르면 이동 전에 확인을 받는다", async () => {
+    const base = createMockTodoRepository();
+    const snapshot = await base.getSnapshot();
+    const repository = repositoryOf(base, {
+      getSnapshot: async () => ({
+        ...snapshot,
+        items: snapshot.items.map((item, index) =>
+          index === 0
+            ? { ...item, title: "칩 테스트", note: "here @[scrap:scrap-1]", done: false, routineId: null, occurrenceDate: null }
+            : item,
+        ),
+      }),
+    });
+    renderTodo(repository);
+    fireEvent.click(await screen.findByRole("button", { name: "칩 테스트 수정" }));
+    const modal = await screen.findByRole("dialog", { name: "할 일 수정" });
+
+    // 편집 없이 누르면 확인 없이 에디터가 닫힌다.
+    fireEvent.click(within(modal).getByText("#들기름 파스타 레시피"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "할 일 수정" })).not.toBeInTheDocument());
+    expect(screen.queryByText("저장하지 않은 변경사항은 사라집니다. 스크랩으로 이동할까요?")).not.toBeInTheDocument();
+
+    // 다시 열어 제목을 고치면 확인을 받는다.
+    fireEvent.click(await screen.findByRole("button", { name: "칩 테스트 수정" }));
+    const reopened = await screen.findByRole("dialog", { name: "할 일 수정" });
+    typeInto(within(reopened).getByRole("textbox", { name: "제목" }), "칩 테스트 수정본");
+    fireEvent.click(within(reopened).getByText("#들기름 파스타 레시피"));
+    expect(await screen.findByText("저장하지 않은 변경사항은 사라집니다. 스크랩으로 이동할까요?")).toBeInTheDocument();
   });
 
   it("일정과 같은 날짜 선택기로 마감일을 수정한다", async () => {

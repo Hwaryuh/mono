@@ -6,6 +6,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { DashboardRepository } from "./dashboard-repository";
 import { dashboardQueryKey, QuickCapture } from "./QuickCapture";
+import { scrapQueryKey, type ScrapRepository } from "../scrap/scrap-repository";
+import { resolveScrapMentions, type ScrapRef } from "../todo/scrap-mention";
+import { ScrapText } from "../todo/ScrapText";
 
 function formatWon(amount: number) {
   return `₩ ${amount.toLocaleString("ko-KR")}`;
@@ -50,9 +53,11 @@ function ErrorState() {
   );
 }
 
-export function DashboardPage({ repository }: { repository: DashboardRepository }) {
+export function DashboardPage({ repository, scrapRepository }: { repository: DashboardRepository; scrapRepository: ScrapRepository }) {
   const queryClient = useQueryClient();
   const snapshotQuery = useQuery({ queryKey: dashboardQueryKey, queryFn: () => repository.getSnapshot() });
+  const scrapQuery = useQuery({ queryKey: scrapQueryKey, queryFn: () => scrapRepository.getSnapshot() });
+  const scraps: ScrapRef[] = (scrapQuery.data?.items ?? []).map((item) => ({ id: item.id, title: item.title }));
   const toggleTaskMutation = useMutation({
     mutationFn: (taskId: string) => repository.toggleTask(taskId),
     onSuccess: async () => {
@@ -76,7 +81,7 @@ export function DashboardPage({ repository }: { repository: DashboardRepository 
       </Card>
 
       <div className="dashboard-grid">
-        <TodayTasks snapshot={snapshot} onToggle={(taskId) => toggleTaskMutation.mutate(taskId)} />
+        <TodayTasks scraps={scraps} snapshot={snapshot} onToggle={(taskId) => toggleTaskMutation.mutate(taskId)} />
         <TodayEvents snapshot={snapshot} />
         <MonthlyExpense snapshot={snapshot} />
         <RoutineWidget snapshot={snapshot} />
@@ -86,19 +91,22 @@ export function DashboardPage({ repository }: { repository: DashboardRepository 
   );
 }
 
-function TodayTasks({ snapshot, onToggle }: { snapshot: DashboardSnapshot; onToggle: (taskId: string) => void }) {
+function TodayTasks({ snapshot, scraps, onToggle }: { snapshot: DashboardSnapshot; scraps: ScrapRef[]; onToggle: (taskId: string) => void }) {
   return (
     <Widget icon="todo" title={translate("dashboard.todayTodos.title")} to="/todo" wide>
       {snapshot.tasks.length === 0 ? <WidgetEmpty icon="todo">{translate("dashboard.todayTodos.empty")}</WidgetEmpty> : (
         <div className="task-list">
-          {snapshot.tasks.slice(0, 3).map((task) => (
+          {snapshot.tasks.slice(0, 3).map((task) => {
+            const title = resolveScrapMentions(task.title, scraps);
+            return (
             <div className={`task-row ${task.done ? "task-row--done" : ""}`} key={task.id}>
-              <Checkbox checked={task.done} label={translate("routine.action.toggleCompletion", { title: task.title, state: task.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => onToggle(task.id)} />
-              <span className="task-row__title">{task.title}</span>
+              <Checkbox checked={task.done} label={translate("routine.action.toggleCompletion", { title, state: task.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => onToggle(task.id)} />
+              <span className="task-row__title"><ScrapText scraps={scraps} text={task.title} /></span>
               {task.isRoutine && <Badge>{translate("app.navigation.routine")}</Badge>}
               <Chip dotColor={task.labelColor}>{task.label}</Chip>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Widget>

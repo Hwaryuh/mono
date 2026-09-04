@@ -1,5 +1,7 @@
 import type { ScrapCommentInput, ScrapSnapshot, ScrapWriteInput } from "@mono/contracts";
 
+export const scrapQueryKey = ["scrap"] as const;
+
 export interface ScrapCommentRepository {
   addComment(scrapId: string, input: ScrapCommentInput): Promise<void>;
   updateComment(scrapId: string, commentId: string, input: ScrapCommentInput, expectedVersion?: number): Promise<void>;

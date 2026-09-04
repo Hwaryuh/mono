@@ -26,7 +26,7 @@ describe("빠른 캡처에서 수집함 흐름", () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/dashboard"]}>
           <Routes>
-            <Route path="dashboard" element={<DashboardPage repository={dashboardRepository} />} />
+            <Route path="dashboard" element={<DashboardPage repository={dashboardRepository} scrapRepository={scrapRepository} />} />
             <Route path="inbox" element={<InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={inboxRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} />} />
           </Routes>
         </MemoryRouter>

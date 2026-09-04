@@ -47,9 +47,9 @@ export function createAppRouter(
       errorElement: <RouteErrorScreen />,
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },
-        { path: "dashboard", element: <DashboardPage repository={dashboardRepository} /> },
+        { path: "dashboard", element: <DashboardPage repository={dashboardRepository} scrapRepository={scrapRepository} /> },
         { path: "inbox", element: <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={inboxRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} viewStateStore={inboxViewStateStore} /> },
-        { path: "todo", element: <TodoPage repository={todoRepository} viewStateStore={todoViewStateStore} /> },
+        { path: "todo", element: <TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} /> },
         { path: "routine", element: <RoutinePage repository={routineRepository} todoRepository={todoRepository} /> },
         { path: "timer", element: <TimerPage repository={todoRepository} /> },
         { path: "calendar", element: <CalendarPage repository={calendarRepository} viewStateStore={calendarViewStateStore} /> },
