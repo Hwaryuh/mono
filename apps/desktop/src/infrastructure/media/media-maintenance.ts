@@ -4,8 +4,10 @@
  */
 export type OrphanMediaUsage = { count: number; bytes: number; totalCount: number; totalBytes: number };
 
-/** R2 무료 한도: Standard 저장 10 GB·월. 초과분은 GB당 월 $0.015. */
+/** R2 무료 한도 (월, 계정 단위). 초과분: 저장 $0.015/GB, Class A $4.50/M, Class B $0.36/M. */
 export const R2_FREE_STORAGE_BYTES = 10 * 1024 * 1024 * 1024;
+export const R2_FREE_CLASS_A = 1_000_000;
+export const R2_FREE_CLASS_B = 10_000_000;
 
 /** 고아 미디어(참조 없는 R2 객체) 정리. 참조 목록은 서버가 자체 DB에서 계산한다. */
 export interface MediaMaintenance {

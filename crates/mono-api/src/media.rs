@@ -7,12 +7,15 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use hmac::{Hmac, Mac};
 use rusqlite::Connection;
+use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use chrono::Datelike;
+
 use super::db::DbExt;
 use super::error::{ApiError, ApiResult};
-use super::secret::{get_r2_config, R2Config, SecretState};
+use super::secret::{get_cf_analytics_token, get_r2_config, R2Config, SecretState};
 
 // apps/api/src/repositories/r2-media-store.ts + routes/media.ts 이식.
 // R2는 S3 호환. AWS SigV4로 서명해 reqwest로 직접 친다(aws-sdk 대신 — 6개 op뿐).
@@ -460,12 +463,159 @@ fn require_media_id(id: &str) -> ApiResult<()> {
     }
 }
 
+// ---------- 사용량 리포트 (Cloudflare GraphQL Analytics) ----------
+// Tier 1(list_all)은 근사 저장량만. 여기선 CF Analytics로 청구 기준 저장량 + 이번 달 op 수를
+// 받아 무료 한도(저장 10GB, Class A 100만, Class B 1000만) 대비 경고할 수 있게 한다.
+
+const GRAPHQL_ENDPOINT: &str = "https://api.cloudflare.com/client/v4/graphql";
+
+// op → 청구 클래스. https://developers.cloudflare.com/r2/pricing/ (2026). 미지의 actionType은 other로.
+const CLASS_A_ACTIONS: &[&str] = &[
+    "ListBuckets", "PutBucket", "ListObjects", "PutObject", "CopyObject",
+    "CompleteMultipartUpload", "CreateMultipartUpload", "LifecycleStorageTierTransition",
+    "ListMultipartUploads", "UploadPart", "UploadPartCopy", "ListParts",
+    "PutBucketEncryption", "PutBucketCors", "PutBucketLifecycleConfiguration",
+];
+const CLASS_B_ACTIONS: &[&str] = &[
+    "HeadBucket", "HeadObject", "GetObject", "UsageSummary",
+    "GetBucketEncryption", "GetBucketLocation", "GetBucketCors", "GetBucketLifecycleConfiguration",
+];
+const FREE_ACTIONS: &[&str] = &["DeleteObject", "DeleteBucket", "AbortMultipartUpload"];
+
+const USAGE_QUERY: &str = r#"query($tag: string!, $storageStart: Time!, $opsStart: Time!, $now: Time!) {
+  viewer {
+    accounts(filter: { accountTag: $tag }) {
+      r2StorageAdaptiveGroups(limit: 1, filter: { datetime_geq: $storageStart, datetime_leq: $now }, orderBy: [datetime_DESC]) {
+        max { objectCount payloadSize metadataSize }
+        dimensions { datetime }
+      }
+      r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $opsStart, datetime_leq: $now }) {
+        sum { requests }
+        dimensions { actionType }
+      }
+    }
+  }
+}"#;
+
+#[derive(Serialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct UsageReport {
+    // 계정 전체(모든 버킷 합산) — 무료 한도가 계정 단위라 버킷 필터를 걸지 않는다.
+    storage_bytes: i64,
+    object_count: i64,
+    sampled_at: Option<String>,
+    class_a: i64,
+    class_b: i64,
+    free_ops: i64,
+    other_ops: i64,
+    month_start: String,
+}
+
+fn utc_month_start(now: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chrono::Utc> {
+    now.date_naive()
+        .with_day(1)
+        .and_then(|d| d.and_hms_opt(0, 0, 0))
+        .map(|d| d.and_utc())
+        .unwrap_or(now)
+}
+
+fn fmt_utc(t: chrono::DateTime<chrono::Utc>) -> String {
+    t.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+async fn fetch_usage_report(account_id: &str, token: &str) -> ApiResult<UsageReport> {
+    let now = chrono::Utc::now();
+    let month_start = utc_month_start(now);
+    let body = json!({
+        "query": USAGE_QUERY,
+        "variables": {
+            "tag": account_id,
+            "storageStart": fmt_utc(now - chrono::Duration::days(2)),
+            "opsStart": fmt_utc(month_start),
+            "now": fmt_utc(now),
+        }
+    });
+
+    let res = reqwest::Client::new()
+        .post(GRAPHQL_ENDPOINT)
+        .bearer_auth(token)
+        .header("content-type", "application/json")
+        .body(serde_json::to_vec(&body).unwrap_or_default())
+        .send()
+        .await
+        .map_err(net_err)?;
+    if !res.status().is_success() {
+        return Err(status_err(res, "Cloudflare Analytics 조회").await);
+    }
+    let text = res.text().await.map_err(net_err)?;
+    let payload: Value = serde_json::from_str(&text)
+        .map_err(|error| ApiError::BadRequest(format!("Cloudflare 응답 파싱 실패: {error}")))?;
+    parse_usage_report(&payload, fmt_utc(month_start))
+}
+
+fn parse_usage_report(payload: &Value, month_start: String) -> ApiResult<UsageReport> {
+    if let Some(errors) =
+        payload.get("errors").and_then(Value::as_array).filter(|e| !e.is_empty())
+    {
+        let msg = errors[0].get("message").and_then(Value::as_str).unwrap_or("알 수 없는 오류");
+        return Err(ApiError::BadRequest(format!(
+            "Cloudflare Analytics 오류 — 토큰에 Account Analytics 읽기 권한이 있는지 확인하세요. ({msg})"
+        )));
+    }
+
+    let account = payload
+        .pointer("/data/viewer/accounts/0")
+        .ok_or_else(|| ApiError::BadRequest("Cloudflare 계정을 찾을 수 없습니다 — account id를 확인하세요.".into()))?;
+
+    let (storage_bytes, object_count, sampled_at) =
+        match account.pointer("/r2StorageAdaptiveGroups/0") {
+            Some(s) => (
+                s.pointer("/max/payloadSize").and_then(Value::as_i64).unwrap_or(0)
+                    + s.pointer("/max/metadataSize").and_then(Value::as_i64).unwrap_or(0),
+                s.pointer("/max/objectCount").and_then(Value::as_i64).unwrap_or(0),
+                s.pointer("/dimensions/datetime").and_then(Value::as_str).map(str::to_string),
+            ),
+            None => (0, 0, None),
+        };
+
+    let (mut class_a, mut class_b, mut free_ops, mut other_ops) = (0i64, 0i64, 0i64, 0i64);
+    if let Some(groups) =
+        account.pointer("/r2OperationsAdaptiveGroups").and_then(Value::as_array)
+    {
+        for group in groups {
+            let requests = group.pointer("/sum/requests").and_then(Value::as_i64).unwrap_or(0);
+            let action = group.pointer("/dimensions/actionType").and_then(Value::as_str).unwrap_or("");
+            if CLASS_A_ACTIONS.contains(&action) {
+                class_a += requests;
+            } else if CLASS_B_ACTIONS.contains(&action) {
+                class_b += requests;
+            } else if FREE_ACTIONS.contains(&action) {
+                free_ops += requests;
+            } else {
+                other_ops += requests;
+            }
+        }
+    }
+
+    Ok(UsageReport {
+        storage_bytes,
+        object_count,
+        sampled_at,
+        class_a,
+        class_b,
+        free_ops,
+        other_ops,
+        month_start,
+    })
+}
+
 // ---------- 라우트 (routes/media.ts, /credentials/test는 프록시) ----------
 
 pub(super) fn routes(state: SecretState) -> Router {
     Router::new()
         .route("/media", post(upload_handler))
         .route("/media/orphan-stats", get(orphan_stats_handler))
+        .route("/media/usage-report", get(usage_report_handler))
         .route("/media/gc", post(gc_handler))
         .route("/media/credentials/test", post(credentials_test_handler))
         .route("/media/{id}", get(download_handler).delete(delete_handler))
@@ -561,6 +711,19 @@ async fn orphan_stats_handler(State(state): State<SecretState>) -> ApiResult<Jso
     })))
 }
 
+async fn usage_report_handler(State(state): State<SecretState>) -> ApiResult<Json<UsageReport>> {
+    let (account_id, token) = {
+        let conn = state.db.conn();
+        let account_id = get_r2_config(&conn, &state.crypto)?
+            .map(|c| c.account_id)
+            .ok_or_else(|| ApiError::BadRequest("R2 자격증명이 설정되지 않았습니다.".into()))?;
+        let token = get_cf_analytics_token(&conn, &state.crypto)?
+            .ok_or_else(|| ApiError::BadRequest("Cloudflare Analytics 토큰이 설정되지 않았습니다.".into()))?;
+        (account_id, token)
+    };
+    Ok(Json(fetch_usage_report(&account_id, &token).await?))
+}
+
 async fn credentials_test_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> {
     let client = client_from(&state)?;
     client.head_bucket().await?;
@@ -651,6 +814,56 @@ mod tests {
             parse_list_objects(xml),
             vec![("a".to_string(), 10), ("b".to_string(), 20)]
         );
+    }
+
+    #[test]
+    fn usage_report_folds_ops_into_billing_classes() {
+        let payload = serde_json::json!({
+            "data": { "viewer": { "accounts": [ {
+                "r2StorageAdaptiveGroups": [ {
+                    "max": { "objectCount": 1200, "payloadSize": 9_000_000_000i64, "metadataSize": 500_000 },
+                    "dimensions": { "datetime": "2026-09-04T12:00:00Z" }
+                } ],
+                "r2OperationsAdaptiveGroups": [
+                    { "sum": { "requests": 300 }, "dimensions": { "actionType": "PutObject" } },
+                    { "sum": { "requests": 40 }, "dimensions": { "actionType": "ListObjects" } },
+                    { "sum": { "requests": 5000 }, "dimensions": { "actionType": "GetObject" } },
+                    { "sum": { "requests": 12 }, "dimensions": { "actionType": "DeleteObject" } },
+                    { "sum": { "requests": 7 }, "dimensions": { "actionType": "SomethingNew" } }
+                ]
+            } ] } }
+        });
+        let report = parse_usage_report(&payload, "2026-09-01T00:00:00Z".into()).unwrap();
+        assert_eq!(report.storage_bytes, 9_000_500_000);
+        assert_eq!(report.object_count, 1200);
+        assert_eq!(report.class_a, 340);
+        assert_eq!(report.class_b, 5000);
+        assert_eq!(report.free_ops, 12);
+        assert_eq!(report.other_ops, 7);
+        assert_eq!(report.sampled_at.as_deref(), Some("2026-09-04T12:00:00Z"));
+    }
+
+    #[test]
+    fn usage_report_surfaces_graphql_errors() {
+        let payload = serde_json::json!({ "data": null, "errors": [ { "message": "authentication error" } ] });
+        let err = parse_usage_report(&payload, "x".into()).unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(m) if m.contains("Account Analytics")));
+    }
+
+    #[test]
+    fn usage_report_handles_empty_storage_samples() {
+        let payload = serde_json::json!({
+            "data": { "viewer": { "accounts": [ { "r2StorageAdaptiveGroups": [], "r2OperationsAdaptiveGroups": [] } ] } }
+        });
+        let report = parse_usage_report(&payload, "x".into()).unwrap();
+        assert_eq!(report.storage_bytes, 0);
+        assert_eq!(report.sampled_at, None);
+    }
+
+    #[test]
+    fn utc_month_start_is_first_of_month_midnight() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-04T15:30:45Z").unwrap().with_timezone(&chrono::Utc);
+        assert_eq!(fmt_utc(utc_month_start(now)), "2026-09-01T00:00:00Z");
     }
 
     #[test]

@@ -6,6 +6,7 @@ import { createMockInboxRepository } from "../infrastructure/mock/mock-inbox-rep
 import type { InboxRepository } from "../features/inbox/inbox-repository";
 import { InMemoryMediaStore, type MediaStore } from "../infrastructure/media/media-store";
 import { InMemoryMediaMaintenance, type MediaMaintenance } from "../infrastructure/media/media-maintenance";
+import { InMemoryR2SettingsStore, type R2SettingsStore, type R2UsageReport } from "../infrastructure/media/r2-settings-store";
 import { MediaStoreProvider } from "../infrastructure/media/media-store-context";
 import { createMockTodoRepository } from "../infrastructure/mock/mock-todo-repository";
 import { createMockRoutineRepository } from "../infrastructure/mock/mock-routine-repository";
@@ -28,7 +29,7 @@ import { ACCENT_COLOR_STORAGE_KEY } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
 import { InMemoryServerSettingsStore, type ServerSettingsStore } from "../infrastructure/server/server-settings-store";
 
-function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(), serverSettingsStore: ServerSettingsStore = new InMemoryServerSettingsStore()) {
+function renderShell(routineRepository: RoutineRepository = createMockRoutineRepository(), calendarRepository: CalendarRepository = createMockCalendarRepository(), scrapRepository: ScrapRepository = createMockScrapRepository(), ledgerRepository: LedgerRepository = createMockLedgerRepository(), dashboardRepository: DashboardRepository = createMockDashboardRepository(), aiSettingsStore?: AiSettingsStore, mediaStore: MediaStore = new InMemoryMediaStore(), inboxRepository: InboxRepository = createMockInboxRepository(), mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(), serverSettingsStore: ServerSettingsStore = new InMemoryServerSettingsStore(), r2SettingsStore?: R2SettingsStore) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const todoRepository = createMockTodoRepository();
   const todoViewStateStore = todoViewStateStoreOf();
@@ -37,7 +38,7 @@ function renderShell(routineRepository: RoutineRepository = createMockRoutineRep
       <MediaStoreProvider value={mediaStore}>
         <MemoryRouter initialEntries={["/dashboard"]}>
           <Routes>
-            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />}>
+            <Route path="/" element={<AppShell aiSettingsStore={aiSettingsStore} calendarRepository={calendarRepository} dashboardRepository={dashboardRepository} inboxRepository={inboxRepository} mediaMaintenance={mediaMaintenance} r2SettingsStore={r2SettingsStore} routineRepository={routineRepository} serverSettingsStore={serverSettingsStore} todoRepository={todoRepository} />}>
               <Route path="dashboard" element={<div>대시보드 경로</div>} />
               <Route path="inbox" element={<div>수집함 경로</div>} />
               <Route path="todo" element={<TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} />} />
@@ -415,17 +416,17 @@ describe("AppShell", () => {
     expect(within(settingsModal).getByRole("textbox", { name: "원격 서버 주소" })).toHaveAttribute("aria-invalid", "true");
   });
 
-  async function openStoragePanel(mediaMaintenance: MediaMaintenance) {
-    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mediaMaintenance);
+  async function openStoragePanel(mediaMaintenance: MediaMaintenance, r2SettingsStore?: R2SettingsStore) {
+    renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, mediaMaintenance, undefined, r2SettingsStore);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
     fireEvent.click(within(settingsModal).getByRole("button", { name: "저장공간" }));
-    return within(settingsModal).getByRole("region", { name: "미사용 미디어 정리" });
+    return settingsModal;
   }
 
   it("저장공간 설정에서 미사용 미디어를 확인한 뒤 정리한다", async () => {
     const mediaMaintenance = new InMemoryMediaMaintenance({ count: 2, bytes: 1024, totalCount: 5, totalBytes: 4096 });
-    const section = await openStoragePanel(mediaMaintenance);
+    const section = within(await openStoragePanel(mediaMaintenance)).getByRole("region", { name: "미사용 미디어 정리" });
     expect(within(section).getByText("확인 필요")).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
@@ -442,9 +443,31 @@ describe("AppShell", () => {
   it("저장 사용량이 R2 무료 한도의 80%를 넘으면 경고한다", async () => {
     const nineGb = 9 * 1024 * 1024 * 1024;
     const mediaMaintenance = new InMemoryMediaMaintenance({ count: 0, bytes: 0, totalCount: 1200, totalBytes: nineGb });
-    const section = await openStoragePanel(mediaMaintenance);
+    const section = within(await openStoragePanel(mediaMaintenance)).getByRole("region", { name: "미사용 미디어 정리" });
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
     expect(await within(section).findByRole("alert")).toHaveTextContent("무료 저장 한도의 90%");
+  });
+
+  it("R2 사용량 리포트에서 Class B 작업이 무료 한도의 80%를 넘으면 경고한다", async () => {
+    const r2SettingsStore = new InMemoryR2SettingsStore({
+      storageBytes: 3 * 1024 * 1024 * 1024,
+      objectCount: 500,
+      sampledAt: "2026-09-04T12:00:00Z",
+      classA: 200_000,
+      classB: 9_500_000,
+      freeOps: 10,
+      otherOps: 3,
+      monthStart: "2026-09-01T00:00:00Z",
+    } satisfies R2UsageReport);
+    const modal = await openStoragePanel(new InMemoryMediaMaintenance(), r2SettingsStore);
+    const section = within(modal).getByRole("region", { name: "R2 사용량" });
+    const checkButton = within(section).getByRole("button", { name: "확인" });
+    await waitFor(() => expect(checkButton).not.toBeDisabled());
+
+    fireEvent.click(checkButton);
+
+    expect(await within(section).findByRole("alert")).toHaveTextContent("Class B 작업 (이번 달) 이(가) 무료 한도의 80%를 넘었습니다");
+    expect(within(section).getByText(/요금 클래스 미상 작업 3건/)).toBeInTheDocument();
   });
 
   it("확인이 실패하면 오류만 알리고 정리 버튼을 비활성 상태로 둔다", async () => {
@@ -452,7 +475,7 @@ describe("AppShell", () => {
       orphanUsage: () => Promise.reject(new Error("API 서버에 연결할 수 없습니다.")),
       gc: () => Promise.reject(new Error("사용되지 않음")),
     };
-    const section = await openStoragePanel(brokenMaintenance);
+    const section = within(await openStoragePanel(brokenMaintenance)).getByRole("region", { name: "미사용 미디어 정리" });
 
     fireEvent.click(within(section).getByRole("button", { name: "확인" }));
 

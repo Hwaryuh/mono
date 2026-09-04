@@ -104,6 +104,7 @@ impl SecretCrypto {
 const ACTIVE_PROVIDER_KEY: &str = "active_ai_provider";
 const R2_KEYS: [&str; 4] =
     ["r2_account_id", "r2_access_key_id", "r2_secret_access_key", "r2_bucket"];
+const CF_ANALYTICS_TOKEN_KEY: &str = "cf_analytics_token";
 
 fn provider_storage_key(provider: &str) -> ApiResult<&'static str> {
     match provider {
@@ -250,6 +251,37 @@ fn delete_r2(conn: &Connection) -> ApiResult<()> {
     Ok(())
 }
 
+// Cloudflare GraphQL Analytics API 토큰 (Account Analytics: Read). R2 사용량 리포트에만 쓴다.
+fn has_cf_analytics_token(conn: &Connection) -> ApiResult<bool> {
+    has_key(conn, CF_ANALYTICS_TOKEN_KEY)
+}
+
+pub(super) fn get_cf_analytics_token(
+    conn: &Connection,
+    crypto: &SecretCrypto,
+) -> ApiResult<Option<String>> {
+    match conn
+        .query_row("SELECT value FROM secrets WHERE key = ?1", [CF_ANALYTICS_TOKEN_KEY], |r| {
+            r.get::<_, String>(0)
+        })
+        .optional()?
+    {
+        Some(enc) => Ok(Some(crypto.decrypt(&enc)?)),
+        None => Ok(None),
+    }
+}
+
+fn set_cf_analytics_token(conn: &Connection, crypto: &SecretCrypto, token: &str) -> ApiResult<()> {
+    if token.trim().is_empty() {
+        return Err(ApiError::BadRequest("Cloudflare Analytics 토큰을 입력해야 합니다.".into()));
+    }
+    set_key(conn, crypto, CF_ANALYTICS_TOKEN_KEY, token.trim())
+}
+
+fn delete_cf_analytics_token(conn: &Connection) -> ApiResult<()> {
+    delete_key(conn, CF_ANALYTICS_TOKEN_KEY)
+}
+
 // ---------- DTO ----------
 
 #[derive(Deserialize)]
@@ -261,6 +293,11 @@ struct ApiKeyInput {
 #[derive(Deserialize)]
 struct ProviderInput {
     provider: String,
+}
+
+#[derive(Deserialize)]
+struct AnalyticsTokenInput {
+    token: String,
 }
 
 #[derive(Deserialize)]
@@ -294,6 +331,10 @@ pub(super) fn routes(state: SecretState) -> Router {
         .route(
             "/media/credentials",
             get(r2_get).post(r2_set).delete(r2_delete),
+        )
+        .route(
+            "/media/analytics-token",
+            get(analytics_token_get).post(analytics_token_set).delete(analytics_token_delete),
         )
         .with_state(state)
 }
@@ -351,6 +392,23 @@ async fn r2_set(
 
 async fn r2_delete(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
     delete_r2(&st.db.conn())?;
+    Ok(ok())
+}
+
+async fn analytics_token_get(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "hasToken": has_cf_analytics_token(&st.db.conn())? })))
+}
+
+async fn analytics_token_set(
+    State(st): State<SecretState>,
+    Json(input): Json<AnalyticsTokenInput>,
+) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
+    set_cf_analytics_token(&st.db.conn(), &st.crypto, &input.token)?;
+    Ok(created())
+}
+
+async fn analytics_token_delete(State(st): State<SecretState>) -> ApiResult<Json<Value>> {
+    delete_cf_analytics_token(&st.db.conn())?;
     Ok(ok())
 }
 

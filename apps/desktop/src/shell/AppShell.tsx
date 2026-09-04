@@ -9,11 +9,11 @@ import type { TodoRepository } from "../features/todo/todo-repository";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
 import { useNavigate } from "react-router";
-import { currentIsoDate } from "@mono/domain";
+import { currentIsoDate, formatTimestamp } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiProviderId, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
-import { InMemoryMediaMaintenance, R2_FREE_STORAGE_BYTES, type MediaMaintenance, type OrphanMediaUsage } from "../infrastructure/media/media-maintenance";
-import { InMemoryR2SettingsStore, type R2SettingsStore } from "../infrastructure/media/r2-settings-store";
+import { InMemoryMediaMaintenance, R2_FREE_CLASS_A, R2_FREE_CLASS_B, R2_FREE_STORAGE_BYTES, type MediaMaintenance, type OrphanMediaUsage } from "../infrastructure/media/media-maintenance";
+import { InMemoryR2SettingsStore, type R2SettingsStore, type R2UsageReport } from "../infrastructure/media/r2-settings-store";
 import {
   looksLikeRemoteApiUrl,
   trimBaseUrl,
@@ -516,6 +516,7 @@ function SettingsModal({ open, onClose, theme, onThemeChange, accentColor, onAcc
             <>
               <StorageSettingsPanel mediaMaintenance={mediaMaintenance} />
               <R2CredentialsSection store={r2SettingsStore} />
+              <R2UsageSection store={r2SettingsStore} />
             </>
           )}
 
@@ -682,6 +683,101 @@ function R2CredentialsSection({ store }: { store: R2SettingsStore }) {
           setMessage(translate("settings.r2.deleted"));
         })} type="button">{translate("common.action.delete")}</Button>
       </div>
+      {message && <p className="settings-ai__message" role="status">{message}</p>}
+      {error && <p className="settings-ai__error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+function usagePercent(value: number, limit: number) {
+  return Math.round((value / limit) * 100);
+}
+
+/** Cloudflare Analytics 토큰으로 청구 기준 저장량 + 이번 달 Class A/B op를 무료 한도 대비 표시. */
+function R2UsageSection({ store }: { store: R2SettingsStore }) {
+  const [token, setToken] = useState("");
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const [report, setReport] = useState<R2UsageReport | null>(null);
+  const [pending, setPending] = useState<"save" | "load" | "delete" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    store.hasAnalyticsToken()
+      .then((configured) => { if (active) setHasToken(configured); })
+      .catch((cause: unknown) => { if (active) setError(messageOf(cause)); });
+    return () => { active = false; };
+  }, [store]);
+
+  async function run(action: "save" | "load" | "delete", operation: () => Promise<void>) {
+    setPending(action);
+    setMessage(null);
+    setError(null);
+    try {
+      await operation();
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  const rows: Array<{ label: string; value: string; percent: number }> = report ? [
+    { label: translate("settings.storage.totalUsage"), value: `${formatMediaSize(report.storageBytes)} / ${formatMediaSize(R2_FREE_STORAGE_BYTES)}`, percent: usagePercent(report.storageBytes, R2_FREE_STORAGE_BYTES) },
+    { label: translate("settings.r2usage.classA"), value: `${report.classA.toLocaleString("ko-KR")} / ${R2_FREE_CLASS_A.toLocaleString("ko-KR")}`, percent: usagePercent(report.classA, R2_FREE_CLASS_A) },
+    { label: translate("settings.r2usage.classB"), value: `${report.classB.toLocaleString("ko-KR")} / ${R2_FREE_CLASS_B.toLocaleString("ko-KR")}`, percent: usagePercent(report.classB, R2_FREE_CLASS_B) },
+  ] : [];
+  const overLimit = rows.filter((row) => row.percent >= 80);
+
+  return (
+    <section aria-label={translate("settings.r2usage.title")} className="settings-group settings-ai">
+      <header>
+        <strong>{translate("settings.r2usage.title")}</strong>
+        <span>{translate("settings.r2usage.description")}</span>
+      </header>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        void run("save", async () => {
+          await store.setAnalyticsToken(token);
+          setToken("");
+          setHasToken(true);
+          setMessage(translate("settings.r2usage.tokenSaved"));
+        });
+      }}>
+        <Input aria-label={translate("settings.r2usage.tokenLabel")} autoComplete="off" onChange={(event) => setToken(event.target.value)} placeholder={translate("settings.r2usage.tokenLabel")} type="password" value={token} />
+        <Button disabled={token.trim().length === 0} loading={pending === "save"} type="submit" variant="primary">{translate("common.action.save")}</Button>
+      </form>
+      <div className="settings-ai__status">
+        <span>{translate("common.status.label")}</span>
+        <strong>{hasToken === null ? translate("common.status.checking") : hasToken ? translate("common.status.configured") : translate("common.status.notConfigured")}</strong>
+        <Button disabled={!hasToken} loading={pending === "load"} onClick={() => void run("load", async () => {
+          setReport(await store.usageReport());
+        })} type="button">{translate("common.action.check")}</Button>
+        <Button disabled={!hasToken} loading={pending === "delete"} onClick={() => void run("delete", async () => {
+          await store.deleteAnalyticsToken();
+          setHasToken(false);
+          setReport(null);
+          setMessage(translate("settings.r2usage.tokenDeleted"));
+        })} type="button">{translate("common.action.delete")}</Button>
+      </div>
+      {rows.map((row) => (
+        <div className="settings-ai__status" key={row.label}>
+          <span>{row.label}</span>
+          <strong>{translate("settings.r2usage.metricValue", { value: row.value, percent: row.percent })}</strong>
+        </div>
+      ))}
+      {report && report.otherOps > 0 && (
+        <p className="settings-ai__notice-text">{translate("settings.r2usage.otherOps", { count: report.otherOps.toLocaleString("ko-KR") })}</p>
+      )}
+      {overLimit.length > 0 && (
+        <p className="settings-ai__error" role="alert">
+          {translate("settings.r2usage.limitWarning", { names: overLimit.map((row) => row.label).join(", ") })}
+        </p>
+      )}
+      {report?.sampledAt && (
+        <p className="settings-ai__notice-text">{translate("settings.r2usage.sampledAt", { time: formatTimestamp(report.sampledAt) })}</p>
+      )}
       {message && <p className="settings-ai__message" role="status">{message}</p>}
       {error && <p className="settings-ai__error" role="alert">{error}</p>}
     </section>
