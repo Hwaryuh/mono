@@ -151,7 +151,7 @@
   transition: background-color 180ms ease-out, border-color 180ms ease-out;
 }
 .todo-item > .ui-checkbox { margin-left: 12px; width: 20px; height: 20px; flex-basis: 20px; border-radius: 5px; }
-.todo-item__stars { flex: none; display: flex; align-items: center; }
+.todo-item__stars { flex: none; margin-right: 10px; display: flex; align-items: center; }
 .todo-item__star { appearance: none; width: 19px; height: 22px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 5px; box-shadow: none; background: transparent; color: var(--color-text-faint); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out; }
 .todo-item__star:hover { background: var(--color-hover); color: var(--color-text-muted); }
 .todo-item__star:active { scale: 0.85; }
@@ -162,7 +162,7 @@
   min-width: 0;
   min-height: 60px;
   flex: 1;
-  padding: 9px 12px 9px 0;
+  padding: 9px 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -189,7 +189,6 @@
 .todo-item__label { padding: 1px 8px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--color-border); border-radius: 20px; color: var(--color-text-faint); font-size: 10px; }
 .todo-item__label i { width: 6px; height: 6px; flex: none; border-radius: 50%; }
 .todo-item__note { flex: none; color: var(--color-text-faint); }
-.todo-item__open > svg { flex: none; color: var(--color-text-faint); }
 .todo-item--done { background: var(--color-surface-subtle); }
 .todo-item--completion-feedback { animation: todo-complete-feedback 220ms cubic-bezier(0.16, 1, 0.3, 1); }
 .todo-item--done .todo-item__copy > strong { color: var(--color-text-faint); text-decoration: line-through; }
