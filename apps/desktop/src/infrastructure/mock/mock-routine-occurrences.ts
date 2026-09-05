@@ -67,5 +67,6 @@ export function routineTodoItems(state: MockPlatformState): TodoItem[] {
     completedAt: occurrence.completedAt,
     routineId: routine.id,
     occurrenceDate: occurrence.occurrenceDate,
+    priority: 0,
   }));
 }

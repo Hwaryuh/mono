@@ -35,6 +35,7 @@ function repositoryOf(base: TodoRepository, overrides: Partial<TodoRepository> =
     update: overrides.update ?? ((itemId, input) => base.update(itemId, input)),
     delete: overrides.delete ?? ((itemId) => base.delete(itemId)),
     toggleComplete: overrides.toggleComplete ?? ((itemId) => base.toggleComplete(itemId)),
+    setPriority: overrides.setPriority ?? ((itemId, priority) => base.setPriority(itemId, priority)),
   };
 }
 
@@ -279,8 +280,8 @@ describe("TodoPage", () => {
       today: "2026-08-05",
       labels: [{ id: "home", name: "집안일", color: "oklch(0.7 0.1 250)" }],
       items: [
-        { id: "aged", title: "오래된 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), routineId: null, occurrenceDate: null },
-        { id: "fresh", title: "방금 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date().toISOString(), routineId: null, occurrenceDate: null },
+        { id: "aged", title: "오래된 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), routineId: null, occurrenceDate: null, priority: 0 },
+        { id: "fresh", title: "방금 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date().toISOString(), routineId: null, occurrenceDate: null, priority: 0 },
       ],
     };
     renderTodo(repositoryOf(base, { getSnapshot: async () => snapshot }));
@@ -312,5 +313,21 @@ describe("TodoPage", () => {
     rejectToggle?.(new Error("완료 저장 실패"));
     expect(await screen.findByRole("alert")).toHaveTextContent("완료 저장 실패");
     expect(second.closest(".todo-item")?.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("별표를 누르면 우선순위가 매겨지고 목록 위로 올라온다", async () => {
+    renderTodo();
+    await screen.findByText("렌즈 주문");
+    const titlesInOrder = () => screen.getAllByText((_, el) => el?.tagName === "STRONG" && !!el.closest(".todo-item__copy")).map((el) => el.textContent);
+    expect(titlesInOrder()[0]).not.toBe("렌즈 주문");
+
+    fireEvent.click(screen.getByRole("button", { name: "렌즈 주문 우선순위 2단계로 설정" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "렌즈 주문 우선순위 1단계로 설정" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "렌즈 주문 우선순위 3단계로 설정" })).toHaveAttribute("aria-pressed", "false");
+    expect(titlesInOrder()[0]).toBe("렌즈 주문");
+
+    fireEvent.click(screen.getByRole("button", { name: "렌즈 주문 우선순위 2단계로 설정" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "렌즈 주문 우선순위 1단계로 설정" })).toHaveAttribute("aria-pressed", "false"));
+    expect(titlesInOrder()[0]).not.toBe("렌즈 주문");
   });
 });

@@ -192,6 +192,7 @@ export const todoItemSchema = z.object({
   completedAt: z.string().nullable(),
   routineId: z.string().nullable().default(null),
   occurrenceDate: z.string().nullable().default(null),
+  priority: z.number().int().min(0).max(3).default(0),
 });
 
 export const todoSnapshotSchema = z.object({

@@ -158,9 +158,10 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
     const statusMatches = status === "all" ? !isAgedDone(item, now) : statusOf(item, snapshot.today) === status;
     return statusMatches && (labelIds.length === 0 || labelIds.includes(item.labelId));
   });
-  const visibleItems = status === "all"
-    ? [...filteredItems].sort((left, right) => Number(left.done) - Number(right.done))
-    : filteredItems;
+  const visibleItems = [...filteredItems].sort((left, right) => {
+    if (status === "all" && left.done !== right.done) return Number(left.done) - Number(right.done);
+    return right.priority - left.priority;
+  });
   const title = labelIds.length > 0 ? translate("todo.list.filteredLabel") : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -446,6 +447,12 @@ function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: 
     },
     onError: (error) => setMutationError(errorMessage(error)),
   });
+  const priorityMutation = useMutation({
+    mutationFn: (priority: number) => repository.setPriority(item.id, priority),
+    onMutate: () => setMutationError(null),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+    onError: (error) => setMutationError(errorMessage(error)),
+  });
   const status = statusOf(item, snapshot.today);
   const justCompleted = item.done && !previousDoneRef.current;
   const dueText = item.done
@@ -482,6 +489,23 @@ function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: 
       ref={rowRef}
     >
       <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
+      {!item.routineId && (
+        <div className="todo-item__stars">
+          {[1, 2, 3].map((level) => (
+            <button
+              aria-label={translate("todo.action.setPriority", { title: displayTitle, level })}
+              aria-pressed={item.priority >= level}
+              className={item.priority >= level ? "todo-item__star todo-item__star--active" : "todo-item__star"}
+              disabled={priorityMutation.isPending}
+              key={level}
+              onClick={() => priorityMutation.mutate(item.priority === level ? 0 : level)}
+              type="button"
+            >
+              <Icon fill={item.priority >= level ? "currentColor" : "none"} name="star" size={13} />
+            </button>
+          ))}
+        </div>
+      )}
       <div className="todo-item__open">
         <span className="todo-item__copy"><strong><ScrapText scraps={scraps} text={item.title} /></strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
         <Icon name="chevronRight" size={13} />

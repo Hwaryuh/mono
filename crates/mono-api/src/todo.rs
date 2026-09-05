@@ -46,6 +46,7 @@ struct TodoItem {
     // Routine 경계가 넘어오기 전까지 항상 null.
     routine_id: Option<String>,
     occurrence_date: Option<String>,
+    priority: i64,
 }
 
 #[derive(Serialize)]
@@ -64,6 +65,11 @@ struct TodoWriteInput {
     due_time: Option<String>,
     #[serde(default)]
     note: String,
+}
+
+#[derive(Deserialize)]
+struct SetPriorityInput {
+    priority: i64,
 }
 
 #[derive(Deserialize)]
@@ -117,7 +123,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     let own_items = conn
         .prepare(
             "SELECT id, version, title, label_id, due_date, due_time, note, done, completed_at, \
-             routine_id, occurrence_date FROM todo_items ORDER BY seq DESC",
+             routine_id, occurrence_date, priority FROM todo_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
             Ok(TodoItem {
@@ -132,6 +138,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
                 completed_at: row.get(8)?,
                 routine_id: row.get(9)?,
                 occurrence_date: row.get(10)?,
+                priority: row.get(11)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -152,6 +159,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
             completed_at: r.completed_at,
             routine_id: Some(r.routine_id),
             occurrence_date: Some(r.occurrence_date),
+            priority: 0,
         })
         .collect();
     items.extend(own_items);
@@ -256,6 +264,15 @@ pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
     Ok(())
 }
 
+fn set_priority(conn: &Connection, id: &str, priority: i64) -> ApiResult<()> {
+    if !(0..=3).contains(&priority) {
+        return Err(ApiError::validation("우선순위는 0~3 사이여야 합니다."));
+    }
+    require_item(conn, id)?;
+    conn.execute("UPDATE todo_items SET priority = ?1 WHERE id = ?2", params![priority, id])?;
+    Ok(())
+}
+
 fn delete_item(conn: &Connection, id: &str) -> ApiResult<()> {
     require_item(conn, id)?;
     conn.execute("DELETE FROM todo_items WHERE id = ?1", [id])?;
@@ -273,6 +290,7 @@ pub fn routes(db: Db) -> Router {
             put(update_item_handler).delete(delete_item_handler),
         )
         .route("/todo/items/{id}/toggle", post(toggle_handler))
+        .route("/todo/items/{id}/priority", put(set_priority_handler))
         .route("/todo/labels", post(create_label_handler))
         .route("/todo/labels/order", put(reorder_handler))
         .route(
@@ -307,6 +325,15 @@ async fn update_item_handler(
 
 async fn toggle_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
     toggle_complete(&db.conn(), &id)?;
+    Ok(ok())
+}
+
+async fn set_priority_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<SetPriorityInput>,
+) -> ApiResult<Json<Value>> {
+    set_priority(&db.conn(), &id, input.priority)?;
     Ok(ok())
 }
 
@@ -493,6 +520,25 @@ mod tests {
         let names: Vec<String> =
             get_snapshot(&conn).unwrap().labels.into_iter().map(|l| l.name).collect();
         assert_eq!(names, ["기타", "B", "A"]);
+    }
+
+    #[test]
+    fn set_priority_updates_and_validates_range() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("할 일", &label)).unwrap();
+        let id = get_snapshot(&conn).unwrap().items[0].id.clone();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 0);
+
+        set_priority(&conn, &id, 3).unwrap();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 3);
+
+        set_priority(&conn, &id, 0).unwrap();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 0);
+
+        let err = set_priority(&conn, &id, 4).unwrap_err();
+        assert!(matches!(err, ApiError::Validation(_)));
     }
 
     #[test]

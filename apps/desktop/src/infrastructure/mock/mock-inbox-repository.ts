@@ -44,6 +44,7 @@ function approveItem(state: MockPlatformState, itemId: string) {
         completedAt: null,
         routineId: null,
         occurrenceDate: null,
+        priority: 0,
       },
       ...state.todo.items,
     ];

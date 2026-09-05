@@ -12,5 +12,6 @@ export interface TodoRepository extends TodoLabelRepository {
   create(input: TodoWriteInput): Promise<void>;
   update(itemId: string, input: TodoWriteInput, expectedVersion?: number): Promise<void>;
   toggleComplete(itemId: string): Promise<void>;
+  setPriority(itemId: string, priority: number): Promise<void>;
   delete(itemId: string): Promise<void>;
 }

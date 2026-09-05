@@ -67,7 +67,7 @@ class MockTodoRepository implements TodoRepository {
     const parsed = todoWriteInputSchema.parse(input);
     const id = `task-${this.state.nextTodoId++}`;
     this.state.todo.items = [
-      { id, ...parsed, done: false, completedAt: null, routineId: null, occurrenceDate: null },
+      { id, ...parsed, done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: 0 },
       ...this.state.todo.items,
     ];
   }
@@ -89,6 +89,14 @@ class MockTodoRepository implements TodoRepository {
   async delete(itemId: string) {
     requireItem(this.state.todo.items, itemId);
     this.state.todo.items = this.state.todo.items.filter((item) => item.id !== itemId);
+  }
+
+  async setPriority(itemId: string, priority: number) {
+    requireItem(this.state.todo.items, itemId);
+    if (!Number.isInteger(priority) || priority < 0 || priority > 3) {
+      throw new Error("우선순위는 0~3 사이여야 합니다.");
+    }
+    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, priority } : item);
   }
 
   private assertUniqueLabelName(name: string, exceptLabelId?: string) {
