@@ -40,7 +40,7 @@ function repositoryOf(base: TodoRepository, overrides: Partial<TodoRepository> =
 }
 
 describe("TodoPage", () => {
-  it("상태 필터를 키보드로 전환하고 라벨 필터를 겹친다", async () => {
+  it("switches status filters with the keyboard and layers a label filter on top", async () => {
     renderTodo();
     const all = await screen.findByRole("radio", { name: /전체 7/ });
     fireEvent.keyDown(all, { key: "End" });
@@ -54,7 +54,7 @@ describe("TodoPage", () => {
     expect(screen.getByRole("button", { name: "업무 필터 해제" })).toBeInTheDocument();
   });
 
-  it("공통 Modal에서 새 할 일을 생성하고 기존 할 일을 수정한다", async () => {
+  it("creates a new todo and edits an existing one via the shared Modal", async () => {
     renderTodo(createMockTodoRepository(), "/todo?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 할 일" });
     expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
@@ -73,7 +73,7 @@ describe("TodoPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "할 일 수정" })).not.toBeInTheDocument());
   });
 
-  it("제목의 스크랩 토큰을 목록에서 현재 이름의 링크로 보여준다", async () => {
+  it("renders a scrap token in the title as a link with its current name in the list", async () => {
     const base = createMockTodoRepository();
     const snapshot = await base.getSnapshot();
     const repository = repositoryOf(base, {
@@ -92,7 +92,7 @@ describe("TodoPage", () => {
     expect(link).toHaveAttribute("href", expect.stringContaining("detail=scrap-3"));
   });
 
-  it("편집한 상태에서 멘션 칩을 누르면 이동 전에 확인을 받는다", async () => {
+  it("asks for confirmation before navigating away when clicking a mention chip while editing", async () => {
     const base = createMockTodoRepository();
     const snapshot = await base.getSnapshot();
     const repository = repositoryOf(base, {
@@ -122,7 +122,7 @@ describe("TodoPage", () => {
     expect(await screen.findByText("저장하지 않은 변경사항은 사라집니다. 스크랩으로 이동할까요?")).toBeInTheDocument();
   });
 
-  it("일정과 같은 날짜 선택기로 마감일을 수정한다", async () => {
+  it("edits the due date using the same date picker as the calendar", async () => {
     const repository = createMockTodoRepository();
     const update = vi.spyOn(repository, "update");
     renderTodo(repository);
@@ -139,7 +139,7 @@ describe("TodoPage", () => {
     await waitFor(() => expect(update).toHaveBeenCalledWith("task-5", expect.objectContaining({ dueDate: "2026-08-12" }), expect.anything()));
   });
 
-  it("라벨을 추가하고 Modal을 닫으면 focus를 복귀한다", async () => {
+  it("returns focus after adding a label and closing the Modal", async () => {
     renderTodo();
     const trigger = await screen.findByRole("button", { name: "라벨 관리" });
     expect(trigger).toHaveTextContent("관리");
@@ -156,7 +156,7 @@ describe("TodoPage", () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
-  it("자유 HEX 색상으로 라벨을 추가한다", async () => {
+  it("adds a label with a custom HEX color", async () => {
     const repository = createMockTodoRepository();
     const createLabel = vi.spyOn(repository, "createLabel");
     renderTodo(repository);
@@ -173,7 +173,7 @@ describe("TodoPage", () => {
     await waitFor(() => expect(createLabel).toHaveBeenCalledWith({ name: "자유색", color: "oklch(0.319 0.072 251.168)" }));
   });
 
-  it("라벨 생성 pending을 잠그고 실패 시 입력값을 보존한다", async () => {
+  it("locks the form during label-creation pending and preserves input on failure", async () => {
     const base = createMockTodoRepository();
     let rejectCreateLabel: ((reason?: unknown) => void) | undefined;
     const repository = repositoryOf(base, {
@@ -194,7 +194,7 @@ describe("TodoPage", () => {
     await waitFor(() => expect(name).toHaveFocus());
   });
 
-  it("전체에서 완료 토글한 항목을 미완료 항목 아래로 옮긴다", async () => {
+  it("moves a completed-toggled item below the incomplete items in the All view", async () => {
     renderTodo();
     const checkbox = await screen.findByRole("checkbox", { name: "설거지 하기 완료 처리" });
     fireEvent.click(checkbox);
@@ -207,7 +207,7 @@ describe("TodoPage", () => {
     expect(rows.slice(firstDone).every((row) => row.classList.contains("todo-item--done"))).toBe(true);
   });
 
-  it("메모가 있는 할 일에만 메모 아이콘을 표시한다", async () => {
+  it("shows the note icon only on todos that have a note", async () => {
     renderTodo();
     const withNote = (await screen.findByText("홍길동이 보내준 기획안 검토하기")).closest(".todo-item");
     const withoutNote = screen.getByText("설거지 하기").closest(".todo-item");
@@ -215,7 +215,7 @@ describe("TodoPage", () => {
     expect(within(withoutNote as HTMLElement).queryByRole("img", { name: "메모 있음" })).not.toBeInTheDocument();
   });
 
-  it("라벨을 수정·정렬하고 삭제 시 기존 할 일을 선택한 라벨로 이동한다", async () => {
+  it("edits and reorders labels, and moves existing todos to the selected label on delete", async () => {
     const repository = createMockTodoRepository();
     renderTodo(repository);
     fireEvent.click(await screen.findByRole("button", { name: "라벨 관리" }));
@@ -242,7 +242,7 @@ describe("TodoPage", () => {
     expect(snapshot.items.filter((item) => item.routineId === null && ["설거지 하기", "빨래 정리하기", "렌즈 주문"].includes(item.title)).every((item) => item.labelId === "work")).toBe(true);
   });
 
-  it("삭제 확인 Modal 취소 시 focus를 복귀하고 확인 시 항목을 지운다", async () => {
+  it("returns focus when the delete confirmation Modal is canceled and removes the item when confirmed", async () => {
     renderTodo();
     const editButton = await screen.findByRole("button", { name: "렌즈 주문 수정" });
     editButton.focus();
@@ -262,7 +262,7 @@ describe("TodoPage", () => {
     expect(screen.getByRole("radio", { name: /전체 6/ })).toHaveFocus();
   });
 
-  it("필터 결과 없음과 전체 빈 상태를 구분한다", async () => {
+  it("distinguishes between no filter results and the fully empty state", async () => {
     const { repository } = renderTodo();
     await screen.findByText("설거지 하기");
     fireEvent.click(screen.getByRole("radio", { name: /완료 1/ }));
@@ -274,7 +274,7 @@ describe("TodoPage", () => {
     expect(await screen.findByText("아직 할 일이 없습니다")).toBeInTheDocument();
   });
 
-  it("하루 이상 지난 완료 항목은 전체에서 숨기고 완료 탭에만 보인다", async () => {
+  it("hides completed items older than a day from the All view and shows them only in the Completed tab", async () => {
     const base = createMockTodoRepository();
     const snapshot = {
       today: "2026-08-05",
@@ -295,7 +295,7 @@ describe("TodoPage", () => {
     expect(screen.getByText("방금 완료")).toBeInTheDocument();
   });
 
-  it("mutation pending과 오류를 해당 항목에만 표시한다", async () => {
+  it("shows mutation pending and error states only on the affected item", async () => {
     const base = createMockTodoRepository();
     let rejectToggle: ((reason?: unknown) => void) | undefined;
     const repository = repositoryOf(base, {
@@ -315,7 +315,7 @@ describe("TodoPage", () => {
     expect(second.closest(".todo-item")?.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it("별표를 누르면 우선순위가 매겨지고 목록 위로 올라온다", async () => {
+  it("prioritizes an item and moves it to the top of the list when the star is clicked", async () => {
     renderTodo();
     await screen.findByText("렌즈 주문");
     const titlesInOrder = () => screen.getAllByText((_, el) => el?.tagName === "STRONG" && !!el.closest(".todo-item__copy")).map((el) => el.textContent);

@@ -50,7 +50,7 @@ function moveDatePickerTo(dialog: HTMLElement, targetMonth: string) {
 }
 
 describe("InboxPage", () => {
-  it("다시 열어도 마지막 상태 탭을 유지한다", async () => {
+  it("keeps the last status tab after reopening", async () => {
     const repository = createMockInboxRepository();
     const calendarRepository = createMockCalendarRepository();
     const todoRepository = createMockTodoRepository();
@@ -66,7 +66,7 @@ describe("InboxPage", () => {
     expect(await screen.findByRole("tab", { name: /분류 실패/ })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("탭 필터를 키보드와 포인터로 전환한다", async () => {
+  it("switches tab filters using keyboard and pointer", async () => {
     renderInbox();
     const pendingTab = await screen.findByRole("tab", { name: /대기/ });
 
@@ -76,7 +76,7 @@ describe("InboxPage", () => {
     expect(screen.getByRole("tab", { name: /분류 실패/ })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("단일 항목과 높은 확신도 항목을 승인한다", async () => {
+  it("approves a single item and high-confidence items", async () => {
     renderInbox();
     const firstRow = await rowFor("담주 일요일 홍대에서 합주함");
 
@@ -91,7 +91,7 @@ describe("InboxPage", () => {
     expect(screen.getByText("@할일 홍길동이 보내준 기획안 검토하기")).toBeInTheDocument();
   });
 
-  it("Modal에서 필드를 수정한다", async () => {
+  it("edits fields in the Modal", async () => {
     const calendarRepository = createMockCalendarRepository();
     await calendarRepository.createCategory({ name: "운동", color: "#2f7a61" });
     renderInbox(createMockInboxRepository(), calendarRepository);
@@ -123,7 +123,7 @@ describe("InboxPage", () => {
     expect(screen.getByText("약속")).toBeInTheDocument();
   });
 
-  it("할 일 대상 Modal에서 라벨을 실제 할 일 라벨 목록으로 고른다", async () => {
+  it("picks a label from the actual todo label list in the todo-target Modal", async () => {
     renderInbox();
     const row = await rowFor("@할일 홍길동이 보내준 기획안 검토하기");
 
@@ -152,7 +152,7 @@ describe("InboxPage", () => {
     expect(within(await rowFor("@할일 홍길동이 보내준 기획안 검토하기")).getByText("2026-08-12")).toBeInTheDocument();
   });
 
-  it("스크랩과 가계부 대상 Modal에서 라벨을 각 모듈 목록으로 고른다", async () => {
+  it("picks a label from each module's list in the scrap/ledger-target Modal", async () => {
     renderInbox();
 
     const scrapRow = await rowFor("https://youtube.com/watch?v=ref-camera-move");
@@ -190,7 +190,7 @@ describe("InboxPage", () => {
     expect(within(await rowFor("오늘 점심값 만육천원")).getByText("2026-08-06")).toBeInTheDocument();
   });
 
-  it("분류 실패 항목을 Modal에서 직접 분류한다", async () => {
+  it("manually classifies a classification-failed item in the Modal", async () => {
     renderInbox();
     fireEvent.click(await screen.findByRole("tab", { name: /분류 실패/ }));
     const row = await rowFor("스크린샷 · 흐릿한 손글씨 메모");
@@ -212,7 +212,7 @@ describe("InboxPage", () => {
     expect(within(pendingRow).getByRole("button", { name: "분류 대상 변경: 스크랩" })).toBeInTheDocument();
   });
 
-  it("버리기 취소 시 focus를 복귀하고 확인 시 항목을 제거한다", async () => {
+  it("returns focus when discard is canceled and removes the item when confirmed", async () => {
     renderInbox();
     const row = await rowFor("https://youtube.com/watch?v=ref-camera-move");
     const discardButton = within(row).getByRole("button", { name: "버리기" });
@@ -238,7 +238,7 @@ describe("InboxPage", () => {
     await waitFor(() => expect(screen.getByRole("tab", { name: /대기/ })).toHaveFocus());
   });
 
-  it("mutation pending과 오류를 해당 항목에만 표시한다", async () => {
+  it("shows mutation pending and error states only on the affected item", async () => {
     const base = createMockInboxRepository();
     let rejectApproval: ((reason?: unknown) => void) | undefined;
     const repository: InboxRepository = {

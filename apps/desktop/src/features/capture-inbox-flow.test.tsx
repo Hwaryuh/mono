@@ -12,8 +12,8 @@ import { createMockTodoRepository } from "../infrastructure/mock/mock-todo-repos
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { InboxPage } from "./inbox/InboxPage";
 
-describe("빠른 캡처에서 수집함 흐름", () => {
-  it("캡처한 원문과 대기 수를 수집함 화면에 반영한다", async () => {
+describe("quick capture to inbox flow", () => {
+  it("reflects the captured original text and pending count on the inbox screen", async () => {
     const state = createMockPlatformState();
     const dashboardRepository = createMockDashboardRepository(state);
     const calendarRepository = createMockCalendarRepository(state);

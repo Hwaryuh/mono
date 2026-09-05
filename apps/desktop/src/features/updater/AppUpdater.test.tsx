@@ -22,14 +22,14 @@ function pendingUpdate(overrides: Partial<PendingUpdate> = {}): PendingUpdate {
 }
 
 describe("AppUpdater", () => {
-  it("시작 시 업데이트가 없으면 아무것도 렌더하지 않는다", async () => {
+  it("renders nothing on startup when there is no update", async () => {
     updater.checkForUpdate.mockResolvedValue(null);
     render(<AppUpdater />);
     await waitFor(() => expect(updater.checkForUpdate).toHaveBeenCalled());
     expect(screen.queryByRole("dialog", { name: "업데이트" })).not.toBeInTheDocument();
   });
 
-  it("시작 시 업데이트가 있으면 모달을 띄우고, 지금 업데이트를 누르면 설치 후 재시작한다", async () => {
+  it("shows a modal on startup when an update is available, and installs then restarts when \"Update now\" is clicked", async () => {
     const update = pendingUpdate();
     updater.checkForUpdate.mockResolvedValue(update);
     render(<AppUpdater />);
@@ -44,7 +44,7 @@ describe("AppUpdater", () => {
     await waitFor(() => expect(update.relaunch).toHaveBeenCalled());
   });
 
-  it("수동 확인은 최신 버전이어도 결과 모달을 연다", async () => {
+  it("opens the result modal for a manual check even when already on the latest version", async () => {
     updater.checkForUpdate.mockResolvedValue(null);
     render(<AppUpdater />);
     await waitFor(() => expect(updater.checkForUpdate).toHaveBeenCalledTimes(1));
@@ -54,7 +54,7 @@ describe("AppUpdater", () => {
     expect(await screen.findByText("최신 버전입니다.")).toBeInTheDocument();
   });
 
-  it("설치가 실패하면 오류를 알린다", async () => {
+  it("notifies an error when installation fails", async () => {
     const update = pendingUpdate({
       downloadAndInstall: vi.fn().mockRejectedValue(new Error("네트워크 오류")),
     });

@@ -8,7 +8,7 @@ import { checkServerCompatibility, serverBehindOf } from "./server-compatibility
 beforeEach(() => http.httpGet.mockReset());
 
 describe("checkServerCompatibility", () => {
-  it("서버 버전이 앱보다 낮으면 server-behind", async () => {
+  it("returns server-behind when the server version is lower than the app's", async () => {
     http.httpGet.mockResolvedValue({ version: "0.1.9" });
     // __APP_VERSION__ 은 이 저장소 package.json 버전(0.1.x, 항상 0.1.9보다 큼)
     const result = await checkServerCompatibility();
@@ -16,7 +16,7 @@ describe("checkServerCompatibility", () => {
     expect(serverBehindOf(result)?.serverVersion).toBe("0.1.9");
   });
 
-  it("서버 버전이 앱과 같거나 높으면 ok", async () => {
+  it("returns ok when the server version is equal to or higher than the app's", async () => {
     http.httpGet.mockResolvedValue({ version: __APP_VERSION__ });
     expect((await checkServerCompatibility()).kind).toBe("ok");
 
@@ -24,7 +24,7 @@ describe("checkServerCompatibility", () => {
     expect((await checkServerCompatibility()).kind).toBe("ok");
   });
 
-  it("서버 응답이 없거나 파싱 불가면 unknown (경고 안 함)", async () => {
+  it("returns unknown (without warning) when there is no server response or it can't be parsed", async () => {
     http.httpGet.mockRejectedValue(new Error("연결 불가"));
     expect((await checkServerCompatibility()).kind).toBe("unknown");
 

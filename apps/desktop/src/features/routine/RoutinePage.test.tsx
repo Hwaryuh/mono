@@ -16,7 +16,7 @@ function renderRoutine(repository: RoutineRepository = createMockRoutineReposito
 }
 
 describe("RoutinePage", () => {
-  it("반복 요일, 기간·만료, 진행률, 최근 2주와 비지정 요일을 표시한다", async () => {
+  it("shows the recurring days, period/expiration, progress, last 2 weeks, and unspecified days", async () => {
     renderRoutine();
     const vitamin = (await screen.findByText("비타민 먹기")).closest<HTMLElement>(".routine-card")!;
     expect(within(vitamin).getByText("14일 남음")).toBeInTheDocument();
@@ -29,7 +29,7 @@ describe("RoutinePage", () => {
     expect(within(expired).getByRole("button", { name: "주간 회고 쓰기 완료 처리" })).toBeDisabled();
   });
 
-  it("공통 Modal에서 만들고 수정하며 focus를 복귀한다", async () => {
+  it("creates and edits via the shared Modal and returns focus", async () => {
     renderRoutine(createMockRoutineRepository(), "/routine?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 루틴" });
     expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
@@ -48,7 +48,7 @@ describe("RoutinePage", () => {
     expect(screen.getByText("아침 스트레칭")).toBeInTheDocument();
   });
 
-  it("루틴 수정 Modal에서 확인을 거쳐 삭제한다", async () => {
+  it("deletes a routine through a confirmation in the edit Modal", async () => {
     const { repository } = renderRoutine();
     const vitaminCard = (await screen.findByText("비타민 먹기")).closest<HTMLElement>(".routine-card")!;
     fireEvent.click(within(vitaminCard).getByRole("button", { name: "수정" }));
@@ -67,7 +67,7 @@ describe("RoutinePage", () => {
     expect(snapshot.items.some((routine) => routine.title === "운동 30분 하기")).toBe(true);
   });
 
-  it("새 루틴 종료일에 공통 날짜 선택기를 사용한다", async () => {
+  it("uses the shared date picker for a new routine's end date", async () => {
     renderRoutine(createMockRoutineRepository(), "/routine?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 루틴" });
     fireEvent.click(within(modal).getByRole("radio", { name: "종료일 지정" }));
@@ -77,7 +77,7 @@ describe("RoutinePage", () => {
     expect(screen.getByRole("dialog", { name: "종료일 선택" })).toHaveClass("ui-date-picker__popup--end");
   });
 
-  it("루틴 Modal에서 공통 라벨 관리자를 연다", async () => {
+  it("opens the shared label manager from the routine Modal", async () => {
     const state = createMockPlatformState();
     renderRoutine(createMockRoutineRepository(state), "/routine?modal=new", createMockTodoRepository(state));
     const routineModal = await screen.findByRole("dialog", { name: "새 루틴" });
@@ -91,7 +91,7 @@ describe("RoutinePage", () => {
     expect(await within(labelModal).findByText("회복")).toBeInTheDocument();
   });
 
-  it("오늘 완료 mutation pending과 오류를 해당 루틴에만 표시한다", async () => {
+  it("shows today's completion mutation pending and error states only on the affected routine", async () => {
     const base = createMockRoutineRepository();
     let rejectToggle: ((reason?: unknown) => void) | undefined;
     const repository: RoutineRepository = {
@@ -113,7 +113,7 @@ describe("RoutinePage", () => {
     expect(second.closest(".routine-card")?.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it("빈 상태에서 새 루틴 진입을 제공한다", async () => {
+  it("provides a new-routine entry point in the empty state", async () => {
     const base = createMockRoutineRepository();
     const repository: RoutineRepository = {
       ...base,

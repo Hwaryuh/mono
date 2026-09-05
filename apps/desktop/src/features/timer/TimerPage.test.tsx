@@ -29,7 +29,7 @@ describe("TimerPage", () => {
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
   afterEach(() => vi.useRealTimers());
 
-  it("설정한 집중 길이로 시작하고 흘려보낸 만큼 줄어든다", () => {
+  it("starts at the configured focus duration and counts down as time elapses", () => {
     renderTimer({ focusMinutes: 2 });
     expect(screen.getByText("02:00")).toBeInTheDocument();
 
@@ -40,7 +40,7 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("큰 숫자를 눌러 집중 길이를 직접 입력한다", () => {
+  it("taps the large number to directly enter the focus duration", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 25 });
 
     fireEvent.click(screen.getByRole("button", { name: "25:00" }));
@@ -52,7 +52,7 @@ describe("TimerPage", () => {
     expect(settingsStore.read().focusMinutes).toBe(40);
   });
 
-  it("범위를 벗어난 입력은 경계로 잘라낸다", () => {
+  it("clamps an out-of-range input to the boundary", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 25 });
 
     fireEvent.click(screen.getByRole("button", { name: "25:00" }));
@@ -63,7 +63,7 @@ describe("TimerPage", () => {
     expect(settingsStore.read().focusMinutes).toBe(180);
   });
 
-  it("일시정지 중에도 길이를 고칠 수 있다", () => {
+  it("allows editing the duration even while paused", () => {
     const { settingsStore } = renderTimer({ focusMinutes: 2 });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(30_000); });
@@ -78,7 +78,7 @@ describe("TimerPage", () => {
     expect(settingsStore.read().focusMinutes).toBe(10);
   });
 
-  it("카운트다운 중에는 숫자를 편집할 수 없다", () => {
+  it("does not allow editing the number while counting down", () => {
     renderTimer({ focusMinutes: 2 });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(1_000); });
@@ -87,7 +87,7 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /일시정지/ })).toBeInTheDocument();
   });
 
-  it("집중이 끝나면 알람이 울리고, 끄기 전에는 새 집중으로 돌아가지 않는다", () => {
+  it("sounds the alarm when focus ends and does not return to a new focus session until it's turned off", () => {
     const { sessionStore, alarm } = renderTimer({ focusMinutes: 1 });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
@@ -103,7 +103,7 @@ describe("TimerPage", () => {
     expect(screen.getByRole("button", { name: /^시작$/ })).toBeInTheDocument();
   });
 
-  it("알람이 꺼져 있으면 곧바로 새 집중으로 돌아간다", () => {
+  it("returns immediately to a new focus session when the alarm is off", () => {
     const { alarm } = renderTimer({ focusMinutes: 1, alarmEnabled: false });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
@@ -112,14 +112,14 @@ describe("TimerPage", () => {
     expect(screen.getByText("01:00")).toBeInTheDocument();
   });
 
-  it("건너뛰기는 세션을 기록하지 않는다", () => {
+  it("does not record a session when skipping", () => {
     const { sessionStore } = renderTimer({ focusMinutes: 1 });
     fireEvent.click(screen.getByRole("button", { name: "세션 건너뛰기" }));
 
     expect(sessionStore.read(currentIsoDate())).toHaveLength(0);
   });
 
-  it("고른 할 일에 세션이 붙는다", async () => {
+  it("attaches the session to the selected todo", async () => {
     const { sessionStore } = renderTimer({ focusMinutes: 1 });
     const tasks = await screen.findAllByRole("button", { pressed: false });
     const target = tasks.find((task) => task.classList.contains("timer-task"))!;

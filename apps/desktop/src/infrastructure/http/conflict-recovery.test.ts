@@ -6,7 +6,7 @@ type Snapshot = { items: Array<{ id: string; version: number }> };
 const key = ["todo"] as const;
 
 describe("resyncConflictVersion", () => {
-  it("무효화 뒤 최신 snapshot의 version을 돌려준다(409 후 재저장이 stuck 되지 않도록)", async () => {
+  it("returns the latest snapshot's version after invalidation (so a re-save after a 409 doesn't get stuck)", async () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData<Snapshot>(key, { items: [{ id: "a", version: 1 }] });
     // 다른 기기가 먼저 저장해 서버 version이 2로 올라간 상황을 무효화(=재조회)가 반영한다.
@@ -23,7 +23,7 @@ describe("resyncConflictVersion", () => {
     expect(version).toBe(2);
   });
 
-  it("레코드가 사라졌으면 null(다른 기기 삭제)", async () => {
+  it("returns null if the record is gone (deleted on another device)", async () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData<Snapshot>(key, { items: [] });
 

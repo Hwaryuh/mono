@@ -6,11 +6,11 @@ const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 afterEach(() => vi.unstubAllGlobals());
 
 describe("newMediaId", () => {
-  it("crypto.randomUUID가 있으면 그걸 쓴다", () => {
+  it("uses crypto.randomUUID when it's available", () => {
     expect(newMediaId()).toMatch(uuidV4);
   });
 
-  it("crypto.randomUUID가 없어도 getRandomValues로 v4 UUID를 만든다", () => {
+  it("generates a v4 UUID via getRandomValues when crypto.randomUUID isn't available", () => {
     vi.stubGlobal("crypto", {
       getRandomValues: (array: Uint8Array) => {
         for (let index = 0; index < array.length; index += 1) array[index] = index;

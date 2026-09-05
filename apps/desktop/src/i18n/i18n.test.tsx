@@ -5,12 +5,12 @@ import { I18nProvider, LOCALE_STORAGE_KEY, readLocale, useI18n } from "./i18n";
 import { koMessages } from "./messages.ko";
 
 describe("i18n", () => {
-  it("지원하지 않는 저장값은 한국어로 복구한다", () => {
+  it("falls back to Korean for an unsupported stored value", () => {
     localStorage.setItem(LOCALE_STORAGE_KEY, "en");
     expect(readLocale(localStorage)).toBe("ko");
   });
 
-  it("한국어 메시지와 날짜 형식을 제공하고 선택을 저장한다", () => {
+  it("provides Korean messages and date format and persists the selection", () => {
     const wrapper = ({ children }: { children: ReactNode }) => <I18nProvider>{children}</I18nProvider>;
     const { result } = renderHook(() => useI18n(), { wrapper });
 
@@ -22,7 +22,7 @@ describe("i18n", () => {
     expect(document.documentElement).toHaveAttribute("lang", "ko-KR");
   });
 
-  it("의미가 드러나는 키와 독립된 메시지를 유지한다", () => {
+  it("keeps keys meaningful and messages self-contained", () => {
     for (const [key, message] of Object.entries(koMessages)) {
       expect(key).not.toMatch(/\.text\.\d+$/);
       expect(message).not.toMatch(/\{value\d+\}/);

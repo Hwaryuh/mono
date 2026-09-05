@@ -18,7 +18,7 @@ function storageOf(initial: Record<string, string> = {}): Storage {
 }
 
 describe("LocalStorageTimerSessionStore", () => {
-  it("어제 기록은 오늘 읽을 때 버린다", () => {
+  it("discards yesterday's records when read today", () => {
     const storage = storageOf({
       [TIMER_SESSIONS_STORAGE_KEY]: JSON.stringify({
         date: "2026-09-01",
@@ -29,7 +29,7 @@ describe("LocalStorageTimerSessionStore", () => {
     expect(LocalStorageTimerSessionStore.of(storage).read("2026-09-02")).toEqual([]);
   });
 
-  it("같은 날 세션은 쌓인다", () => {
+  it("accumulates sessions from the same day", () => {
     const store = LocalStorageTimerSessionStore.of(storageOf());
     store.append("2026-09-02", { startedAt: "09:20", todoId: "t1", minutes: 25 });
     const sessions = store.append("2026-09-02", { startedAt: "09:55", todoId: "t2", minutes: 25 });
@@ -38,13 +38,13 @@ describe("LocalStorageTimerSessionStore", () => {
     expect(store.read("2026-09-02")).toHaveLength(2);
   });
 
-  it("깨진 저장값은 빈 기록으로 읽는다", () => {
+  it("reads a corrupted stored value as an empty record", () => {
     const storage = storageOf({ [TIMER_SESSIONS_STORAGE_KEY]: "{not json" });
 
     expect(LocalStorageTimerSessionStore.of(storage).read("2026-09-02")).toEqual([]);
   });
 
-  it("할 일별 세션 수를 센다", () => {
+  it("counts the number of sessions per todo", () => {
     const counts = sessionCountsByTodo([
       { startedAt: "09:20", todoId: "t1", minutes: 25 },
       { startedAt: "09:55", todoId: "t1", minutes: 25 },

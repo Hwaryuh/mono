@@ -12,7 +12,7 @@ describe("PlatformApiEndpointProvider", () => {
     tauri.isTauri.mockReset();
   });
 
-  it("Tauri에서는 Rust가 결정한 런타임 주소를 사용한다", async () => {
+  it("uses the runtime address determined by Rust when running in Tauri", async () => {
     tauri.isTauri.mockReturnValue(true);
     tauri.invoke.mockResolvedValue("http://mono-server:4174");
 
@@ -20,13 +20,13 @@ describe("PlatformApiEndpointProvider", () => {
     expect(tauri.invoke).toHaveBeenCalledWith("server_api_base_url");
   });
 
-  it("브라우저 개발 환경에서는 기본 로컬 주소를 사용한다", async () => {
+  it("uses the default local address in the browser dev environment", async () => {
     tauri.isTauri.mockReturnValue(false);
 
     await expect(PlatformApiEndpointProvider.of().resolve()).resolves.toBe("http://127.0.0.1:4174");
   });
 
-  it("Tauri에서는 Rust가 준 베어러 토큰을 사용하고, 브라우저에서는 빈 문자열이다", async () => {
+  it("uses the bearer token provided by Rust in Tauri, and an empty string in the browser", async () => {
     tauri.isTauri.mockReturnValue(true);
     tauri.invoke.mockResolvedValue("s3cr3t");
     await expect(PlatformApiEndpointProvider.of().resolveToken()).resolves.toBe("s3cr3t");

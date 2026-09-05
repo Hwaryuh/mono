@@ -13,23 +13,23 @@ const c = item({ id: "c", title: "다라마", savedAt: "2026-05-20T00:00:00Z", c
 const ids = (items: ScrapItem[]) => items.map((i) => i.id);
 
 describe("sortItems", () => {
-  it("recent: 최신 savedAt 먼저", () => {
+  it("recent: newest savedAt first", () => {
     expect(ids(sortItems([a, b, c], "recent"))).toEqual(["c", "a", "b"]);
   });
 
-  it("oldest: 오래된 savedAt 먼저", () => {
+  it("oldest: oldest savedAt first", () => {
     expect(ids(sortItems([a, b, c], "oldest"))).toEqual(["b", "a", "c"]);
   });
 
-  it("title: 한국어 사전순", () => {
+  it("title: Korean alphabetical order", () => {
     expect(ids(sortItems([a, b, c], "title"))).toEqual(["a", "c", "b"]);
   });
 
-  it("comments: 댓글 많은 순, 동수는 최신 먼저", () => {
+  it("comments: most comments first, ties broken by newest first", () => {
     expect(ids(sortItems([a, b, c], "comments"))).toEqual(["b", "c", "a"]);
   });
 
-  it("입력 배열을 변형하지 않는다", () => {
+  it("does not mutate the input array", () => {
     const input = [a, b, c];
     sortItems(input, "oldest");
     expect(ids(input)).toEqual(["a", "b", "c"]);

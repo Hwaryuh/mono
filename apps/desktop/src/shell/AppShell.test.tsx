@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("다른 화면을 다녀와도 마지막 할 일 필터를 유지한다", async () => {
+  it("keeps the last todo filter after navigating to another screen and back", async () => {
     renderShell();
     fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /오늘/ }));
@@ -72,7 +72,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: "업무 1" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("검색 UI를 제거하고 Ctrl+K로 빠른 캡처를 연다", async () => {
+  it("removes the search UI and opens quick capture with Ctrl+K", async () => {
     const { container } = renderShell();
     expect(container.querySelector(".sidebar__search")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "검색" })).not.toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("AppShell", () => {
     expect(collapseButton).toHaveFocus();
   });
 
-  it("Ctrl+K 빠른 캡처에서 사진과 텍스트를 구성한 뒤 화살표로 제출한다", async () => {
+  it("composes a photo and text in the Ctrl+K quick capture and submits with the arrow button", async () => {
     renderShell();
     fireEvent.keyDown(window, { ctrlKey: true, key: "k" });
     const modal = await screen.findByRole("dialog", { name: "빠른 캡처" });
@@ -127,7 +127,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(within(modal).getByText("https://example.com/reference")).toBeInTheDocument());
   });
 
-  it("macOS에서는 Cmd 조합만 처리하고 플랫폼별 단축키 힌트를 표시한다", async () => {
+  it("only handles Cmd combinations on macOS and shows platform-specific shortcut hints", async () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
     renderShell();
     const settingsButton = screen.getByRole("button", { name: "설정 열기" });
@@ -157,14 +157,14 @@ describe("AppShell", () => {
     expect(await screen.findByRole("dialog", { name: "새 할 일" })).toBeInTheDocument();
   });
 
-  it("상단바에 별도 테마 전환 버튼을 표시하지 않는다", () => {
+  it("does not show a separate theme-toggle button in the top bar", () => {
     renderShell();
 
     expect(screen.queryByRole("button", { name: "다크 테마" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "라이트 테마" })).not.toBeInTheDocument();
   });
 
-  it("사이드바를 56px 축소 상태로 전환한다", () => {
+  it("switches the sidebar to its 56px collapsed state", () => {
     const { container } = renderShell();
 
     const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
@@ -176,7 +176,7 @@ describe("AppShell", () => {
     expect(screen.queryByRole("button", { name: "설정 열기" })).not.toBeInTheDocument();
   });
 
-  it("사이드바 폭을 키보드로 줄이고 최대값을 넘지 못한다", async () => {
+  it("narrows the sidebar width with the keyboard and cannot exceed the maximum value", async () => {
     localStorage.clear();
     const { container } = renderShell();
     const shell = container.querySelector<HTMLElement>(".app-shell")!;
@@ -195,7 +195,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(localStorage.getItem("mono:sidebar-width")).toBe("216"));
   });
 
-  it("최소 폭에서 더 줄이면 사이드바가 접힌다", () => {
+  it("collapses the sidebar when narrowed further from the minimum width", () => {
     localStorage.clear();
     const { container } = renderShell();
     const shell = container.querySelector(".app-shell")!;
@@ -209,7 +209,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: "사이드바 확장" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("드래그하는 동안 폭이 포인터를 따라가고 놓는 위치로 접힘·펼침이 결정된다", () => {
+  it("the width follows the pointer while dragging, and the drop position decides whether it collapses or expands", () => {
     // jsdom에 PointerEvent가 없어 clientX를 담을 수 있는 MouseEvent로 대체한다.
     const firePointer = (node: Element, type: string, clientX: number) =>
       fireEvent(node, new MouseEvent(type, { bubbles: true, clientX }));
@@ -238,7 +238,7 @@ describe("AppShell", () => {
     expect(shell.style.getPropertyValue("--sidebar-width")).toBe("200px");
   });
 
-  it("좌측 설정 아이콘을 닫기 아이콘으로 morph하고 설정 패널을 제어한다", async () => {
+  it("morphs the left settings icon into a close icon and controls the settings panel", async () => {
     const { container } = renderShell();
     const settingsButton = screen.getByRole("button", { name: "설정 열기" });
     const collapseButton = screen.getByRole("button", { name: "사이드바 축소" });
@@ -267,7 +267,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument());
   });
 
-  it("설정에서 강조색을 바꾸고 다음 실행에 복원한다", async () => {
+  it("changes the accent color in settings and restores it on the next launch", async () => {
     const firstRender = renderShell();
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
@@ -291,7 +291,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(document.documentElement).toHaveStyle({ "--color-accent": "oklch(0.873 0.14 93.538)" }));
   });
 
-  it("설정에서 지원 언어를 한국어 한 항목으로 제공한다", async () => {
+  it("offers Korean as the only supported language in settings", async () => {
     renderShell();
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
     const settingsModal = screen.getByRole("dialog", { name: "설정" });
@@ -304,7 +304,7 @@ describe("AppShell", () => {
     expect(within(listbox).getByRole("option", { name: "한국어" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("설정에서 Gemini API 키를 저장하고 연결 확인 후 삭제한다", async () => {
+  it("saves a Gemini API key in settings, verifies the connection, and deletes it", async () => {
     const store = new InMemoryAiSettingsStore();
     renderShell(undefined, undefined, undefined, undefined, undefined, store);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
@@ -323,7 +323,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(within(geminiSection).getByText("키 없음")).toBeInTheDocument());
   });
 
-  it("각 API 키 카드에서 사용할 AI 모델을 선택한다", async () => {
+  it("selects the AI model to use on each API key card", async () => {
     const store = new InMemoryAiSettingsStore();
     renderShell(undefined, undefined, undefined, undefined, undefined, store);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
@@ -351,7 +351,7 @@ describe("AppShell", () => {
     await expect(store.getActiveProvider()).resolves.toBe("openai");
   });
 
-  it("서버 설정에서 원격 모드로 전환하고 저장하면 재시작 안내가 뜬다", async () => {
+  it("shows a restart notice when switching to remote mode and saving in server settings", async () => {
     const store = new InMemoryServerSettingsStore({ reachable: ["http://100.80.12.34:4174"] });
     renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
@@ -383,7 +383,7 @@ describe("AppShell", () => {
     await waitFor(async () => expect((await store.read()).runningEmbedded).toBe(false));
   });
 
-  it("토큰이 걸린 원격 서버를 현재 연결로 정상 표시한다", async () => {
+  it("correctly displays a token-protected remote server as the current connection", async () => {
     const store = new InMemoryServerSettingsStore({ reachable: ["https://mono.example.ts.net"], requiredToken: "sekret" });
     await store.save({ mode: "remote", remoteUrl: "https://mono.example.ts.net", token: "sekret" });
     await store.restart();
@@ -399,7 +399,7 @@ describe("AppShell", () => {
     expect(probe).toHaveBeenCalledWith("https://mono.example.ts.net", "sekret");
   });
 
-  it("잘못된 원격 주소는 저장을 막고 오류를 알린다", async () => {
+  it("blocks saving and shows an error for an invalid remote address", async () => {
     const store = new InMemoryServerSettingsStore();
     renderShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, store);
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
@@ -424,7 +424,7 @@ describe("AppShell", () => {
     return settingsModal;
   }
 
-  it("저장공간 설정에서 미사용 미디어를 확인한 뒤 정리한다", async () => {
+  it("reviews unused media in storage settings and then cleans it up", async () => {
     const mediaMaintenance = new InMemoryMediaMaintenance({ count: 2, bytes: 1024, totalCount: 5, totalBytes: 4096 });
     const section = within(await openStoragePanel(mediaMaintenance)).getByRole("region", { name: "미사용 미디어 정리" });
     expect(within(section).getByText("확인 필요")).toBeInTheDocument();
@@ -440,7 +440,7 @@ describe("AppShell", () => {
     expect((await mediaMaintenance.orphanUsage()).count).toBe(0);
   });
 
-  it("저장 사용량이 R2 무료 한도의 80%를 넘으면 경고한다", async () => {
+  it("warns when storage usage exceeds 80% of the R2 free tier limit", async () => {
     const nineGb = 9 * 1024 * 1024 * 1024;
     const mediaMaintenance = new InMemoryMediaMaintenance({ count: 0, bytes: 0, totalCount: 1200, totalBytes: nineGb });
     const section = within(await openStoragePanel(mediaMaintenance)).getByRole("region", { name: "미사용 미디어 정리" });
@@ -448,7 +448,7 @@ describe("AppShell", () => {
     expect(await within(section).findByRole("alert")).toHaveTextContent("무료 저장 한도의 90%");
   });
 
-  it("R2 사용량 리포트에서 Class B 작업이 무료 한도의 80%를 넘으면 경고한다", async () => {
+  it("warns in the R2 usage report when Class B operations exceed 80% of the free tier limit", async () => {
     const r2SettingsStore = new InMemoryR2SettingsStore({
       storageBytes: 3 * 1024 * 1024 * 1024,
       objectCount: 500,
@@ -470,7 +470,7 @@ describe("AppShell", () => {
     expect(within(section).getByText(/요금 클래스 미상 작업 3건/)).toBeInTheDocument();
   });
 
-  it("확인이 실패하면 오류만 알리고 정리 버튼을 비활성 상태로 둔다", async () => {
+  it("only shows an error and keeps the cleanup button disabled when the check fails", async () => {
     const brokenMaintenance: MediaMaintenance = {
       orphanUsage: () => Promise.reject(new Error("API 서버에 연결할 수 없습니다.")),
       gc: () => Promise.reject(new Error("사용되지 않음")),
@@ -484,7 +484,7 @@ describe("AppShell", () => {
     expect(within(section).getByRole("button", { name: "정리" })).toBeDisabled();
   });
 
-  it("사이드바 링크로 수집함 경로를 연다", async () => {
+  it("opens the inbox route via the sidebar link", async () => {
     renderShell();
 
     fireEvent.click(screen.getByRole("link", { name: /수집함/ }));
@@ -493,7 +493,7 @@ describe("AppShell", () => {
     expect(screen.queryByText("AI 분류 결과를 확인하고 승인합니다")).not.toBeInTheDocument();
   });
 
-  it("할 일 상단 액션으로 새 할 일 Modal을 연다", async () => {
+  it("opens the new-todo Modal via the todo top action", async () => {
     renderShell();
     fireEvent.click(screen.getByRole("link", { name: /할 일/ }));
     const createButton = await screen.findByRole("button", { name: "새 할 일" });
@@ -507,7 +507,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(createButton).toHaveFocus());
   });
 
-  it("사이드바 루틴 배지를 공유 상태에서 파생한다", async () => {
+  it("derives the sidebar routine badge from shared state", async () => {
     const routineRepository = createMockRoutineRepository();
     await routineRepository.create({ title: "추가 루틴", labelId: "health", days: [3], endDate: null });
     renderShell(routineRepository);
@@ -515,7 +515,7 @@ describe("AppShell", () => {
     expect(await screen.findByRole("link", { name: /루틴 4/ })).toBeInTheDocument();
   });
 
-  it("사이드바 일정 배지와 상단 액션을 일정 원본에서 연결한다", async () => {
+  it("wires the sidebar calendar badge and top action to the calendar data source", async () => {
     const calendarRepository = createMockCalendarRepository();
     await calendarRepository.create({ title: "오늘 추가 일정", startDate: "2026-08-05", startTime: "23:00", endDate: "2026-08-05", endTime: "23:30", location: "", categoryId: "work", note: "" });
     renderShell(createMockRoutineRepository(), calendarRepository);
@@ -530,7 +530,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(createButton).toHaveFocus());
   });
 
-  it("사이드바 스크랩 링크에서 상단 스크랩 추가 액션을 연결한다", async () => {
+  it("wires the top add-scrap action to the sidebar scrap link", async () => {
     renderShell();
 
     const scrapLink = await screen.findByRole("link", { name: "스크랩" });
@@ -543,7 +543,7 @@ describe("AppShell", () => {
     await waitFor(() => expect(createButton).toHaveFocus());
   });
 
-  it("가계부 상단 액션에서 Escape·취소·생성 후 focus를 복귀한다", async () => {
+  it("returns focus after Escape, cancel, and creation from the ledger top action", async () => {
     renderShell();
     fireEvent.click(screen.getByRole("link", { name: "가계부" }));
     const createButton = await screen.findByRole("button", { name: "지출 추가" });

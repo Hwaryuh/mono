@@ -14,7 +14,7 @@ function renderCalendar(repository: CalendarRepository = createMockCalendarRepos
 }
 
 describe("CalendarPage", () => {
-  it("다시 열어도 마지막 보기와 조회 월을 유지한다", async () => {
+  it("keeps the last view and viewed month after reopening", async () => {
     const repository = createMockCalendarRepository();
     const viewStateStore = calendarViewStateStoreOf("2026-08");
     const first = renderCalendar(repository, "/calendar", viewStateStore);
@@ -30,7 +30,7 @@ describe("CalendarPage", () => {
     expect(screen.getByRole("tab", { name: "일정표" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("42칸 월 경계, 오늘, 긴 제목과 일정표 키보드 전환을 표시한다", async () => {
+  it("renders the 42-cell month grid boundaries, today marker, long titles, and schedule-table keyboard switching", async () => {
     const { container } = renderCalendar();
     expect(await screen.findByText("2026년 8월")).toBeInTheDocument();
     expect(container.querySelectorAll(".calendar-cell")).toHaveLength(42);
@@ -47,7 +47,7 @@ describe("CalendarPage", () => {
     expect(screen.getByRole("button", { name: /부산 여행/ })).toBeInTheDocument();
   });
 
-  it("하루 일정을 월간 셀에 최대 3개까지 표시한다", async () => {
+  it("shows up to 3 events per day in a month cell", async () => {
     const { container } = renderCalendar();
     await screen.findByText("2026년 8월");
 
@@ -56,7 +56,7 @@ describe("CalendarPage", () => {
     expect(todayCell?.querySelector(".calendar-cell__more")).not.toBeInTheDocument();
   });
 
-  it("일정이 있는 날짜 숫자로 해당 날짜의 전체 일정 창을 연다", async () => {
+  it("opens the full day-schedule panel by clicking the date number of a day with events", async () => {
     renderCalendar();
     fireEvent.click(await screen.findByRole("button", { name: "8월 5일 일정 3개 보기" }));
 
@@ -66,7 +66,7 @@ describe("CalendarPage", () => {
     expect(within(dayDialog).getByRole("button", { name: /가계부 정리/ })).toBeInTheDocument();
   });
 
-  it("여러 날 일정을 이어지는 막대로 그리고, 끼인 날에서도 일정 창에 넣는다", async () => {
+  it("draws multi-day events as a continuous bar and includes them in the day-schedule panel for days in between", async () => {
     const { container } = renderCalendar();
     await screen.findByText("2026년 8월");
 
@@ -93,7 +93,7 @@ describe("CalendarPage", () => {
     expect(within(dialog).getByRole("button", { name: /제주 워크샵/ })).toBeInTheDocument();
   });
 
-  it("앱 스타일 날짜 선택기에서 날짜를 변경하고 입력 버튼으로 focus를 복귀한다", async () => {
+  it("changes the date in the app-style date picker and returns focus to the trigger button", async () => {
     renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 일정" });
     const trigger = within(modal).getByRole("button", { name: "시작 날짜" });
@@ -108,7 +108,7 @@ describe("CalendarPage", () => {
     expect(screen.queryByRole("dialog", { name: "시작 날짜 선택" })).not.toBeInTheDocument();
   });
 
-  it("앱 스타일 라벨 목록을 키보드로 선택한다", async () => {
+  it("selects from the app-style label list using the keyboard", async () => {
     renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 일정" });
     const trigger = within(modal).getByRole("combobox", { name: "라벨" });
@@ -126,7 +126,7 @@ describe("CalendarPage", () => {
     expect(screen.queryByRole("listbox", { name: "라벨 옵션" })).not.toBeInTheDocument();
   });
 
-  it("일정 라벨을 추가하고 이름과 색상을 커스텀한다", async () => {
+  it("adds an event label and customizes its name and color", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository, "/calendar?modal=new");
     const eventModal = await screen.findByRole("dialog", { name: "새 일정" });
@@ -151,7 +151,7 @@ describe("CalendarPage", () => {
     expect(category).toMatchObject({ color: "oklch(0.604 0.149 260.322)" });
   });
 
-  it("단발 일정 삭제는 확인 모달을 거친다", async () => {
+  it("deleting a single (non-recurring) event goes through a confirmation modal", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository);
     fireEvent.click(await screen.findByRole("button", { name: /미용실 방문/ }));
@@ -168,7 +168,7 @@ describe("CalendarPage", () => {
     expect((await repository.getSnapshot()).events.some((event) => event.id === "event-2")).toBe(false);
   });
 
-  it("사용 중인 라벨 삭제 시 열린 일정과 기존 일정을 대체 라벨로 이동한다", async () => {
+  it("moves the open event and existing events to a replacement label when deleting a label in use", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository);
     fireEvent.click(await screen.findByRole("button", { name: /미용실 방문/ }));
@@ -188,7 +188,7 @@ describe("CalendarPage", () => {
     expect(within(eventModal).getByRole("combobox", { name: "라벨" })).toHaveTextContent("업무");
   });
 
-  it("공통 Modal에서 생성·수정하고 수정 진입점으로 focus를 복귀한다", async () => {
+  it("creates and edits via the shared Modal and returns focus to the edit entry point", async () => {
     renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
     let modal = await screen.findByRole("dialog", { name: "새 일정" });
     fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "치과 검진" } });
@@ -204,7 +204,7 @@ describe("CalendarPage", () => {
     expect(await screen.findByRole("button", { name: /정기 치과 검진/ })).toHaveFocus();
   });
 
-  it("반복 프리셋으로 일정을 만들면 월간 보기에 회차로 펼쳐진다", async () => {
+  it("creating an event with a recurrence preset expands it into occurrences in month view", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository, "/calendar?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 일정" });
@@ -225,7 +225,7 @@ describe("CalendarPage", () => {
       .toEqual(["2026-08-05", "2026-08-12", "2026-08-19", "2026-08-26"]);
   });
 
-  it("반복 회차를 수정하면 범위를 묻고 이 일정만 반영한다", async () => {
+  it("editing a recurring occurrence asks for the scope and applies the change to this event only", async () => {
     const repository = createMockCalendarRepository();
     await repository.create({
       title: "루틴 미팅", startDate: "2026-08-03", startTime: "09:00", endDate: "2026-08-03", endTime: "09:30",
@@ -248,7 +248,7 @@ describe("CalendarPage", () => {
     expect(changed.filter((event) => event.title === "루틴 미팅").length).toBeGreaterThanOrEqual(3);
   });
 
-  it("빈 상태에서 생성 진입을 제공한다", async () => {
+  it("provides a create entry point in the empty state", async () => {
     const base = createMockCalendarRepository();
     const repository: CalendarRepository = {
       ...base,
@@ -262,7 +262,7 @@ describe("CalendarPage", () => {
     expect(await screen.findByRole("dialog", { name: "새 일정" })).toBeInTheDocument();
   });
 
-  it("수정 mutation pending·실패를 열린 일정에만 표시한다", async () => {
+  it("shows the edit mutation's pending/failure state only on the open event", async () => {
     const base = createMockCalendarRepository();
     let rejectUpdate: ((reason?: unknown) => void) | undefined;
     const repository: CalendarRepository = {
@@ -282,7 +282,7 @@ describe("CalendarPage", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 
-  it("종료가 시작보다 빠른 경계 조건을 저장하지 않는다", async () => {
+  it("does not save when the end time is earlier than the start time", async () => {
     const repository = createMockCalendarRepository();
     const update = vi.spyOn(repository, "update");
     renderCalendar(repository);
@@ -298,7 +298,7 @@ describe("CalendarPage", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("시간은 직접 입력하고 아이콘으로만 다이얼을 연다", async () => {
+  it("types the time directly and opens the dial only via the icon", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository);
     fireEvent.click(await screen.findByRole("button", { name: /팀 회의/ }));

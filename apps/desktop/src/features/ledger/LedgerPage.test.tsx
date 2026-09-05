@@ -40,7 +40,7 @@ async function fillRequiredFields() {
 }
 
 describe("LedgerPage", () => {
-  it("다시 열어도 마지막 조회 월을 유지한다", async () => {
+  it("keeps the last viewed month after reopening", async () => {
     const repository = createMockLedgerRepository();
     const viewStateStore = ledgerViewStateStoreOf();
     const first = renderLedger(repository, "/ledger", viewStateStore);
@@ -54,7 +54,7 @@ describe("LedgerPage", () => {
     expect(screen.getByText("전기세")).toBeInTheDocument();
   });
 
-  it("월 합계, 비교, 라벨별 금액과 현재 월 목록을 표시한다", async () => {
+  it("shows the monthly total, comparison, per-label amounts, and the current month's list", async () => {
     renderLedger();
 
     expect(await screen.findByText("₩ 609,200")).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("LedgerPage", () => {
     expect(screen.queryByText("전기세")).not.toBeInTheDocument();
   });
 
-  it("이전 월/다음 월로 이동하며 해당 월 목록을 보여준다", async () => {
+  it("navigates to the previous/next month and shows that month's list", async () => {
     renderLedger();
     await screen.findByText("점심값");
 
@@ -83,7 +83,7 @@ describe("LedgerPage", () => {
     expect(screen.getByRole("button", { name: "다음 월" })).toBeDisabled();
   });
 
-  it("거래가 없는 전체 빈 상태와 0원 합계를 표시한다", async () => {
+  it("shows the full empty state and a 0-won total when there are no transactions", async () => {
     const state = createMockPlatformState();
     state.ledger.expenses = [];
     renderLedger(repositoryOf(createMockLedgerRepository(), { getSnapshot: async () => structuredClone(state.ledger), create: async () => undefined }));
@@ -93,7 +93,7 @@ describe("LedgerPage", () => {
     expect(screen.getByText("이번 달 지출이 없습니다")).toBeInTheDocument();
   });
 
-  it("긴 항목명과 큰 금액을 손실 없이 표시한다", async () => {
+  it("displays long item names and large amounts without truncation", async () => {
     const state = createMockPlatformState();
     const title = "아주 긴 지출 항목 이름 ".repeat(10).trim();
     state.ledger.expenses = [{ id: "expense-large", title, amountWon: 9_000_000_000_000, date: "2026-08-05", categoryId: "other", note: "" }];
@@ -103,7 +103,7 @@ describe("LedgerPage", () => {
     expect(screen.getAllByText("₩ 9,000,000,000,000").length).toBeGreaterThan(0);
   });
 
-  it("쉼표 금액으로 지출을 생성하고 Modal을 닫는다", async () => {
+  it("creates an expense with a comma-formatted amount and closes the Modal", async () => {
     renderLedger(createMockLedgerRepository(), "/ledger?modal=new");
     const modal = await fillRequiredFields();
     expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
@@ -115,7 +115,7 @@ describe("LedgerPage", () => {
     expect(screen.getAllByText("₩ 12,345").length).toBeGreaterThan(0);
   });
 
-  it("지출 행을 눌러 항목과 금액을 수정한다", async () => {
+  it("clicks an expense row to edit its item and amount", async () => {
     renderLedger();
     fireEvent.click(await screen.findByRole("button", { name: "점심값 수정" }));
 
@@ -131,7 +131,7 @@ describe("LedgerPage", () => {
     expect(screen.getAllByText("₩ 9,000").length).toBeGreaterThan(0);
   });
 
-  it("지출을 확인 후 삭제한다", async () => {
+  it("deletes an expense after confirmation", async () => {
     renderLedger();
     fireEvent.click(await screen.findByRole("button", { name: "장보기 수정" }));
 
@@ -144,7 +144,7 @@ describe("LedgerPage", () => {
     await waitFor(() => expect(screen.queryByText("장보기")).not.toBeInTheDocument());
   });
 
-  it("생성 pending을 Modal 내부에 표시한다", async () => {
+  it("shows the creation pending state inside the Modal", async () => {
     const base = createMockLedgerRepository();
     const repository = repositoryOf(base, { create: vi.fn(() => new Promise<void>(() => undefined)) });
     renderLedger(repository, "/ledger?modal=new");
@@ -156,7 +156,7 @@ describe("LedgerPage", () => {
     expect(within(modal).getByRole("button", { name: "저장" })).toBeDisabled();
   });
 
-  it("생성 실패 시 입력값을 보존하고 항목 입력으로 focus를 돌린다", async () => {
+  it("preserves input values on creation failure and returns focus to the item input", async () => {
     const base = createMockLedgerRepository();
     const repository = repositoryOf(base, { create: vi.fn(async () => { throw new Error("저장소 오류"); }) });
     renderLedger(repository, "/ledger?modal=new");
@@ -170,7 +170,7 @@ describe("LedgerPage", () => {
     await waitFor(() => expect(within(modal).getByRole("textbox", { name: "항목" })).toHaveFocus());
   });
 
-  it("Modal focus를 가두고 Escape로 닫는다", async () => {
+  it("traps focus within the Modal and closes it with Escape", async () => {
     renderLedger(createMockLedgerRepository(), "/ledger?modal=new");
     const modal = await screen.findByRole("dialog", { name: "지출 추가" });
     const saveButton = within(modal).getByRole("button", { name: "저장" });
@@ -186,7 +186,7 @@ describe("LedgerPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "지출 추가" })).not.toBeInTheDocument());
   });
 
-  it("라벨을 방향키, Home, End, Enter로 선택한다", async () => {
+  it("selects a label using arrow keys, Home, End, and Enter", async () => {
     renderLedger(createMockLedgerRepository(), "/ledger?modal=new");
     const modal = await screen.findByRole("dialog", { name: "지출 추가" });
     const trigger = within(modal).getByRole("combobox", { name: "라벨" });
@@ -206,7 +206,7 @@ describe("LedgerPage", () => {
     expect(trigger).toHaveTextContent("식비");
   });
 
-  it("라벨 관리에서 자유 색상의 라벨을 추가하고 지출 라벨에 반영한다", async () => {
+  it("adds a label with a custom color in label management and reflects it in the expense label", async () => {
     const repository = createMockLedgerRepository();
     renderLedger(repository, "/ledger?modal=new");
     const expenseModal = await screen.findByRole("dialog", { name: "지출 추가" });
@@ -229,7 +229,7 @@ describe("LedgerPage", () => {
     expect(await screen.findByRole("option", { name: "교통" })).toBeInTheDocument();
   });
 
-  it("사용 중인 라벨을 삭제하면 기존 지출과 선택값을 기타로 이동한다", async () => {
+  it("moves existing expenses and the current selection to \"Other\" when a label in use is deleted", async () => {
     const repository = createMockLedgerRepository();
     renderLedger(repository, "/ledger?modal=new");
     const expenseModal = await screen.findByRole("dialog", { name: "지출 추가" });

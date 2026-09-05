@@ -19,12 +19,12 @@ function storageOf(initial: Record<string, string> = {}): Storage {
 }
 
 describe("timer settings", () => {
-  it("범위를 벗어난 값은 경계로 잘라낸다", () => {
+  it("clamps an out-of-range value to the boundary", () => {
     expect(normalizeTimerSettings({ focusMinutes: 999 }).focusMinutes).toBe(180);
     expect(normalizeTimerSettings({ focusMinutes: 0 }).focusMinutes).toBe(1);
   });
 
-  it("예전 휴식 설정은 폐기한다", () => {
+  it("discards the legacy rest setting", () => {
     const settings = normalizeTimerSettings({ shortBreakMinutes: 5, autoStartBreak: true, autoStartFocus: true });
 
     expect(settings).not.toHaveProperty("shortBreakMinutes");
@@ -32,12 +32,12 @@ describe("timer settings", () => {
     expect(settings).not.toHaveProperty("autoStartFocus");
   });
 
-  it("빠지거나 깨진 값은 기본값으로 채운다", () => {
+  it("fills in missing or corrupted values with defaults", () => {
     expect(normalizeTimerSettings({ focusMinutes: "몰라" })).toEqual(defaultTimerSettings);
     expect(normalizeTimerSettings(null)).toEqual(defaultTimerSettings);
   });
 
-  it("저장한 값을 다시 읽는다", () => {
+  it("reads back a saved value", () => {
     const storage = storageOf();
     const store = LocalStorageTimerSettingsStore.of(storage);
     store.write({ ...defaultTimerSettings, focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
@@ -45,7 +45,7 @@ describe("timer settings", () => {
     expect(store.read()).toMatchObject({ focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
   });
 
-  it("깨진 저장값은 기본값으로 읽는다", () => {
+  it("reads a corrupted stored value as the default", () => {
     const storage = storageOf({ [TIMER_SETTINGS_STORAGE_KEY]: "{not json" });
 
     expect(LocalStorageTimerSettingsStore.of(storage).read()).toEqual(defaultTimerSettings);

@@ -35,7 +35,7 @@ const emptyDashboardRepository: DashboardRepository = {
 };
 
 describe("DashboardPage", () => {
-  it("초기 데이터가 없으면 각 위젯에 빈 상태를 표시한다", async () => {
+  it("shows an empty state in each widget when there is no initial data", async () => {
     renderDashboard(emptyDashboardRepository);
 
     expect(await screen.findByText("아직 분류한 항목이 없습니다")).toBeInTheDocument();
@@ -46,7 +46,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("아직 스크랩이 없습니다")).toBeInTheDocument();
   });
 
-  it("빠른 캡처를 저장소 경계로 제출하고 최근 분류를 갱신한다", async () => {
+  it("submits quick capture through to the repository and updates the recent classification", async () => {
     renderDashboard();
     const input = await screen.findByRole("textbox", { name: "빠른 캡처" });
 
@@ -57,7 +57,7 @@ describe("DashboardPage", () => {
     expect(input).toHaveValue("");
   });
 
-  it("대시보드 빠른 캡처에 드롭한 텍스트를 화살표를 누를 때 제출한다", async () => {
+  it("submits text dropped into the dashboard quick capture when the arrow button is pressed", async () => {
     const { repository } = renderDashboard();
     const dropZone = await screen.findByRole("region", { name: "빠른 캡처 드롭 영역" });
     const input = screen.getByRole("textbox", { name: "빠른 캡처" });
@@ -80,7 +80,7 @@ describe("DashboardPage", () => {
     expect(dropZone).not.toHaveClass("quick-capture--dragging");
   });
 
-  it("대시보드 빠른 캡처에 영상을 첨부하고 스크랩으로 표시한다", async () => {
+  it("attaches a video to the dashboard quick capture and marks it as a scrap", async () => {
     const { repository } = renderDashboard();
     const dropZone = await screen.findByRole("region", { name: "빠른 캡처 드롭 영역" });
     const videoFile = new File(["video"], "rehearsal.mp4", { type: "video/mp4" });
@@ -104,7 +104,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("스크랩")).toBeInTheDocument();
   });
 
-  it("할 일 체크박스로 완료 상태를 바꾼다", async () => {
+  it("toggles the completed state via the todo checkbox", async () => {
     renderDashboard();
     const checkbox = await screen.findByRole("checkbox", { name: "설거지 하기 완료 처리" });
 

@@ -17,7 +17,7 @@ describe("createHttpTodoRepository", () => {
     vi.unstubAllGlobals();
   });
 
-  it("GET으로 스냅샷을 받아온다", async () => {
+  it("fetches the snapshot via GET", async () => {
     const snapshot = { today: "2026-08-26", labels: [], items: [] };
     fetchMock.mockResolvedValueOnce(jsonResponse(snapshot));
 
@@ -29,7 +29,7 @@ describe("createHttpTodoRepository", () => {
     expect(init).toEqual({});
   });
 
-  it("생성 시 POST로 JSON 바디를 전송한다", async () => {
+  it("sends a JSON body via POST when creating", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }, 201));
 
     const repository = createHttpTodoRepository();
@@ -41,14 +41,14 @@ describe("createHttpTodoRepository", () => {
     expect(init).toMatchObject({ method: "POST", body: JSON.stringify(input) });
   });
 
-  it("서버 오류 응답의 error 메시지를 Error로 던진다", async () => {
+  it("throws the server error response's error message as an Error", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: "항목을 찾을 수 없습니다." }, 404));
 
     const repository = createHttpTodoRepository();
     await expect(repository.delete("missing")).rejects.toThrow("항목을 찾을 수 없습니다.");
   });
 
-  it("Zod 검증 오류(422) 배열에서 첫 메시지를 뽑아 Error로 던진다", async () => {
+  it("extracts the first message from a Zod validation error (422) array and throws it as an Error", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: [{ message: "제목을 입력해야 합니다." }] }, 422));
 
     const repository = createHttpTodoRepository();
@@ -57,7 +57,7 @@ describe("createHttpTodoRepository", () => {
     ).rejects.toThrow("제목을 입력해야 합니다.");
   });
 
-  it("네트워크 연결 실패를 이해 가능한 Error로 감싼다", async () => {
+  it("wraps a network connection failure in an understandable Error", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
 
     const repository = createHttpTodoRepository();

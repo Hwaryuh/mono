@@ -3,7 +3,7 @@ import { createMockPlatformState } from "../../infrastructure/mock/mock-platform
 import { summarizeLedgerMonth } from "./ledger-summary";
 
 describe("summarizeLedgerMonth", () => {
-  it("현재 월 합계와 분류별 집계를 계산한다", () => {
+  it("calculates the current month's total and per-category aggregates", () => {
     const summary = summarizeLedgerMonth(createMockPlatformState().ledger);
 
     expect(summary.totalWon).toBe(609_200);
@@ -14,21 +14,21 @@ describe("summarizeLedgerMonth", () => {
     ]);
   });
 
-  it("다른 달 거래를 현재 월 합계에서 제외한다", () => {
+  it("excludes transactions from other months from the current month's total", () => {
     const summary = summarizeLedgerMonth(createMockPlatformState().ledger);
 
     expect(summary.expenses.some((expense) => expense.title === "전기세")).toBe(false);
     expect(summary.expenses.some((expense) => expense.title === "합주실 대여")).toBe(false);
   });
 
-  it("거래가 없는 전체 빈 상태를 계산한다", () => {
+  it("calculates the full empty state when there are no transactions", () => {
     const state = createMockPlatformState();
     state.ledger.expenses = [];
 
     expect(summarizeLedgerMonth(state.ledger)).toEqual({ expenses: [], totalWon: 0, categories: [] });
   });
 
-  it("월 합계가 0이면 NaN이나 Infinity 비율을 만들지 않는다", () => {
+  it("does not produce NaN or Infinity ratios when the monthly total is 0", () => {
     const state = createMockPlatformState();
     state.ledger.expenses = state.ledger.expenses.filter((expense) => !expense.date.startsWith("2026-08-"));
     const summary = summarizeLedgerMonth(state.ledger);

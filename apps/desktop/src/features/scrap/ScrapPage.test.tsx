@@ -44,7 +44,7 @@ function repositoryOf(snapshot: ScrapSnapshot, overrides: Partial<ScrapRepositor
 }
 
 describe("ScrapPage", () => {
-  it("다시 열어도 마지막 라벨 필터를 유지한다", async () => {
+  it("keeps the last label filter after reopening", async () => {
     const repository = createMockScrapRepository();
     const viewStateStore = scrapViewStateStoreOf();
     const first = renderPage(repository, "/scrap", undefined, undefined, viewStateStore);
@@ -59,7 +59,7 @@ describe("ScrapPage", () => {
     expect(screen.queryByRole("button", { name: /들기름 파스타 레시피/ })).not.toBeInTheDocument();
   });
 
-  it("정상 목록과 라벨 필터를 표시하고 키보드로 라벨 사이를 이동한다", async () => {
+  it("shows the normal list and label filters and moves between labels using the keyboard", async () => {
     renderPage();
     expect(await screen.findByRole("button", { name: /들기름 파스타 레시피/ })).toBeInTheDocument();
 
@@ -73,7 +73,7 @@ describe("ScrapPage", () => {
     expect(screen.queryByRole("button", { name: /들기름 파스타 레시피/ })).not.toBeInTheDocument();
   });
 
-  it("전체 빈 상태에서 생성 흐름을 연다", async () => {
+  it("opens the create flow from the full empty state", async () => {
     renderPage(repositoryOf({ tags: ["수집"], items: [] }));
     expect(await screen.findByText("아직 스크랩이 없습니다")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "스크랩 추가" });
@@ -84,7 +84,7 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(button).toHaveFocus());
   });
 
-  it("필터 결과 없음과 필터 해제를 구분한다", async () => {
+  it("distinguishes between no filter results and having no filter applied", async () => {
     renderPage();
     await screen.findByRole("button", { name: "수집" });
     fireEvent.click(screen.getByRole("button", { name: "수집" }));
@@ -93,7 +93,7 @@ describe("ScrapPage", () => {
     expect(screen.getByRole("button", { name: /들기름 파스타 레시피/ })).toBeInTheDocument();
   });
 
-  it("긴 제목을 카드에서 제한하고 상세에서는 전체 표시한다", async () => {
+  it("truncates long titles on the card but shows them in full in the detail view", async () => {
     const title = "아주 긴 스크랩 제목이 카드의 정해진 높이를 넘어가더라도 레이아웃을 밀어내지 않고 상세에서는 온전히 보여야 하는 자료";
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "long", kind: "text", title, memo: "긴 제목 검증", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
     const card = await screen.findByRole("button", { name: new RegExp(title) });
@@ -102,7 +102,7 @@ describe("ScrapPage", () => {
     expect(within(await screen.findByRole("dialog", { name: /스크랩/ })).getByText(title)).toBeInTheDocument();
   });
 
-  it("상세 헤더에서 ISO 저장 시각을 사람이 읽는 형식으로 표시한다", async () => {
+  it("displays the ISO saved timestamp in a human-readable format in the detail header", async () => {
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "iso", kind: "text", title: "시각 검증", memo: "", tag: "수집", savedAt: "2026-08-27T00:38:50.792Z", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=iso",
@@ -112,7 +112,7 @@ describe("ScrapPage", () => {
     expect(within(drawer).queryByText(/2026-08-27T/)).not.toBeInTheDocument();
   });
 
-  it("상세의 웹 URL을 안전한 외부 링크로 연다", async () => {
+  it("opens the web URL in the detail view as a safe external link", async () => {
     const url = "https://www.youtube.com/watch?v=rop5hVsowDQ&list=WL&index=3";
     const open = vi.fn(async () => {});
     renderPage(
@@ -129,7 +129,7 @@ describe("ScrapPage", () => {
     expect(open).toHaveBeenCalledWith(url);
   });
 
-  it("URL 스크랩 카드와 상세에 서버 링크 미리보기 이미지를 표시한다", async () => {
+  it("shows the server's link preview image on the URL scrap card and in the detail view", async () => {
     const url = "https://example.com/article?id=1&lang=ko";
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "link-preview", kind: "url", title: "관련 사진", memo: "", tag: "수집", savedAt: "오늘", url, mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
@@ -143,7 +143,7 @@ describe("ScrapPage", () => {
     expect(await within(drawer).findByRole("presentation")).toHaveAttribute("src", "blob:mock");
   });
 
-  it("링크 미리보기 이미지를 못 받으면 플레이스홀더로 남는다", async () => {
+  it("falls back to a placeholder when the link preview image can't be fetched", async () => {
     httpClient.httpGetBlob.mockRejectedValue(new Error("401"));
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "no-preview", kind: "url", title: "미리보기 없음", memo: "", tag: "수집", savedAt: "오늘", url: "https://example.com/x", mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
@@ -152,14 +152,14 @@ describe("ScrapPage", () => {
     expect(within(card).queryByRole("presentation")).not.toBeInTheDocument();
   });
 
-  it("프로토콜 없는 URL도 HTTPS로 정규화해 미리보기한다", async () => {
+  it("normalizes a protocol-less URL to HTTPS for the preview", async () => {
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "bare-link", kind: "url", title: "프로토콜 없는 링크", memo: "", tag: "수집", savedAt: "오늘", url: "example.com/article", mediaId: null, fileName: null, fileSize: null, comments: [] }] }));
 
     await within(await screen.findByRole("button", { name: /프로토콜 없는 링크/ })).findByRole("presentation");
     expect(httpClient.httpGetBlob).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("https://example.com/article")));
   });
 
-  it("웹 URL이 아닌 값은 외부 링크로 만들지 않는다", async () => {
+  it("does not turn a non-web-URL value into an external link", async () => {
     const unsafeUrl = "javascript:alert('xss')";
     renderPage(repositoryOf({ tags: ["수집"], items: [{ id: "unsafe", kind: "url", title: "안전하지 않은 링크", memo: "", tag: "수집", savedAt: "오늘", url: unsafeUrl, mediaId: null, fileName: null, fileSize: null, comments: [] }] }), "/scrap?detail=unsafe");
 
@@ -168,7 +168,7 @@ describe("ScrapPage", () => {
     expect(within(drawer).queryByRole("link", { name: unsafeUrl })).not.toBeInTheDocument();
   });
 
-  it("댓글 URL을 외부 링크와 첫 링크의 썸네일 카드로 표시한다", async () => {
+  it("shows a comment URL as an external link and renders the first link as a thumbnail card", async () => {
     const url = "https://www.youtube.com/watch?v=rop5hVsowDQ";
     const open = vi.fn(async () => {});
     renderPage(
@@ -191,7 +191,7 @@ describe("ScrapPage", () => {
     expect(open).toHaveBeenCalledWith(url);
   });
 
-  it("댓글의 ~~취소선~~ 마크다운을 <s>로 렌더한다", async () => {
+  it("renders ~~strikethrough~~ markdown in comments as <s>", async () => {
     renderPage(
       repositoryOf({
         tags: ["수집"],
@@ -206,7 +206,7 @@ describe("ScrapPage", () => {
     expect(struck.closest("p")).toHaveTextContent("이건 틀림 맞음");
   });
 
-  it("새 댓글은 Shift+Enter로 줄바꿈하고 Enter로 등록한다", async () => {
+  it("inserts a line break with Shift+Enter and submits a new comment with Enter", async () => {
     const addComment = vi.fn(async () => {});
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "comment-keyboard", kind: "text", title: "댓글 키보드", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }, { addComment }),
@@ -224,7 +224,7 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(addComment).toHaveBeenCalledWith("comment-keyboard", { text: "첫 줄\n둘째 줄" }));
   });
 
-  it("댓글 수정도 Shift+Enter로 줄바꿈하고 Enter로 저장한다", async () => {
+  it("inserts a line break with Shift+Enter and saves an edited comment with Enter", async () => {
     const updateComment = vi.fn(async () => {});
     const text = "수정 전";
     renderPage(
@@ -244,7 +244,7 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(updateComment).toHaveBeenCalledWith("edit-keyboard", "edit-keyboard-comment", { text: "수정 첫 줄\n수정 둘째 줄" }, 1));
   });
 
-  it("댓글 mutation 성공 후 원본 댓글을 다시 읽고 상세 진입점으로 focus를 돌린다", async () => {
+  it("re-reads the original comment after the mutation succeeds and returns focus to the detail entry point", async () => {
     renderPage();
     const card = await screen.findByRole("button", { name: /카메라 무빙 레퍼런스/ });
     card.focus();
@@ -258,7 +258,7 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(card).toHaveFocus());
   });
 
-  it("댓글 mutation 실패를 해당 상세에만 표시한다", async () => {
+  it("shows the comment mutation failure only on the affected detail view", async () => {
     const base = await createMockScrapRepository().getSnapshot();
     renderPage(repositoryOf(base, { addComment: vi.fn(async () => { throw new Error("댓글 저장 실패"); }) }));
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -269,7 +269,7 @@ describe("ScrapPage", () => {
     expect(within(drawer).getByRole("textbox", { name: "새 댓글" })).toHaveValue("실패할 댓글");
   });
 
-  it("댓글 mutation pending을 선택한 스크랩 입력에만 표시한다", async () => {
+  it("shows the comment mutation pending state only on the selected scrap's input", async () => {
     const base = await createMockScrapRepository().getSnapshot();
     let resolveComment!: () => void;
     const pending = new Promise<void>((resolve) => { resolveComment = resolve; });
@@ -285,7 +285,7 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(input).not.toBeDisabled());
   });
 
-  it("기존 댓글을 인라인으로 수정하고 저장 후 수정 버튼으로 focus를 복귀한다", async () => {
+  it("edits an existing comment inline and returns focus to the edit button after saving", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -305,7 +305,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-1")?.comments.find((comment) => comment.id === "comment-1")?.text).toBe("마늘은 그대로 넣는 편이 낫다.");
   });
 
-  it("댓글을 확인 후 삭제하고 목록에서 제거한다", async () => {
+  it("deletes a comment after confirmation and removes it from the list", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -320,7 +320,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-1")?.comments.some((comment) => comment.id === "comment-1")).toBe(false);
   });
 
-  it("삭제 확인을 취소하면 댓글이 유지된다", async () => {
+  it("keeps the comment when the delete confirmation is canceled", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -334,7 +334,7 @@ describe("ScrapPage", () => {
     expect(within(drawer).getByRole("button", { name: `${commentText} 댓글 삭제` })).toBeInTheDocument();
   });
 
-  it("스크랩 상세에서 제목과 라벨을 인라인으로 수정한다", async () => {
+  it("edits the title and label inline in the scrap detail view", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /합주실 후보 정리/ }));
@@ -350,7 +350,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-3")?.title).toBe("합주실 후보 3곳");
   });
 
-  it("스크랩을 확인 후 삭제하고 목록·상세에서 제거한다", async () => {
+  it("deletes a scrap after confirmation and removes it from the list and detail view", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -365,7 +365,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items.some((item) => item.id === "scrap-1")).toBe(false);
   });
 
-  it("스크랩 삭제 확인을 취소하면 스크랩이 유지된다", async () => {
+  it("keeps the scrap when the delete confirmation is canceled", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository);
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -380,7 +380,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items.some((item) => item.id === "scrap-1")).toBe(true);
   });
 
-  it("댓글 수정 실패 시 입력값을 보존하고 Escape로 취소한다", async () => {
+  it("preserves the input value on comment edit failure and cancels with Escape", async () => {
     const base = await createMockScrapRepository().getSnapshot();
     renderPage(repositoryOf(base, { updateComment: vi.fn(async () => { throw new Error("댓글 수정 실패"); }) }));
     fireEvent.click(await screen.findByRole("button", { name: /들기름 파스타 레시피/ }));
@@ -399,7 +399,7 @@ describe("ScrapPage", () => {
     expect(screen.getByRole("dialog", { name: /스크랩/ })).toBeInTheDocument();
   });
 
-  it("라벨 관리 Modal을 중첩해 새 라벨을 만들고 생성에 반영한다", async () => {
+  it("opens the label-management Modal nested inside and reflects a newly created label in creation", async () => {
     renderPage(createMockScrapRepository(), "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
     expect(within(modal).getByRole("combobox", { name: "라벨" }).closest("fieldset")).toBeNull();
@@ -421,7 +421,7 @@ describe("ScrapPage", () => {
     expect(await screen.findByRole("button", { name: /새 링크 자료/ })).toBeInTheDocument();
   });
 
-  it("수동으로 고른 사진을 업로드하고 이미지 스크랩으로 저장한다", async () => {
+  it("uploads a manually chosen photo and saves it as an image scrap", async () => {
     const repository = createMockScrapRepository();
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => null), delete: vi.fn(async () => {}) };
     const mediaId = "00000000-0000-4000-8000-000000000001";
@@ -442,7 +442,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "image", mediaId, title: "여름 바다" });
   });
 
-  it("이미지가 아닌 파일을 업로드하면 file 종류로 저장하고 상세에 다운로드 칩을 띄운다", async () => {
+  it("saves a non-image file upload as a file type and shows a download chip in the detail view", async () => {
     const repository = createMockScrapRepository();
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:doc"), delete: vi.fn(async () => {}) };
     const mediaId = "00000000-0000-4000-8000-0000000000ab";
@@ -465,7 +465,7 @@ describe("ScrapPage", () => {
     expect(chip).toHaveAttribute("download", "1분기 보고서.pdf");
   });
 
-  it("사진 제거 후 보이는 사진 선택 버튼으로 focus를 복귀한다", async () => {
+  it("returns focus to the photo-select button that appears after removing a photo", async () => {
     renderPage(createMockScrapRepository(), "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
     const input = within(modal).getByLabelText("첨부 파일 선택");
@@ -480,7 +480,7 @@ describe("ScrapPage", () => {
     expect(within(modal).queryByRole("img", { name: "제거.png 미리보기" })).not.toBeInTheDocument();
   });
 
-  it("사진이 연결된 스크랩 저장 실패 시 업로드한 사진을 정리하고 입력을 보존한다", async () => {
+  it("cleans up the uploaded photo and preserves input when saving a photo-attached scrap fails", async () => {
     const base = await createMockScrapRepository().getSnapshot();
     const repository = repositoryOf(base, { create: vi.fn(async () => { throw new Error("스크랩 저장 실패"); }) });
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => null), delete: vi.fn(async () => {}) };
@@ -499,7 +499,7 @@ describe("ScrapPage", () => {
     expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("보존");
   });
 
-  it("스크랩 상세에서 사진을 교체하면 새 미디어를 올리고 저장한다", async () => {
+  it("uploads new media and saves it when replacing a photo in the scrap detail view", async () => {
     const snapshot: ScrapSnapshot = {
       tags: ["수집", "기타"],
       items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }],
@@ -526,7 +526,7 @@ describe("ScrapPage", () => {
     expect(repository.update).toHaveBeenCalledWith("img", expect.objectContaining({ mediaId: "22222222-2222-4222-8222-222222222222" }));
   });
 
-  it("스크랩 상세에서 사진을 제거하면 mediaId 없이 저장한다", async () => {
+  it("saves without a mediaId when removing a photo in the scrap detail view", async () => {
     const snapshot: ScrapSnapshot = {
       tags: ["수집", "기타"],
       items: [{ id: "img", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }],
@@ -544,7 +544,7 @@ describe("ScrapPage", () => {
     expect(mediaStore.save).not.toHaveBeenCalled();
   });
 
-  it("라벨 관리 Modal에서 기존 라벨 이름을 바꾸면 목록과 필터에 반영된다", async () => {
+  it("reflects a renamed existing label in the list and filters via the label-management Modal", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository, "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
@@ -567,7 +567,7 @@ describe("ScrapPage", () => {
     expect(snapshot.items.filter((item) => item.tag === "요리")).toHaveLength(0);
   });
 
-  it("라벨 관리 Modal에서 라벨을 삭제하면 참조하던 스크랩이 대체 라벨로 옮겨간다", async () => {
+  it("moves scraps that referenced a deleted label to a replacement label via the label-management Modal", async () => {
     const repository = createMockScrapRepository();
     renderPage(repository, "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
@@ -587,7 +587,7 @@ describe("ScrapPage", () => {
     expect(snapshot.items.filter((item) => item.tag === "요리")).toHaveLength(0);
   });
 
-  it("생성 mutation 실패 시 Modal과 입력값을 보존한다", async () => {
+  it("preserves the Modal and input values when the creation mutation fails", async () => {
     const base = await createMockScrapRepository().getSnapshot();
     renderPage(repositoryOf(base, { create: vi.fn(async () => { throw new Error("스크랩 저장 실패"); }) }), "/scrap?modal=new");
     const modal = await screen.findByRole("dialog", { name: "스크랩 추가" });
@@ -597,7 +597,7 @@ describe("ScrapPage", () => {
     expect(within(modal).getByRole("textbox", { name: "제목" })).toHaveValue("보존할 제목");
   });
 
-  it("댓글에 파일을 첨부해 업로드하고 mediaId·이름·크기와 함께 등록한다", async () => {
+  it("attaches and uploads a file to a comment and registers it with mediaId, name, and size", async () => {
     const addComment = vi.fn(async () => {});
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:file"), delete: vi.fn(async () => {}) };
     const mediaId = "00000000-0000-4000-8000-0000000000fa";
@@ -619,7 +619,7 @@ describe("ScrapPage", () => {
     expect(addComment).toHaveBeenCalledWith("with-file", { text: "", file: { mediaId, name: "보고서.pdf", size: 5 } });
   });
 
-  it("댓글 입력에 클립보드 파일을 붙여넣으면 첨부로 잡힌다", async () => {
+  it("captures a pasted clipboard file in the comment input as an attachment", async () => {
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "paste", kind: "text", title: "붙여넣기", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=paste",
@@ -631,7 +631,7 @@ describe("ScrapPage", () => {
     expect(within(drawer).getByAltText("첨부 이미지 미리보기")).toBeInTheDocument();
   });
 
-  it("댓글 폼에 파일을 드롭하면 첨부로 잡힌다", async () => {
+  it("captures a file dropped onto the comment form as an attachment", async () => {
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "drop", kind: "text", title: "드롭", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=drop",
@@ -643,7 +643,7 @@ describe("ScrapPage", () => {
     expect(await within(drawer).findByText("dropped.pdf")).toBeInTheDocument();
   });
 
-  it("스크랩 편집 모드에도 라벨 관리 버튼이 있다", async () => {
+  it("has a label-management button in scrap edit mode too", async () => {
     renderPage(
       repositoryOf({ tags: ["수집", "기타"], items: [{ id: "edit-tag", kind: "text", title: "편집 라벨", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
       "/scrap?detail=edit-tag",
@@ -654,7 +654,7 @@ describe("ScrapPage", () => {
     expect(await screen.findByRole("dialog", { name: "라벨 관리" })).toBeInTheDocument();
   });
 
-  it("스크랩 사진을 클릭하면 라이트박스로 크게 열고 다운로드·닫기를 준다", async () => {
+  it("clicking a scrap photo opens it large in a lightbox with download and close controls", async () => {
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:poster"), delete: vi.fn(async () => {}) };
     renderPage(
       repositoryOf({ tags: ["수집"], items: [{ id: "poster", kind: "image", title: "포스터", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: "11111111-1111-4111-8111-111111111111", fileName: null, fileSize: null, comments: [] }] }),

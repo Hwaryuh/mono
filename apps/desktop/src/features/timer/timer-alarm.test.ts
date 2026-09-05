@@ -13,7 +13,7 @@ describe("createAlarm", () => {
     delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
   });
 
-  it("Tauri 안에서는 start/stop 이 네이티브 명령을 부른다", async () => {
+  it("inside Tauri, start/stop invoke the native commands", async () => {
     (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
     const alarm = createAlarm();
 
@@ -26,7 +26,7 @@ describe("createAlarm", () => {
     expect(core.invoke).toHaveBeenCalledWith("alarm_stop");
   });
 
-  it("Tauri 밖에서는 아무것도 하지 않는다", async () => {
+  it("does nothing outside Tauri", async () => {
     const alarm = createAlarm();
     alarm.start();
     alarm.stop();
