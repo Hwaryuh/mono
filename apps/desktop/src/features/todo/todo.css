@@ -151,7 +151,7 @@
   transition: background-color 180ms ease-out, border-color 180ms ease-out;
 }
 .todo-item > .ui-checkbox { margin-left: 12px; width: 20px; height: 20px; flex-basis: 20px; border-radius: 5px; }
-.todo-item__stars { flex: none; margin-right: 10px; display: flex; align-items: center; }
+.todo-item__stars { position: relative; z-index: 2; flex: none; display: inline-flex; align-items: center; }
 .todo-item__star { appearance: none; width: 19px; height: 22px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 5px; box-shadow: none; background: transparent; color: var(--color-text-faint); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out; }
 .todo-item__star:hover { background: var(--color-hover); color: var(--color-text-muted); }
 .todo-item__star:active { scale: 0.85; }
@@ -162,7 +162,7 @@
   min-width: 0;
   min-height: 60px;
   flex: 1;
-  padding: 9px 0;
+  padding: 9px 12px 9px 0;
   display: flex;
   align-items: center;
   gap: 10px;

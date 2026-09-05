@@ -490,26 +490,33 @@ function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: 
     >
       <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
       <div className="todo-item__open">
-        <span className="todo-item__copy"><strong><ScrapText scraps={scraps} text={item.title} /></strong><span><time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time><span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>{item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}</span></span>
+        <span className="todo-item__copy">
+          <strong><ScrapText scraps={scraps} text={item.title} /></strong>
+          <span>
+            <time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time>
+            <span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>
+            {item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}
+            {!item.routineId && (
+              <span className="todo-item__stars">
+                {[1, 2, 3].map((level) => (
+                  <button
+                    aria-label={translate("todo.action.setPriority", { title: displayTitle, level })}
+                    aria-pressed={item.priority >= level}
+                    className={item.priority >= level ? "todo-item__star todo-item__star--active" : "todo-item__star"}
+                    disabled={priorityMutation.isPending}
+                    key={level}
+                    onClick={() => priorityMutation.mutate(item.priority === level ? 0 : level)}
+                    type="button"
+                  >
+                    <Icon fill={item.priority >= level ? "currentColor" : "none"} name="star" size={13} />
+                  </button>
+                ))}
+              </span>
+            )}
+          </span>
+        </span>
         <button aria-label={translate("todo.action.editLabel", { title: displayTitle })} className="todo-item__hit" disabled={toggleMutation.isPending} onClick={onOpen} type="button" />
       </div>
-      {!item.routineId && (
-        <div className="todo-item__stars">
-          {[1, 2, 3].map((level) => (
-            <button
-              aria-label={translate("todo.action.setPriority", { title: displayTitle, level })}
-              aria-pressed={item.priority >= level}
-              className={item.priority >= level ? "todo-item__star todo-item__star--active" : "todo-item__star"}
-              disabled={priorityMutation.isPending}
-              key={level}
-              onClick={() => priorityMutation.mutate(item.priority === level ? 0 : level)}
-              type="button"
-            >
-              <Icon fill={item.priority >= level ? "currentColor" : "none"} name="star" size={13} />
-            </button>
-          ))}
-        </div>
-      )}
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
     </article>
   );
