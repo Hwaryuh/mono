@@ -1,8 +1,8 @@
 import { translate } from "./i18n";
 import type { TranslationKey } from "./messages.ko";
 
-// Error 메시지는 그대로, 문자열은 그대로, 그 외에는 지정한 fallback 문구.
-// 이전에 각 feature 페이지에 복붙돼 있던 errorMessage 헬퍼의 superset.
+// An Error's message is used as-is, a string is used as-is, anything else falls back to the given fallback text.
+// A superset of the errorMessage helper that used to be copy-pasted into each feature page.
 export function errorMessage(error: unknown, fallbackKey: TranslationKey = "common.error.actionFailed"): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;

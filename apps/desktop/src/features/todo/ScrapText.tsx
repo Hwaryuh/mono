@@ -2,8 +2,8 @@ import { Link } from "react-router";
 import { translate } from "../../i18n/i18n";
 import { parseScrapMentions, type ScrapRef } from "./scrap-mention";
 
-// 자유 텍스트에 섞인 스크랩 멘션 토큰을 렌더한다. 살아 있는 스크랩은 상세로 가는 링크,
-// 삭제된 스크랩은 비활성 표시. 표시 이름은 매 렌더 현재 제목에서 조회한다.
+// Renders scrap-mention tokens embedded in free text. A live scrap becomes a link to its detail view,
+// a deleted scrap is shown as inactive. The display name is looked up from the current title on every render.
 export function ScrapText({ text, scraps }: { text: string; scraps: ScrapRef[] }) {
   return (
     <>

@@ -14,8 +14,8 @@ use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::common::*;
 
-// apps/api/src/security/secret-crypto.ts + repositories/secret-store.ts 이식.
-// 비밀은 DB엔 암호문만, 마스터 키는 별도 파일(mono.secret.key)로 분리한다(§5).
+// Ported from apps/api/src/security/secret-crypto.ts + repositories/secret-store.ts.
+// Only ciphertext for secrets goes in the DB; the master key is kept separate in its own file (mono.secret.key) (§5).
 
 // ---------- hex ----------
 
@@ -35,14 +35,14 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect()
 }
 
-// ---------- 마스터 키 + AES-256-GCM ----------
+// ---------- Master key + AES-256-GCM ----------
 
 pub(super) struct SecretCrypto {
     key: [u8; 32],
 }
 
 impl SecretCrypto {
-    // 키 파일이 있으면 로드, 없으면 32바이트 생성해 hex로 기록(0o600).
+    // Loads the key file if it exists; otherwise generates 32 bytes and writes it as hex (0o600).
     pub(super) fn load_or_create(path: &Path) -> std::io::Result<Self> {
         if path.exists() {
             let raw = std::fs::read_to_string(path)?;
@@ -69,7 +69,7 @@ impl SecretCrypto {
         Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&self.key))
     }
 
-    // iv(12) : tag(16) : ciphertext, 전부 hex. secret-crypto.ts 포맷 동일.
+    // iv(12) : tag(16) : ciphertext, all in hex. Same format as secret-crypto.ts.
     fn encrypt(&self, plaintext: &str) -> String {
         let mut iv = [0u8; 12];
         getrandom::getrandom(&mut iv).expect("getrandom iv");
@@ -99,7 +99,7 @@ impl SecretCrypto {
     }
 }
 
-// ---------- 저장소 (secret-store.ts) ----------
+// ---------- Repository (secret-store.ts) ----------
 
 const ACTIVE_PROVIDER_KEY: &str = "active_ai_provider";
 const R2_KEYS: [&str; 4] =
@@ -149,7 +149,7 @@ fn has_api_key(conn: &Connection, provider: &str) -> ApiResult<bool> {
     has_key(conn, provider_storage_key(provider)?)
 }
 
-// ai 경계 + dashboard capture가 쓴다 — 복호화한 API 키. 알 수 없는 provider면 BadRequest.
+// Used by the ai boundary + dashboard capture — the decrypted API key. BadRequest for an unknown provider.
 pub(super) fn get_api_key(
     conn: &Connection,
     crypto: &SecretCrypto,
@@ -188,7 +188,7 @@ pub(super) fn get_active_provider(conn: &Connection) -> ApiResult<String> {
 }
 
 fn set_active_provider(conn: &Connection, provider: &str) -> ApiResult<()> {
-    provider_storage_key(provider)?; // 검증만
+    provider_storage_key(provider)?; // validation only
     set_plain(conn, ACTIVE_PROVIDER_KEY, provider)
 }
 
@@ -201,7 +201,7 @@ fn has_r2(conn: &Connection) -> ApiResult<bool> {
     Ok(true)
 }
 
-// media 경계가 쓴다 — 복호화한 R2 자격증명.
+// Used by the media boundary — the decrypted R2 credentials.
 pub(super) struct R2Config {
     pub(super) account_id: String,
     pub(super) access_key_id: String,
@@ -251,7 +251,7 @@ fn delete_r2(conn: &Connection) -> ApiResult<()> {
     Ok(())
 }
 
-// Cloudflare GraphQL Analytics API 토큰 (Account Analytics: Read). R2 사용량 리포트에만 쓴다.
+// The Cloudflare GraphQL Analytics API token (Account Analytics: Read). Used only for the R2 usage report.
 fn has_cf_analytics_token(conn: &Connection) -> ApiResult<bool> {
     has_key(conn, CF_ANALYTICS_TOKEN_KEY)
 }
@@ -313,7 +313,7 @@ struct R2Credentials {
     bucket: String,
 }
 
-// ---------- 라우트 (routes/ai.ts + routes/media-credentials.ts, /test 변형은 프록시) ----------
+// ---------- Routes (routes/ai.ts + routes/media-credentials.ts; the /test variants are proxies) ----------
 
 #[derive(Clone)]
 pub(super) struct SecretState {
@@ -412,7 +412,7 @@ async fn analytics_token_delete(State(st): State<SecretState>) -> ApiResult<Json
     Ok(ok())
 }
 
-// ---------- 테스트 (secret-store.test.ts 이식) ----------
+// ---------- Tests (ported from secret-store.test.ts) ----------
 
 #[cfg(test)]
 mod tests {
@@ -457,7 +457,7 @@ mod tests {
             assert!(!has_api_key(&conn, provider).unwrap());
             set_api_key(&conn, &c, provider, "test-key-123").unwrap();
             assert!(has_api_key(&conn, provider).unwrap());
-            // 저장은 암호문
+            // What's stored is ciphertext
             let stored: String = conn
                 .query_row(
                     "SELECT value FROM secrets WHERE key = ?1",

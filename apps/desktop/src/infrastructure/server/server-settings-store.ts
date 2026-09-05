@@ -2,31 +2,31 @@ import { translate } from "../../i18n/i18n";
 export type ServerMode = "embedded" | "remote";
 
 /**
- * `server.json`에 저장된 설정과 지금 실행 중인 연결을 함께 나타낸다. 앱은 실행 시
- * 한 번만 연결을 결정하므로, 저장된 값과 실행 중인 값이 다를 수 있다(`restartRequired`).
+ * Represents both the setting stored in `server.json` and the currently running connection together. Since the app
+ * decides the connection only once at launch, the stored value and the running value can differ (`restartRequired`).
  */
 export interface ServerConnection {
   mode: ServerMode;
-  /** 저장된 원격 주소. embedded이거나 미설정이면 "". 입력란 초기값으로 쓴다. */
+  /** The stored remote address. "" if embedded or unset. Used as the input field's initial value. */
   remoteUrl: string;
-  /** 저장된 베어러 토큰. 없으면 "". 입력란 초기값으로 쓴다. */
+  /** The stored bearer token. "" if none. Used as the input field's initial value. */
   remoteToken: string;
-  /** 지금 실행 중인 앱이 실제로 사용하는 주소. */
+  /** The address the currently running app actually uses. */
   effectiveApiBaseUrl: string;
   runningEmbedded: boolean;
-  /** MONO_API_BASE_URL 환경 변수가 파일 설정을 덮어쓴 상태. */
+  /** Whether the MONO_API_BASE_URL environment variable is overriding the file setting. */
   envOverride: boolean;
-  /** 이 화면에서 설정을 바꿀 수 있는지. 웹 미리보기나 환경 변수 override면 false. */
+  /** Whether the setting can be changed from this screen. False for a web preview or an environment-variable override. */
   manageable: boolean;
-  /** 저장된 설정을 적용하려면 앱을 다시 시작해야 하는지. */
+  /** Whether the app must be restarted to apply the stored setting. */
   restartRequired: boolean;
 }
 
 export interface SaveServerConnectionInput {
   mode: ServerMode;
-  /** mode가 "remote"일 때만 사용. 서버가 정규화·검증한다. */
+  /** Only used when mode is "remote". The server normalizes and validates it. */
   remoteUrl?: string;
-  /** mode가 "remote"일 때만 사용. 비면 토큰 없이 저장. */
+  /** Only used when mode is "remote". Saved without a token if empty. */
   token?: string;
 }
 
@@ -34,11 +34,11 @@ export interface ServerSettingsStore {
   read(): Promise<ServerConnection>;
   save(input: SaveServerConnectionInput): Promise<ServerConnection>;
   /**
-   * 주소가 mono 서버인지(`/health`), 그리고 토큰이 맞는지(인증 걸린 엔드포인트가 401이 아닌지)
-   * 확인한다. 되면 resolve, 아니면 사람이 읽을 오류로 reject.
+   * Confirms the address is a mono server (`/health`), and that the token is correct (the authenticated endpoint isn't a 401).
+   * Resolves if it succeeds, otherwise rejects with a human-readable error.
    */
   probe(baseUrl: string, token?: string): Promise<void>;
-  /** 저장된 설정으로 앱을 다시 시작한다. 성공하면 반환하지 않는다. */
+  /** Restarts the app with the stored setting. Does not return on success. */
   restart(): Promise<void>;
 }
 
@@ -46,7 +46,7 @@ export function trimBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
 }
 
-/** Rust `normalize_remote_url`의 가벼운 앞단 판정 — 저장 버튼 활성화에만 쓴다. */
+/** A lightweight front-end check mirroring Rust's `normalize_remote_url` — used only to enable the save button. */
 export function looksLikeRemoteApiUrl(value: string): boolean {
   let url: URL;
   try {
@@ -113,7 +113,7 @@ export class InMemoryServerSettingsStore implements ServerSettingsStore {
       : { embedded: false, url: this.remoteUrl };
   }
 
-  /** 테스트 편의: 이 주소를 도달 가능으로 표시한다. */
+  /** Test convenience: marks this address as reachable. */
   markReachable(baseUrl: string): void {
     this.reachable.add(trimBaseUrl(baseUrl));
   }

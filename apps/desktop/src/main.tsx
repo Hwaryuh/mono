@@ -31,8 +31,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       retry: 1,
-      // networkMode "always": 서버는 항상 localhost. 브라우저 navigator.onLine 오탐으로
-      // 쿼리가 "paused" 상태로 멈춰 오류 화면이 뜨지 않는 것을 막는다.
+      // networkMode "always": the server is always localhost. This prevents a query from getting stuck
+      // "paused" and never showing an error screen due to a false-positive from the browser's navigator.onLine.
       networkMode: "always",
     },
     mutations: {
@@ -41,8 +41,8 @@ const queryClient = new QueryClient({
   },
 });
 
-// 웹뷰 기본 컨텍스트 메뉴(이미지 새 창으로 열기, 뒤로 가기 등)는 설치형 앱에서 어울리지 않는다.
-// 텍스트 편집 필드와 선택된 텍스트 위에서만 남겨 복사·붙여넣기를 방해하지 않는다.
+// The webview's default context menu (open image in new window, back, etc.) doesn't fit an installed app.
+// Left in place only over text-editing fields and selected text, so copy/paste isn't disrupted.
 document.addEventListener("contextmenu", (event) => {
   const target = event.target as HTMLElement | null;
   if (target?.closest("input, textarea, [contenteditable]") || window.getSelection()?.toString()) return;

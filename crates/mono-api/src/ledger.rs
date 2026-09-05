@@ -12,7 +12,7 @@ use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::version::expected_version;
 
-// (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
+// The shared (id, name, color, order_index) category CRUD config. The logic lives in category::Categories.
 const CATS: Categories = Categories {
     table: "ledger_categories",
     not_found: "가계부 라벨을 찾을 수 없습니다",
@@ -21,7 +21,7 @@ const CATS: Categories = Categories {
     reorder_mismatch: "분류 순서에 현재 분류가 모두 포함되어야 합니다.",
 };
 
-// ---------- DTO (packages/contracts/src/index.ts ledger* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts ledger* schemas) ----------
 
 #[derive(Serialize)]
 struct LedgerCategory {
@@ -79,7 +79,7 @@ struct CategoryOrderInput {
     category_ids: Vec<String>,
 }
 
-// ---------- 검증 ----------
+// ---------- Validation ----------
 
 fn validated_title(raw: &str) -> ApiResult<String> {
     let title = raw.trim();
@@ -99,8 +99,8 @@ fn validated_note(raw: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-// packages/contracts/src/index.ts wonAmountSchema: 숫자면 그대로, 문자열이면 ₩·원·쉼표·공백 제거 후
-// 숫자만이면 파싱. 이후 양의 정수여야 하고 안전 정수 범위(<= 2^53-1).
+// packages/contracts/src/index.ts wonAmountSchema: if a number, used as-is; if a string, strips ₩, 원, commas, and whitespace, then
+// parses it if only digits remain. Must then be a positive integer within the safe-integer range (<= 2^53-1).
 fn validated_amount(value: &Value) -> ApiResult<i64> {
     let amount = match value {
         Value::Number(number) => number
@@ -130,7 +130,7 @@ fn validated_amount(value: &Value) -> ApiResult<i64> {
     Ok(amount)
 }
 
-// packages/contracts/src/index.ts isoDateSchema: YYYY-MM-DD 형식 + 실재하는 날짜.
+// packages/contracts/src/index.ts isoDateSchema: YYYY-MM-DD format + must be a real calendar date.
 fn validated_date(raw: &str) -> ApiResult<String> {
     let parts: Vec<&str> = raw.split('-').collect();
     let looks_iso = parts.len() == 3
@@ -146,7 +146,7 @@ fn validated_date(raw: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-// ---------- 저장소 로직 (apps/api/src/repositories/ledger-repository.ts 1:1) ----------
+// ---------- Repository logic (1:1 with apps/api/src/repositories/ledger-repository.ts) ----------
 
 fn previous_month(month: &str) -> String {
     // "2026-08" -> "2026-07", "2026-01" -> "2025-12"
@@ -289,7 +289,7 @@ fn reorder_categories(conn: &mut Connection, ids: Vec<String>) -> ApiResult<()> 
     CATS.reorder(conn, ids)
 }
 
-// 가계부만 대체 라벨을 받지 않는다 — 항상 "기타"로 지출을 옮긴다.
+// The ledger is the only one that doesn't take a replacement label — expenses always move to "Other".
 fn delete_category(conn: &mut Connection, id: &str) -> ApiResult<()> {
     CATS.require(conn, id)?;
     if id == category::RESERVED_ID {
@@ -308,7 +308,7 @@ fn delete_category(conn: &mut Connection, id: &str) -> ApiResult<()> {
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/ledger.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/ledger.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -387,7 +387,7 @@ async fn delete_category_handler(
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/ledger-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/ledger-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {

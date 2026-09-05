@@ -3,9 +3,9 @@ import { httpDelete, httpGetBlob, httpUpload } from "./http-client";
 
 export class HttpMediaStore implements MediaStore {
   async save(id: string, file: Blob): Promise<void> {
-    // macOS WKWebView는 <input type=file>의 File을 FormData로 fetch 전송할 때 본문을 비워
-    // 보내는 사례가 있다(미리보기는 되지만 업로드만 0바이트). 바이트를 먼저 arrayBuffer로
-    // 실체화해 새 Blob으로 감싸 보내면 이 지연 스트리밍 버그를 피한다.
+    // macOS WKWebView has been observed sending an empty body when a <input type=file> File is sent via
+    // fetch + FormData (the preview works, but only the upload is 0 bytes). Materializing the bytes
+    // as an arrayBuffer first and wrapping them in a new Blob before sending avoids this lazy-streaming bug.
     const bytes = await file.arrayBuffer();
     const blob = new Blob([bytes], { type: file.type || "application/octet-stream" });
     const formData = new FormData();

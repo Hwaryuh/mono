@@ -12,7 +12,7 @@ export type CalendarRange = { from: string; to: string };
 export interface CalendarRepository extends CalendarCategoryRepository {
   getSnapshot(range?: CalendarRange): Promise<CalendarSnapshot>;
   create(input: CalendarWriteInput): Promise<void>;
-  // eventId 는 단발 일정의 uuid 또는 반복 occurrence의 "uuid::YYYY-MM-DD". scope 는 반복 일정에만 적용.
+  // eventId is either a single event's uuid or a recurring occurrence's "uuid::YYYY-MM-DD". scope only applies to recurring events.
   update(eventId: string, input: CalendarWriteInput, scope?: CalendarEditScope, expectedVersion?: number): Promise<void>;
   remove(eventId: string, scope?: CalendarEditScope): Promise<void>;
 }

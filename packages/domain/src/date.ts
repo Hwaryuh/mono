@@ -5,7 +5,7 @@ function parseIsoLocal(iso: string): Date {
   return new Date(year, month - 1, day);
 }
 
-/** 로컬 시계 기준 오늘을 YYYY-MM-DD로 반환한다. */
+/** Returns today, based on the local clock, as YYYY-MM-DD. */
 export function currentIsoDate(now: Date = new Date()): string {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -15,7 +15,7 @@ export function currentIsoDate(now: Date = new Date()): string {
 
 export type WeekdayStyle = "long" | "short" | "none";
 
-/** YYYY-MM-DD → "2026년 8월 5일 수요일"(long) · "… (수)"(short) · "…"(none). */
+/** YYYY-MM-DD → "August 5, 2026, Wednesday"(long) · "… (Wed)"(short) · "…"(none). */
 export function koreanDateLabel(iso: string, weekday: WeekdayStyle = "long"): string {
   const date = parseIsoLocal(iso);
   const base = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
@@ -24,15 +24,15 @@ export function koreanDateLabel(iso: string, weekday: WeekdayStyle = "long"): st
   return weekday === "short" ? `${base} (${name})` : `${base} ${name}요일`;
 }
 
-/** YYYY-MM-DD → "2026년 8월". */
+/** YYYY-MM-DD → "August 2026". */
 export function koreanMonthLabel(iso: string): string {
   const date = parseIsoLocal(iso);
   return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
 }
 
 /**
- * ISO 타임스탬프 → "2026. 08. 27. 09:38"(로컬 시계). 파싱 불가한 값(mock의 "방금",
- * "2분 전" 등 사람이 읽는 문자열)은 그대로 돌려준다.
+ * ISO timestamp → "2026. 08. 27. 09:38" (local clock). A value that can't be parsed (the mock's "just now",
+ * "2 minutes ago", etc. — human-readable strings) is returned as-is.
  */
 export function formatTimestamp(value: string): string {
   const parsed = Date.parse(value);

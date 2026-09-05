@@ -1,5 +1,5 @@
-// packages/domain/src/color.ts 포팅. todo/ledger/calendar 라벨 색 검증에 필요한 만큼만:
-// normalize_color_to_oklch (oklch 파싱 또는 hex→oklch). 나머지(oklch→hex 등)는 필요할 때.
+// Ported from packages/domain/src/color.ts. Only as much as is needed for todo/ledger/calendar label color validation:
+// normalize_color_to_oklch (parses oklch, or converts hex→oklch). The rest (oklch→hex etc.) can be added when needed.
 
 struct Oklch {
     lightness: f64,
@@ -7,7 +7,7 @@ struct Oklch {
     hue: f64,
 }
 
-/// oklch(...) 또는 6/3자리 hex 를 정규화된 `oklch(L C H)` 문자열로. 형식 불량이면 None.
+/// Normalizes oklch(...) or a 6/3-digit hex into an `oklch(L C H)` string. None on a malformed input.
 pub fn normalize_color_to_oklch(value: &str) -> Option<String> {
     if let Some(parsed) = parse_oklch(value) {
         return Some(format_oklch(&parsed));
@@ -16,7 +16,7 @@ pub fn normalize_color_to_oklch(value: &str) -> Option<String> {
 }
 
 fn parse_oklch(value: &str) -> Option<Oklch> {
-    // 숫자·공백·괄호는 소문자화에 영향 없다 — 프리픽스만 대소문자 무시로 매칭.
+    // Numbers, whitespace, and parens are unaffected by lowercasing — only the prefix is matched case-insensitively.
     let lowered = value.trim().to_ascii_lowercase();
     let inner = lowered.strip_prefix("oklch(")?.strip_suffix(')')?;
     let parts: Vec<f64> = inner
@@ -69,7 +69,7 @@ fn format_oklch(color: &Oklch) -> String {
     )
 }
 
-// JS `value.toFixed(3).replace(/\.?0+$/, "")` 와 동일: 소수 3자리 후 뒤쪽 0·점 제거, "-0"→"0".
+// Equivalent to JS `value.toFixed(3).replace(/\.?0+$/, "")`: rounds to 3 decimals then strips trailing zeros/dot, and "-0"→"0".
 fn format_channel(value: f64) -> String {
     let fixed = format!("{value:.3}");
     let trimmed = if fixed.contains('.') {
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn converts_arbitrary_hex() {
-        // color.ts hexToOklch("#b03a55") 기준값.
+        // The reference value from color.ts hexToOklch("#b03a55").
         let out = normalize_color_to_oklch("#b03a55").unwrap();
         assert!(out.starts_with("oklch(0.5"), "got {out}");
     }

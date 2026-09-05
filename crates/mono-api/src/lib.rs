@@ -1,7 +1,7 @@
-// mono API 서버. axum HTTP 서버 — 두 가지로 구동된다:
-//   1. 임베드: Tauri 바이너리가 `spawn()`으로 스레드에 띄워 127.0.0.1:4174 점유(오프라인 모드).
-//   2. standalone: `crates/mono-api`의 `main.rs`가 `serve(Config)`로 블로킹 실행(멀티 기기 공유).
-// 예전 Node/Fastify(apps/api)를 전 경계 Rust로 재작성 완료(Option C) — sidecar·proxy 제거됨.
+// The mono API server. An axum HTTP server — run in one of two ways:
+//   1. Embedded: the Tauri binary spawns it on a thread via `spawn()`, occupying 127.0.0.1:4174 (offline mode).
+//   2. Standalone: `crates/mono-api`'s `main.rs` runs it blocking via `serve(Config)` (multi-device sharing).
+// The old Node/Fastify (apps/api) has been fully rewritten to Rust across the board (Option C) — the sidecar/proxy is gone.
 
 mod ai;
 mod auth;
@@ -40,16 +40,16 @@ use secret::{SecretCrypto, SecretState};
 
 const EMBED_BIND_ADDR: &str = "127.0.0.1:4174";
 
-/// 서버 구동 설정. 임베드 호출부는 `spawn()`이 기본값을 채우고, standalone은 env로 채운다.
+/// The server startup config. For embedded, `spawn()`'s caller fills in the defaults; for standalone, env vars fill it in.
 pub struct Config {
-    /// 바인드 주소. 임베드 `127.0.0.1:4174`, standalone 기본 `0.0.0.0:4174`.
+    /// The bind address. `127.0.0.1:4174` for embedded, `0.0.0.0:4174` by default for standalone.
     pub bind_addr: String,
     pub db_path: PathBuf,
     pub secret_key_path: PathBuf,
-    /// 허용 CORS origin. 비면 하드코딩 목록(데스크톱 앱 origin은 서버 위치와 무관하게 고정).
+    /// The allowed CORS origins. If empty, falls back to a hardcoded list (the desktop app's origin is fixed regardless of the server's location).
     pub cors_origins: Vec<String>,
-    /// 설정되면 `/health` 외 모든 요청에 `Authorization: Bearer <token>`을 요구한다.
-    /// 비면 인증 없음(임베드·Tailscale 전용 배포).
+    /// If set, requires `Authorization: Bearer <token>` on every request except `/health`.
+    /// No auth if empty (embedded, Tailscale-only deployments).
     pub api_token: Option<String>,
 }
 
@@ -91,8 +91,8 @@ impl Error for ServeError {
     }
 }
 
-// 임베드 모드 진입점. 시그니처 유지 — Tauri `lib.rs`가 그대로 호출한다.
-// mono.sqlite + mono.secret.key 경로를 받아 스레드에 서버를 띄운다.
+// The embedded-mode entry point. The signature is kept as-is — Tauri's `lib.rs` calls it directly.
+// Takes the mono.sqlite + mono.secret.key paths and starts the server on a thread.
 pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
     let config = Config {
         bind_addr: EMBED_BIND_ADDR.to_string(),
@@ -111,7 +111,7 @@ pub fn spawn(db_path: PathBuf, secret_key_path: PathBuf) -> JoinHandle<()> {
         .expect("API 서버 스레드 생성 실패")
 }
 
-/// standalone 진입점 — 현재 스레드를 블로킹한다.
+/// The standalone entry point — blocks the current thread.
 pub fn serve(config: Config) -> Result<(), ServeError> {
     let database = db::open(&config.db_path).map_err(ServeError::Database)?;
     let crypto = Arc::new(
@@ -137,16 +137,16 @@ pub fn serve(config: Config) -> Result<(), ServeError> {
     })
 }
 
-/// 미디어 미러 결과. R2 자격증명이 없으면 `Skipped`.
+/// The result of mirroring media. `Skipped` if there are no R2 credentials.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MediaMirrorOutcome {
     Skipped,
     Mirrored { downloaded: usize, skipped: usize },
 }
 
-/// 오프사이트 백업용 — R2 미디어 버킷을 `dir`로 증분 미러링한다.
-/// DB 백업 번들 옆(`<backup-root>/media`)에 두면 systemd의 rclone copy가 함께 올린다.
-/// R2 자격증명이 없으면 아무것도 하지 않고 `Skipped`를 돌려준다(로컬 전용 배포).
+/// For offsite backup — incrementally mirrors the R2 media bucket into `dir`.
+/// Placed next to the DB backup bundle (`<backup-root>/media`), systemd's rclone copy uploads it along with it.
+/// Does nothing and returns `Skipped` if there are no R2 credentials (a local-only deployment).
 pub fn mirror_media(
     db_path: &std::path::Path,
     secret_key_path: &std::path::Path,
@@ -180,8 +180,8 @@ fn build_router(
     cors_origins: &[String],
     api_token: Option<&str>,
 ) -> Router {
-    // 데스크톱 앱 origin은 서버 위치와 무관하게 고정. standalone에서 다른 origin이 필요하면
-    // MONO_CORS_ORIGINS로 덮어쓴다(apps/api/src/server.ts 의 기본 목록과 동일).
+    // The desktop app's origin is fixed regardless of the server's location. If standalone needs a different origin,
+    // override it with MONO_CORS_ORIGINS (same default list as apps/api/src/server.ts).
     const DEFAULT_ORIGINS: [&str; 4] = [
         "http://127.0.0.1:4173",
         "http://localhost:4173",
@@ -204,7 +204,7 @@ fn build_router(
 
     let router = Router::new()
         .route("/health", get(|| async { "ok" }))
-        // 클라이언트가 앱↔서버 버전 드리프트를 감지하는 데 쓴다(원격 모드에서 서버만 뒤처지는 상황).
+        // Used by the client to detect app↔server version drift (when only the server falls behind in remote mode).
         .route(
             "/version",
             get(|| async {
@@ -223,16 +223,16 @@ fn build_router(
         .merge(ai::routes(secret_state))
         .merge(link_preview::routes(link_preview::state()))
         .merge(change::routes(change_hub.clone()))
-        // 성공한 mutation 응답을 감지해 모듈 변경 이벤트를 발행한다(SSE 구독자에게 무효화 신호).
+        // Detects a successful mutation response and publishes a module-change event (an invalidation signal to SSE subscribers).
         .layer(middleware::from_fn_with_state(
             change_hub,
             change::publish_successful_mutation,
         ))
-        // 미디어 업로드(최대 100MB+)가 axum 기본 2MB 한도에 걸리지 않도록. 실제 상한은
-        // 각 라우트가 검증한다(media.rs UPLOAD_LIMIT_BYTES, dashboard capture 등).
+        // So that media uploads (up to 100MB+) don't hit axum's default 2MB limit. The actual cap
+        // is validated per route (media.rs UPLOAD_LIMIT_BYTES, dashboard capture, etc.).
         .layer(DefaultBodyLimit::disable());
 
-    // 베어러 검사는 CORS보다 안쪽 — 401 응답도 CORS 헤더를 달고 나가야 브라우저가 본문을 읽는다.
+    // The bearer check sits inside CORS — even a 401 response must carry CORS headers for the browser to read its body.
     auth::apply(router, api_token).layer(cors)
 }
 
@@ -398,7 +398,7 @@ mod tests {
             .unwrap();
         assert_eq!(first.status(), StatusCode::OK);
 
-        // 같은 버전으로 다시 저장하면 409 — 다른 기기가 먼저 수정한 상황과 동일.
+        // Saving again with the same version gives a 409 — the same as another device having edited it first.
         let stale = router
             .oneshot(
                 Request::builder()

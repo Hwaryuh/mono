@@ -4,7 +4,7 @@ const DEFAULT_API_BASE_URL = "http://127.0.0.1:4174";
 
 export interface ApiEndpointProvider {
   resolve(): Promise<string>;
-  /** 원격 모드 베어러 토큰. 없으면 빈 문자열. */
+  /** The remote-mode bearer token. An empty string if none. */
   resolveToken(): Promise<string>;
 }
 

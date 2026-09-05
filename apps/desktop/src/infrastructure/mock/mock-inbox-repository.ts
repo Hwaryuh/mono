@@ -77,7 +77,7 @@ function approveItem(state: MockPlatformState, itemId: string) {
   if (item.target === "scrap") {
     const tag = labelValue(item) || "수집";
     if (!state.scrap.tags.includes(tag)) state.scrap.tags.push(tag);
-    // 미디어 원본은 media 테이블에 있고, 여기선 참조 id만 인계한다.
+    // The original media lives in the media table; only the reference id is handed off here.
     const mediaId = item.images?.[0]?.mediaId ?? item.videos?.[0]?.mediaId ?? null;
     state.scrap.items = [{
       id: `scrap-${state.nextScrapId++}`,

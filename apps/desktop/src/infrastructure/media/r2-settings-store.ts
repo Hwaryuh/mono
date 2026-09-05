@@ -6,7 +6,7 @@ export interface R2Credentials {
   bucket: string;
 }
 
-/** Cloudflare GraphQL Analytics 사용량 리포트. 계정 전체(모든 버킷) 기준. */
+/** A Cloudflare GraphQL Analytics usage report. Based on the entire account (all buckets). */
 export interface R2UsageReport {
   storageBytes: number;
   objectCount: number;

@@ -1,7 +1,7 @@
 import type { CalendarEvent, CalendarRecurrence } from "@mono/contracts";
 
-// 서버 calendar.rs 의 전개 로직과 동작을 맞춘 순수 함수 모음. mock 저장소가 쓴다.
-// 날짜는 모두 "YYYY-MM-DD" (UTC 기준).
+// A collection of pure functions kept in sync with the server's calendar.rs expansion logic. Used by the mock repository.
+// All dates are "YYYY-MM-DD" (UTC-based).
 
 function toUtc(iso: string): Date {
   const [year, month, day] = iso.split("-").map(Number);
@@ -32,13 +32,13 @@ function addMonths(iso: string, months: number): string | null {
   const y = target.getUTCFullYear();
   const m = target.getUTCMonth();
   const probe = new Date(Date.UTC(y, m, day));
-  return probe.getUTCMonth() === m ? fromUtc(probe) : null; // 그 달에 같은 '일'이 없으면 건너뜀
+  return probe.getUTCMonth() === m ? fromUtc(probe) : null; // skipped if that month has no matching day-of-month
 }
 
 function addYears(iso: string, years: number): string | null {
   const [year, month, day] = iso.split("-").map(Number);
   const probe = new Date(Date.UTC(year + years, month - 1, day));
-  return probe.getUTCMonth() === month - 1 ? fromUtc(probe) : null; // 2/29 → 평년 건너뜀
+  return probe.getUTCMonth() === month - 1 ? fromUtc(probe) : null; // Feb 29 → skipped in non-leap years
 }
 
 export function occurrenceSlots(rule: CalendarRecurrence, startDate: string, windowEnd: string): string[] {

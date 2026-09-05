@@ -16,8 +16,8 @@
   user-select: none;
 }
 
-/* 드래그 중에는 접힘 보간이 포인터를 프레임 단위로 따라가야 하므로 트랜지션을 끈다.
-   버튼으로 접거나 펼칠 때만 위 160ms 트랜지션이 살아난다. */
+/* While dragging, the transition is turned off since the collapse interpolation must follow the pointer frame by frame.
+   The 160ms transition above only kicks in when collapsing/expanding via the button. */
 .app-shell--resizing .sidebar__brand-copy,
 .app-shell--resizing .sidebar__group-title,
 .app-shell--resizing .sidebar__link-content,
@@ -152,12 +152,12 @@
   transition: transform 160ms ease;
 }
 
-/* 아이콘은 접힘 상태에서 유일하게 남는 요소다 — 어떤 형제(라벨·배지)도
-   flex 압축으로 15px 밑으로 줄이지 못하게 고정한다. */
+/* The icon is the only element left in the collapsed state — pin it so no sibling (label, badge)
+   can shrink it below 15px via flex compression. */
 .sidebar__link-content > svg { flex: none; }
 
-/* 루틴 들여쓰기도 접힘 진행도에 묶는다. 드래그 중 포인터를 지연 없이 따라가고,
-   버튼으로 접고 펼칠 때는 transform transition 으로 같은 경로를 왕복한다. */
+/* The routine indentation is also tied to the collapse progress. It follows the pointer with no delay while dragging,
+   and retraces the same path via a transform transition when collapsing/expanding with the button. */
 .sidebar__link--nested { --sidebar-nested-offset: 17px; }
 
 .sidebar__link-label {
@@ -175,8 +175,8 @@
   min-width: calc((1 - var(--sidebar-collapse, 0)) * 17px);
   max-width: calc((1 - var(--sidebar-collapse, 0)) * 60px);
   margin-left: auto;
-  /* 접힘 진행도에 좌우 패딩·테두리도 묶는다. 안 그러면 max-width:0 이어도
-     패딩(10px)+테두리(2px)가 남아 아이콘 자리를 뺏는다. */
+  /* The left/right padding and border are also tied to the collapse progress. Otherwise, even at max-width:0,
+     the padding (10px) + border (2px) would remain and eat into the icon's space. */
   padding: 1px calc(5px * (1 - var(--sidebar-collapse, 0)));
   border: 1px solid var(--color-border);
   border-width: calc(1px * (1 - var(--sidebar-collapse, 0)));
@@ -231,8 +231,8 @@
 .sidebar__settings-trigger:active,
 .sidebar__collapse:active { scale: 0.96; }
 
-/* 좁아질수록 설정 아이콘이 폭·투명도를 반납하고, 접기 버튼은 margin-left:auto 로
-   footer 가 줄어드는 만큼 자연히 가운데(접힌 위치)로 미끄러진다. */
+/* As it narrows, the settings icon gives up its width and opacity, and the collapse button, via margin-left:auto,
+   naturally slides to the center (the collapsed position) as the footer shrinks. */
 .sidebar__settings-trigger {
   max-width: calc((1 - var(--sidebar-collapse, 0)) * 40px);
   overflow: hidden;

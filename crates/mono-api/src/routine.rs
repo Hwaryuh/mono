@@ -12,7 +12,7 @@ use super::error::{ApiError, ApiResult};
 use super::common::*;
 use super::version::{ensure_versioned_update, expected_version};
 
-// ---------- DTO (packages/contracts/src/index.ts routine* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts routine* schemas) ----------
 
 #[derive(Serialize)]
 struct RoutineLabel {
@@ -61,7 +61,7 @@ struct RoutineWriteInput {
     end_date: Option<String>,
 }
 
-// ---------- 검증 (routineWriteInputSchema / routineDaysSchema) ----------
+// ---------- Validation (routineWriteInputSchema / routineDaysSchema) ----------
 
 fn validated_title(raw: &str) -> ApiResult<String> {
     let title = raw.trim();
@@ -74,7 +74,7 @@ fn validated_title(raw: &str) -> ApiResult<String> {
     Ok(title.to_string())
 }
 
-// routineDaysSchema: 0~6 정수, 1~7개, 중복 불가. 저장 시 오름차순 정렬.
+// routineDaysSchema: integers 0-6, 1 to 7 of them, no duplicates. Sorted ascending on save.
 fn validated_days(raw: &[i64]) -> ApiResult<Vec<i64>> {
     if raw.is_empty() || raw.len() > 7 {
         return Err(ApiError::validation("반복 요일은 1~7개여야 합니다."));
@@ -90,7 +90,7 @@ fn validated_days(raw: &[i64]) -> ApiResult<Vec<i64>> {
     Ok(days)
 }
 
-// ---------- 저장소 로직 (apps/api/src/repositories/routine-repository.ts 1:1) ----------
+// ---------- Repository logic (1:1 with apps/api/src/repositories/routine-repository.ts) ----------
 
 fn occurrence_id(routine_id: &str, date: &str) -> String {
     format!("routine-occurrence:{routine_id}:{date}")
@@ -150,7 +150,7 @@ fn require_routine(conn: &Connection, id: &str) -> ApiResult<RoutineRow> {
     .map_err(|_| ApiError::NotFound(format!("루틴을 찾을 수 없습니다: {id}")))
 }
 
-// mock-routine-occurrences.ts isRoutineScheduled 와 동일.
+// Same as mock-routine-occurrences.ts's isRoutineScheduled.
 fn is_scheduled(routine: &RoutineRow, date: &str) -> bool {
     if date < routine.start_date.as_str() {
         return false;
@@ -163,7 +163,7 @@ fn is_scheduled(routine: &RoutineRow, date: &str) -> bool {
     let Ok(parsed) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") else {
         return false;
     };
-    // JS new Date(`${date}T00:00:00Z`).getUTCDay() 와 동일: 0=일 ~ 6=토
+    // Equivalent to JS new Date(`${date}T00:00:00Z`).getUTCDay(): 0=Sun ~ 6=Sat
     let weekday = parsed.weekday().num_days_from_sunday() as i64;
     routine.days.contains(&weekday)
 }
@@ -187,7 +187,7 @@ fn fetch_occurrence(conn: &Connection, id: &str) -> ApiResult<Option<OccurrenceR
     Ok(row)
 }
 
-// 결정 키(routineId + date)로 멱등 생성. 스케줄 대상이 아니면 None.
+// Idempotently created via a deterministic key (routineId + date). None if not scheduled for that date.
 fn ensure_occurrence(
     conn: &Connection,
     routine: &RoutineRow,
@@ -318,15 +318,15 @@ fn toggle_today(conn: &Connection, id: &str) -> ApiResult<()> {
 fn delete_routine(conn: &mut Connection, id: &str) -> ApiResult<()> {
     require_routine(conn, id)?;
     let tx = conn.transaction()?;
-    // occurrence는 (routineId, date) 결정 키라 FK가 없다 — routine_id로 함께 지운다.
-    // todo 경계의 루틴 행은 occurrence를 read-model로 조인만 하므로 별도 정리 불필요.
+    // Since an occurrence's key is deterministic (routineId, date), there's no FK — it's deleted together via routine_id.
+    // The routine row on the todo boundary only joins the occurrence as a read model, so no separate cleanup is needed.
     tx.execute("DELETE FROM routine_occurrences WHERE routine_id = ?1", [id])?;
     tx.execute("DELETE FROM routine_items WHERE id = ?1", [id])?;
     tx.commit()?;
     Ok(())
 }
 
-// ---------- todo 경계 read-model join (mock-routine-occurrences.ts routineTodoItems) ----------
+// ---------- Todo-boundary read-model join (mock-routine-occurrences.ts routineTodoItems) ----------
 
 pub(super) struct RoutineTodoRow {
     pub id: String,
@@ -338,7 +338,7 @@ pub(super) struct RoutineTodoRow {
     pub routine_id: String,
 }
 
-// 오늘 스케줄된 루틴 occurrence를 todo item 형태로. todo 스냅샷 맨 앞에 붙는다.
+// Today's scheduled routine occurrences, shaped as todo items. Prepended to the front of the todo snapshot.
 pub(super) fn today_todo_rows(conn: &Connection) -> ApiResult<Vec<RoutineTodoRow>> {
     let today = today_iso();
     let mut rows = Vec::new();
@@ -358,7 +358,7 @@ pub(super) fn today_todo_rows(conn: &Connection) -> ApiResult<Vec<RoutineTodoRow
     Ok(rows)
 }
 
-// occurrence id 직접 토글. 대상이 아니면 false. (mock toggleRoutineOccurrence)
+// Toggles directly by occurrence id. Returns false if not a target. (mock toggleRoutineOccurrence)
 pub(super) fn toggle_occurrence_by_id(conn: &Connection, id: &str) -> ApiResult<bool> {
     if fetch_occurrence(conn, id)?.is_none() {
         return Ok(false);
@@ -367,7 +367,7 @@ pub(super) fn toggle_occurrence_by_id(conn: &Connection, id: &str) -> ApiResult<
     Ok(true)
 }
 
-// ---------- 라우트 (apps/api/src/routes/routine.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/routine.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -413,7 +413,7 @@ async fn delete_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResu
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/routine-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/routine-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {

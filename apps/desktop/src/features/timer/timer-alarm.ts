@@ -1,7 +1,7 @@
 /**
- * 세션이 끝나면 사용자가 끌 때까지 이어서 울리는 알람.
- * 소리는 Rust(rodio)가 OS 오디오에 직접 재생한다 — 창이 가려지거나 최소화돼도 계속 울린다.
- * Tauri 밖(브라우저 개발·테스트)에서는 조용히 무시한다.
+ * An alarm that keeps ringing after a session ends until the user turns it off.
+ * The sound is played directly to OS audio by Rust (rodio) — it keeps ringing even if the window is hidden or minimized.
+ * Silently ignored outside Tauri (browser dev/testing).
  */
 export interface Alarm {
   start(): void;
@@ -17,7 +17,7 @@ function send(command: "alarm_start" | "alarm_stop"): void {
   void import("@tauri-apps/api/core")
     .then(({ invoke }) => invoke(command))
     .catch(() => {
-      // 오디오 장치가 없거나 런타임이 막혀 있으면 OS 알림만으로 충분하다.
+      // If there's no audio device or the runtime call is blocked, the OS notification alone is enough.
     });
 }
 

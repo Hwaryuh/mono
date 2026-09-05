@@ -34,7 +34,7 @@ export class LocalStorageAccentColorPreferenceStore implements AccentColorPrefer
     try {
       this.storage.setItem(ACCENT_COLOR_STORAGE_KEY, normalized);
     } catch {
-      // 저장소가 차단돼도 현재 세션의 테마 변경은 유지한다.
+      // Even if storage is blocked, the current session's theme change is kept.
     }
   }
 }

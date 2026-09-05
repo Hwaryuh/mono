@@ -1,12 +1,12 @@
-// 선택적 베어러 토큰 게이트. `MONO_API_TOKEN`이 설정된 경우에만 켜진다 —
-// 임베드 모드와 Tailscale 전용 배포는 토큰 없이 그대로 동작한다.
+// An optional bearer-token gate. Only turned on when `MONO_API_TOKEN` is set —
+// embedded mode and Tailscale-only deployments work fine without a token.
 //
-// `/health`, `/version`, CORS preflight(OPTIONS)는 항상 통과시킨다. preflight에는 인증 헤더가
-// 실리지 않으므로 여기서 막으면 브라우저가 401 본문을 읽지 못한다. `/version`은 토큰이
-// 틀렸을 때도 앱↔서버 버전 비교가 가능해야 해서 공개다(민감 정보 아님).
+// `/health`, `/version`, and CORS preflight (OPTIONS) always pass through. Since preflight requests
+// carry no auth header, blocking it here would prevent the browser from reading the 401 body. `/version` stays public
+// even with a wrong token, since app↔server version comparison must still work (it's not sensitive information).
 //
-// ponytail: 전 기기 공유 단일 토큰. 기기별 폐기가 필요하면(기기 분실, 3대 이상)
-// 해시 토큰 테이블로 바꾼다 — `apply`가 "1개 digest 비교" → "테이블 조회"로만 바뀜.
+// ponytail: a single token shared across all devices. If per-device revocation becomes necessary (a lost device, 3+ devices),
+// switch to a hashed-token table — `apply` would just change from "compare against one digest" to "look up in a table".
 
 use std::sync::Arc;
 
@@ -19,9 +19,9 @@ use axum::{
 };
 use sha2::{Digest, Sha256};
 
-/// 토큰이 비어 있으면 라우터를 그대로 반환한다. 아니면 베어러 검사 레이어를 씌운다.
-/// CORS보다 안쪽(먼저 요청을 보고, 나중에 응답을 넘김)에 두어야 401 응답에도
-/// `access-control-allow-origin`이 붙는다 — 호출부에서 `.layer(auth).layer(cors)` 순서.
+/// Returns the router unchanged if the token is empty. Otherwise wraps it in a bearer-check layer.
+/// Must sit inside CORS (sees the request first, passes the response through last) so that
+/// `access-control-allow-origin` is attached even to a 401 response — hence `.layer(auth).layer(cors)` order at the call site.
 pub(crate) fn apply(router: Router, token: Option<&str>) -> Router {
     let token = token.map(str::trim).filter(|value| !value.is_empty());
     let Some(token) = token else { return router };
@@ -31,9 +31,9 @@ pub(crate) fn apply(router: Router, token: Option<&str>) -> Router {
         let expected = expected.clone();
         async move {
             let path = request.uri().path();
-            // `/events`(SSE)도 공개다 — 브라우저 EventSource는 커스텀 헤더(Bearer)를 실을 수 없고,
-            // 토큰을 URL 쿼리로 넘기면 로그·프록시에 노출된다. 이벤트 페이로드는 { revision, modules }
-            // 무효화 신호뿐이라 실제 데이터가 없다. 데이터 재조회는 게이트된 snapshot 경로가 막는다.
+            // `/events` (SSE) is also public — a browser EventSource can't carry a custom header (Bearer), and
+            // passing the token as a URL query would expose it in logs/proxies. The event payload is just an
+            // { revision, modules } invalidation signal with no actual data. Re-fetching the data is blocked by the gated snapshot route.
             if request.method() == Method::OPTIONS
                 || path == "/health"
                 || path == "/version"
@@ -47,7 +47,7 @@ pub(crate) fn apply(router: Router, token: Option<&str>) -> Router {
                 .and_then(|value| value.to_str().ok())
                 .and_then(|value| value.strip_prefix("Bearer "))
                 .map(str::trim);
-            // 고정 길이 SHA-256 digest 비교 — 평문 `==`는 토큰 접두사 길이를 타이밍으로 흘린다.
+            // A constant-time SHA-256 digest comparison — a plain `==` would leak the matching token-prefix length via timing.
             let ok = presented
                 .map(|candidate| Sha256::digest(candidate.as_bytes()) == *expected)
                 .unwrap_or(false);

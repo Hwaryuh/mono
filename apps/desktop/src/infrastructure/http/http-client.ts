@@ -11,7 +11,7 @@ export class HttpError extends Error {
   }
 }
 
-/** 편집 충돌(다른 기기가 먼저 저장) — 낙관적 버전 불일치. 편집 폼은 닫지 않고 최신을 다시 읽는다. */
+/** An edit conflict (another device saved first) — an optimistic version mismatch. Doesn't close the edit form; re-reads the latest instead. */
 export function isConflictError(error: unknown): error is HttpError {
   return error instanceof HttpError && error.status === 409;
 }
@@ -20,12 +20,12 @@ export function configureApiBaseUrl(value: string): void {
   API_BASE_URL = value.replace(/\/$/, "");
 }
 
-/** 원격 모드에서 서버가 요구할 때 보낼 베어러 토큰. 빈 문자열이면 헤더 미전송. */
+/** The bearer token to send when the server requires it in remote mode. Not sent as a header if empty. */
 export function configureApiToken(value: string): void {
   apiToken = value.trim();
 }
 
-/** 모든 요청 init에 Authorization 헤더를 얹는다(토큰이 있을 때만). */
+/** Attaches an Authorization header to every request init (only when a token exists). */
 function withAuth(init: RequestInit = {}): RequestInit {
   if (!apiToken) return init;
   return { ...init, headers: { ...init.headers, Authorization: `Bearer ${apiToken}` } };
@@ -76,15 +76,15 @@ export const httpPutVersioned = <T = void>(path: string, expectedVersion: number
   request<T>(path, jsonInit("PUT", body, expectedVersion));
 export const httpDelete = <T = void>(path: string, body?: unknown): Promise<T> => request<T>(path, jsonInit("DELETE", body));
 
-// request()는 항상 JSON 응답을 가정한다. 미디어 업로드·다운로드는 바이너리라 별도 경로가 필요하다.
+// request() always assumes a JSON response. Media upload/download is binary and needs a separate path.
 //
-// fetch가 아니라 XMLHttpRequest를 쓴다 — macOS WKWebView(Tauri)에서 fetch + FormData
-// 멀티파트 업로드가 본문을 비워 보내는 사례가 있다. XHR은 같은 환경에서 안정적이다.
+// Uses XMLHttpRequest instead of fetch — on macOS WKWebView (Tauri), fetch + FormData
+// multipart uploads have been observed sending an empty body. XHR is stable in the same environment.
 export function httpUpload(path: string, formData: FormData): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE_URL}${path}`);
-    // Content-Type은 지정하지 않는다 — XHR이 FormData의 multipart boundary를 스스로 붙인다.
+    // Content-Type is not set — XHR attaches FormData's multipart boundary on its own.
     if (apiToken) xhr.setRequestHeader("Authorization", `Bearer ${apiToken}`);
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -92,7 +92,7 @@ export function httpUpload(path: string, formData: FormData): Promise<void> {
         return;
       }
       let body: unknown = null;
-      try { body = JSON.parse(xhr.responseText); } catch { /* 비 JSON 응답 */ }
+      try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON response */ }
       reject(new Error(extractErrorMessage(body) ?? translate("http.error.requestFailed", { status: xhr.status })));
     };
     xhr.onerror = () => reject(new Error(translate("http.error.apiUnreachable", { apiUrl: API_BASE_URL })));

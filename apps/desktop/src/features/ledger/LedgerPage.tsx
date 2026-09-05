@@ -155,7 +155,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   const listExpenses = summary.expenses;
   const [year, month] = activeMonth.split("-").map(Number);
   const fallbackCategoryName = snapshot.categories.find((category) => category.id === "other")?.name ?? translate("common.label.other");
-  // comparison은 서버가 이번 달 기준으로 선계산하므로 다른 달을 볼 때는 표시하지 않는다.
+  // The server precomputes "comparison" based on the current month, so it isn't shown when viewing another month.
   const comparison = snapshot.comparison.direction === "same"
     ? translate("ledger.comparison.same")
     : translate("ledger.comparison.difference", { percentage: snapshot.comparison.percentage, direction: snapshot.comparison.direction === "less" ? translate("ledger.comparison.less") : translate("ledger.comparison.more") });

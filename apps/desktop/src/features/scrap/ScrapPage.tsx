@@ -29,7 +29,7 @@ const kindMeta: Record<ScrapKind, { icon: IconName; label: string }> = {
 };
 
 type Draft = ScrapWriteInput;
-// previewUrl은 이미지일 때만 채운다. 이미지가 아니면 null이고 파일 칩으로 그린다.
+// previewUrl is only filled in for images. If it's not an image, it's null and rendered as a file chip.
 type PendingPhoto = { file: File; previewUrl: string | null };
 
 const blankDraft: Draft = { title: "", memo: "", url: "", tag: translate("scrap.label.inbox") };
@@ -45,7 +45,7 @@ const commentStrikePattern = /~~(.+?)~~/g;
 
 type CommentTextSegment = { text: string; externalUrl: string | null; strike?: boolean };
 
-// ~~취소선~~ 마크다운을 조각으로 쪼갠다. URL 조각 안쪽은 건드리지 않는다.
+// Splits ~~strikethrough~~ markdown into segments. Doesn't touch the inside of URL segments.
 function splitCommentStrike(text: string): CommentTextSegment[] {
   const segments: CommentTextSegment[] = [];
   let cursor = 0;
@@ -95,7 +95,7 @@ function isImageName(name: string) {
   return /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(name);
 }
 
-// dataTransfer / clipboard에서 첫 파일을 꺼낸다.
+// Pulls the first file out of dataTransfer / clipboard.
 function firstFileFrom(list: FileList | null | undefined, items?: DataTransferItemList): File | null {
   if (list && list.length > 0) return list[0];
   for (let index = 0; index < (items?.length ?? 0); index += 1) {
@@ -128,8 +128,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   const handledModalRef = useRef(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoPreviewUrlRef = useRef<string | null>(null);
-  // pendingPhoto 상태가 렌더 사이에 유실돼도(WKWebView 파일 다이얼로그 특이 동작) 저장 시
-  // 사진을 잃지 않도록, 선택된 파일 자체는 ref에 따로 붙든다. 미리보기는 상태로만 그린다.
+  // Even if the pendingPhoto state is lost between renders (a WKWebView file-dialog quirk), on save
+  // the selected file itself is held separately in a ref so the photo isn't lost. The preview is rendered from state alone.
   const photoFileRef = useRef<File | null>(null);
   const tagRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const queryClient = useQueryClient();
@@ -178,9 +178,9 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     onError: (error) => setDeleteError(errorMessage(error)),
   });
 
-  // URL로 열리는 경우(딥링크, AppShell의 "+ 스크랩 추가")의 초안 세팅만 담당한다.
-  // handledModalRef는 openCreate/closeCreate가 관리하므로, 파일 다이얼로그 포커스 이벤트로
-  // searchParams가 잠깐 흔들려도 이 이펙트가 작성 중인 초안·사진을 초기화하지 않는다.
+  // Only handles draft setup for the case of opening via URL (deep link, AppShell's "+ Add scrap").
+  // handledModalRef is managed by openCreate/closeCreate, so even if a file-dialog focus event
+  // briefly perturbs searchParams, this effect won't reset the draft/photo being composed.
   useEffect(() => {
     if (searchParams.get("modal") !== "new" || handledModalRef.current || !snapshotQuery.data) return;
     handledModalRef.current = true;
@@ -193,7 +193,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
     if (photoPreviewUrlRef.current) URL.revokeObjectURL(photoPreviewUrlRef.current);
   }, []);
 
-  // 첨부가 이미지면 미리보기 object URL을 만들고, 첨부가 바뀌거나 사라지면 회수한다.
+  // If the attachment is an image, creates a preview object URL and revokes it when the attachment changes or is removed.
   useEffect(() => {
     if (!commentFile || !commentFile.type.startsWith("image/")) {
       setCommentPreviewUrl(null);
@@ -483,8 +483,8 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
   );
 }
 
-// 링크 미리보기 이미지는 인증이 걸린 원격 서버에서도 떠야 하므로 <img src>가 아니라
-// 토큰 헤더를 실은 fetch로 가져와 object URL로 만든다(미디어 이미지와 같은 방식).
+// The link preview image must also load from an authenticated remote server, so instead of <img src>
+// it's fetched with the token header attached and turned into an object URL (the same approach as media images).
 function useLinkPreviewImage(externalUrl: string | null) {
   return useQuery({
     queryKey: ["link-preview", externalUrl],
@@ -523,8 +523,8 @@ function CommentContent({ text, urlOpener }: { text: string; urlOpener: External
   return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.strike ? <s key={`${index}-${segment.text}`}>{segment.text}</s> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
 }
 
-// ponytail: <a download>는 데스크톱 WebView2·webkitgtk에선 저장 대화상자를 띄우지만
-// macOS WKWebView에선 새 탭 열기로 떨어질 수 있다. 제대로 하려면 tauri dialog+fs 플러그인.
+// ponytail: <a download> shows a save dialog on desktop WebView2/webkitgtk, but
+// on macOS WKWebView it can fall back to opening a new tab. Doing this properly needs the tauri dialog+fs plugins.
 function MediaFileChip({ mediaId, name, size, className = "scrap-comment__file", iconSize = 14 }: { mediaId: string; name: string; size: number; className?: string; iconSize?: number }) {
   const { data: href } = useMedia(mediaId);
   return (
@@ -595,7 +595,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onMan
       try {
         await repository.update(item.id, { ...input, mediaId, fileName, fileSize });
       } catch (error) {
-        if (stagedMediaId) { try { await mediaStore.delete(stagedMediaId); } catch { /* 고아 미디어 GC가 후속 정리한다. */ } }
+        if (stagedMediaId) { try { await mediaStore.delete(stagedMediaId); } catch { /* the orphaned-media GC cleans it up later. */ } }
         throw error;
       }
     },
@@ -764,7 +764,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
   const deleteMutation = useMutation({
     mutationFn: () => repository.deleteComment(scrapId, comment.id),
     onMutate: () => setDeleteError(null),
-    // 성공 시 이 행이 사라지므로 focus 복원은 필요 없다.
+    // On success this row disappears, so there's no need to restore focus.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: scrapQueryKey }),
     onError: (error) => setDeleteError(errorMessage(error)),
   });
@@ -855,7 +855,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
   );
 }
 
-// 이미지 크게 보기. 다운로드는 blob: object URL에서 원본을 되찾아 네이티브 저장 대화상자로.
+// Opens the image large. Download recovers the original from the blob: object URL and uses the native save dialog.
 function ScrapImageLightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);

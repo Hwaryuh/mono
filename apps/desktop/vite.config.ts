@@ -10,7 +10,7 @@ if (!appVersion) throw new Error("Cargo.toml [workspace.package].version을 찾�
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  // 앱·서버가 공유하는 Cargo workspace 버전을 주입해 원격 서버 드리프트를 경고한다.
+  // Injects the Cargo workspace version shared by the app and server, to warn about remote-server drift.
   define: { __APP_VERSION__: JSON.stringify(appVersion) },
   server: {
     port: 4173,

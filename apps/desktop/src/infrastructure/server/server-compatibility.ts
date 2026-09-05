@@ -22,9 +22,9 @@ export function serverBehindOf(compatibility: ServerCompatibility | undefined): 
 }
 
 /**
- * 앱(빌드 시 주입된 버전)과 서버(`/version`)의 버전을 비교한다. 원격 모드에서 서버만
- * 재배포를 놓치면 앱이 보내는 새 필드를 서버가 조용히 무시해 기능이 말없이 깨진다.
- * 임베드 모드는 서버가 앱에 동봉돼 항상 같은 버전이라 경고가 뜨지 않는다.
+ * Compares the app's version (injected at build time) against the server's (`/version`). In remote mode, if only the server
+ * misses a redeploy, it silently ignores new fields the app sends and features break silently.
+ * In embedded mode, the server ships with the app and is always the same version, so no warning appears.
  */
 export async function checkServerCompatibility(): Promise<ServerCompatibility> {
   const appVersion = __APP_VERSION__;

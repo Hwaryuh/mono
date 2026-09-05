@@ -10,8 +10,8 @@ use super::db::DbExt;
 use super::error::{ApiError, ApiResult};
 use super::secret::{self, SecretState};
 
-// apps/api/src/repositories/{capture-analysis-*,openai-*,gemini-*,selectable-*}.ts 이식.
-// 프롬프트·모델·엔드포인트·스키마·검증 규칙을 그대로 유지한다.
+// Ported from apps/api/src/repositories/{capture-analysis-*,openai-*,gemini-*,selectable-*}.ts.
+// Keeps the prompt, model, endpoint, schema, and validation rules exactly as they were.
 
 const OPENAI_MODEL: &str = "gpt-5-nano";
 const OPENAI_ROOT: &str = "https://api.openai.com/v1";
@@ -23,7 +23,7 @@ const REQUEST_TIMEOUT_SECS: u64 = 45;
 
 pub(super) type AiResult<T> = Result<T, String>;
 
-// ---------- DTO (contracts capture* 스키마) ----------
+// ---------- DTO (contracts capture* schemas) ----------
 
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -84,7 +84,7 @@ pub(super) fn label(provider: &str) -> &'static str {
     }
 }
 
-// ---------- 프롬프트 (capture-analysis-prompt.ts) ----------
+// ---------- Prompt (capture-analysis-prompt.ts) ----------
 
 const BASE: &str = "다음 개인 캡처를 정확히 한 모듈로 분류하고 핵심 필드를 한국어로 추출하라.\n\
 todo: 실행해야 할 작업. calendar: 날짜나 시간이 있는 일정. ledger: 지출이나 구매 기록. \
@@ -128,7 +128,7 @@ pub(super) fn build_analysis_instruction(context: Option<&AnalysisContext>) -> S
     format!("{BASE}{date_rule}{FIELD_CONTRACT}{taxonomy}{TAIL}")
 }
 
-// ---------- 검증 (capture-analysis-validation.ts + captureAnalysisResultSchema) ----------
+// ---------- Validation (capture-analysis-validation.ts + captureAnalysisResultSchema) ----------
 
 fn schema_parse(value: &Value, provider_label: &str) -> AiResult<CaptureAnalysisResult> {
     let violated = || format!("{provider_label} 분석 결과가 스키마를 위반했습니다.");
@@ -165,7 +165,7 @@ fn validate_result(result: &CaptureAnalysisResult, provider_label: &str) -> AiRe
     Ok(())
 }
 
-// ---------- HTTP 공통 ----------
+// ---------- HTTP shared ----------
 
 fn http_client(timeout_secs: u64) -> reqwest::Client {
     reqwest::Client::builder()
@@ -409,7 +409,7 @@ async fn test_connection(provider: &str, api_key: &str) -> AiResult<()> {
     }
 }
 
-// ---------- 라우트: POST /ai/keys/{provider}/test ----------
+// ---------- Route: POST /ai/keys/{provider}/test ----------
 
 pub(super) fn routes(state: SecretState) -> Router {
     Router::new()
@@ -423,7 +423,7 @@ async fn test_handler(
 ) -> ApiResult<Json<Value>> {
     let key = {
         let conn = state.db.conn();
-        // 알 수 없는 provider면 여기서 BadRequest.
+        // BadRequest here if the provider is unknown.
         secret::get_api_key(&conn, &state.crypto, &provider)?
     };
     let key = key.ok_or_else(|| {
@@ -433,7 +433,7 @@ async fn test_handler(
     Ok(Json(json!({ "ok": true })))
 }
 
-// ---------- 테스트 ----------
+// ---------- Tests ----------
 
 #[cfg(test)]
 mod tests {

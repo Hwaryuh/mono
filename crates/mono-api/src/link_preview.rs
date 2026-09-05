@@ -13,9 +13,9 @@ use serde::Deserialize;
 
 use super::error::ApiError;
 
-// apps/api/src/repositories/link-preview-image-provider.ts + routes/link-preview.ts 이식.
-// 페이지를 받아 og:image/twitter:image 메타를 뽑고 그 이미지를 프록시한다. SSRF 방어:
-// localhost/.local·사설 IP 차단, 리디렉션마다 호스트 재검증(최대 4회), 크기·시간 상한.
+// Ported from apps/api/src/repositories/link-preview-image-provider.ts + routes/link-preview.ts.
+// Fetches a page, extracts its og:image/twitter:image meta tag, and proxies that image. SSRF defenses:
+// blocks localhost/.local and private IPs, revalidates the host on every redirect (up to 4), and caps size and time.
 
 const HTML_LIMIT: usize = 2 * 1024 * 1024;
 const IMAGE_LIMIT: usize = 10 * 1024 * 1024;
@@ -34,10 +34,10 @@ struct PreviewImage {
     body: Vec<u8>,
 }
 
-// (요청 URL, 캐시된 시각, 이미지 or None=이미지 없음) — LRU는 Vec 순서로 굴린다.
+// (requested URL, cached time, image or None=no image) — the LRU is driven by Vec ordering.
 type CacheEntry = (String, Instant, Option<PreviewImage>);
 
-// ---------- 캐시 (Node의 30분 TTL · 32개 LRU) ----------
+// ---------- Cache (Node's 30-minute TTL, 32-entry LRU) ----------
 
 #[derive(Clone)]
 pub(super) struct LinkPreviewState {
@@ -69,7 +69,7 @@ impl LinkPreviewState {
     }
 }
 
-// ---------- SSRF 방어 ----------
+// ---------- SSRF defense ----------
 
 // link-preview-image-provider.ts isPrivateAddress
 fn is_private_ip(ip: &IpAddr) -> bool {
@@ -109,7 +109,7 @@ fn require_http_url(raw: &str) -> Fallible<Url> {
     Ok(url)
 }
 
-// 검증된 주소 목록을 돌려준다(첫 주소로 fetch를 pin). 이름은 DNS 조회.
+// Returns the list of validated addresses (the fetch is pinned to the first address). The name comes from a DNS lookup.
 async fn check_host(url: &Url) -> Fallible<Vec<IpAddr>> {
     let host = url.host_str().unwrap_or_default().to_lowercase();
     if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") {
@@ -275,7 +275,7 @@ async fn fetch_image(page_url: &str) -> Fallible<Option<PreviewImage>> {
     fetch_preview_image(&image_url).await
 }
 
-// ---------- HTML 메타 파싱 (previewImageRefOf / attributesOf / decodeHtmlEntities) ----------
+// ---------- HTML meta parsing (previewImageRefOf / attributesOf / decodeHtmlEntities) ----------
 
 fn preview_image_ref(html: &str) -> Option<String> {
     let mut candidates: HashMap<String, String> = HashMap::new();
@@ -295,7 +295,7 @@ fn preview_image_ref(html: &str) -> Option<String> {
         .find_map(|key| candidates.get(key).cloned())
 }
 
-// <meta ...> 태그 문자열들. 따옴표 안의 '>'는 고려 안 함(Node 정규식과 동일 한계).
+// The <meta ...> tag strings. A '>' inside quotes isn't accounted for (the same limitation as the Node regex).
 fn meta_tags(html: &str) -> Vec<String> {
     let lower = html.to_lowercase();
     let bytes = lower.as_bytes();
@@ -322,7 +322,7 @@ fn is_attr_char(b: u8) -> bool {
 fn attributes_of(tag: &str) -> HashMap<String, String> {
     let bytes = tag.as_bytes();
     let mut attributes = HashMap::new();
-    let mut i = 5.min(bytes.len()); // "<meta" 건너뜀
+    let mut i = 5.min(bytes.len()); // skips past "<meta"
     while i < bytes.len() {
         while i < bytes.len() && !is_attr_char(bytes[i]) {
             i += 1;
@@ -409,7 +409,7 @@ fn decode_html_entities(value: &str) -> String {
     out
 }
 
-// ---------- 라우트 ----------
+// ---------- Routes ----------
 
 #[derive(Deserialize)]
 struct UrlQuery {
@@ -439,7 +439,7 @@ async fn image_handler(
     }
 }
 
-// ---------- 테스트 ----------
+// ---------- Tests ----------
 
 #[cfg(test)]
 mod tests {

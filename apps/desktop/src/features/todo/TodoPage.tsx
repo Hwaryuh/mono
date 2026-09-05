@@ -45,7 +45,7 @@ function statusOf(item: TodoItem, today: string): TodoStatus {
   return "upcoming";
 }
 
-// 하루 이상 지난 완료 항목은 "전체"에서 숨기고 "완료" 탭에만 남긴다.
+// Completed items older than a day are hidden from "All" and kept only in the "Completed" tab.
 function isAgedDone(item: TodoItem, now: number): boolean {
   if (!item.done || !item.completedAt) return false;
   const completed = Date.parse(item.completedAt);
@@ -529,7 +529,7 @@ function formatDate(date: string) {
 
 function formatCompletedAt(value: string) {
   const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value; // mock의 사람이 읽는 문자열("방금" 등)은 그대로 둔다
+  if (Number.isNaN(parsed)) return value; // leaves the mock's human-readable strings (like "just now") as-is
   const date = new Date(parsed);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;

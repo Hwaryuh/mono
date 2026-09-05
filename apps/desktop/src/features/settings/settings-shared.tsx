@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-/** 예전 각 설정 패널에 복붙돼 있던 errorMessage. Error가 아니면 문자열화만 한다. */
+/** The errorMessage helper that used to be copy-pasted into each settings panel. Just stringifies non-Error values. */
 export function messageOf(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
 }
@@ -10,9 +10,9 @@ export function SettingsHeading({ title, description }: { title: string; descrip
 }
 
 /**
- * 설정 패널마다 복붙되던 pending/message/error + try/catch/finally 래퍼.
- * `run(action, op)`가 pending을 action으로 세우고 message/error를 리셋한 뒤 op를 돌린다.
- * op 내부에서 성공 메시지는 setMessage로 직접 세운다.
+ * The pending/message/error + try/catch/finally wrapper that used to be copy-pasted into every settings panel.
+ * `run(action, op)` sets pending to action, resets message/error, then runs op.
+ * Inside op, set the success message directly via setMessage.
  */
 export function useAsyncAction<Action extends string>() {
   const [pending, setPending] = useState<Action | null>(null);

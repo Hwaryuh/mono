@@ -17,9 +17,9 @@ use super::db::DbExt;
 use super::error::{ApiError, ApiResult};
 use super::secret::{get_cf_analytics_token, get_r2_config, R2Config, SecretState};
 
-// apps/api/src/repositories/r2-media-store.ts + routes/media.ts 이식.
-// R2는 S3 호환. AWS SigV4로 서명해 reqwest로 직접 친다(aws-sdk 대신 — 6개 op뿐).
-// 배치 DeleteObjects 대신 개별 DELETE 루프 (GC는 드문 op, 고아 수도 보통 적음).
+// Ported from apps/api/src/repositories/r2-media-store.ts + routes/media.ts.
+// R2 is S3-compatible. Signs with AWS SigV4 and hits it directly via reqwest (instead of aws-sdk — it's only 6 ops).
+// Uses an individual DELETE loop instead of batch DeleteObjects (GC is a rare op, and there are usually few orphans anyway).
 
 const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 const UPLOAD_LIMIT_BYTES: usize = 105 * 1024 * 1024;
@@ -47,7 +47,7 @@ fn hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
     mac.finalize().into_bytes().to_vec()
 }
 
-// RFC3986. AWS canonical: unreserved 외 전부 %XX. path에서 '/'는 보존 옵션.
+// RFC3986. AWS canonical: everything but unreserved characters is %XX-encoded. '/' in a path is preserved as an option.
 fn uri_encode(s: &str, encode_slash: bool) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
@@ -70,7 +70,7 @@ struct SignInput<'a> {
     method: &'a str,
     canonical_uri: &'a str,
     canonical_query: &'a str,
-    // (lowercase name, value) — 서명 대상. 이름순 정렬은 함수가 한다.
+    // (lowercase name, value) — what gets signed. The function sorts by name.
     headers: &'a [(String, String)],
     payload_sha256_hex: &'a str,
     access_key: &'a str,
@@ -119,10 +119,10 @@ fn authorization_header(inp: &SignInput) -> String {
     )
 }
 
-// ---------- R2 클라이언트 ----------
+// ---------- R2 client ----------
 
 pub(super) struct R2Client {
-    endpoint: String, // 뒤 슬래시 없음
+    endpoint: String, // no trailing slash
     bucket: String,
     access_key_id: String,
     secret_access_key: String,
@@ -148,7 +148,7 @@ impl R2Client {
         }
     }
 
-    // 서명된 요청 빌더. canonical_uri/query는 이미 인코딩된 상태.
+    // The signed request builder. canonical_uri/query are already encoded.
     fn signed(
         &self,
         method: reqwest::Method,
@@ -231,7 +231,7 @@ impl R2Client {
             .send()
             .await
             .map_err(net_err)?;
-        // S3 DeleteObject는 없는 키에도 204를 준다.
+        // S3 DeleteObject returns 204 even for a nonexistent key.
         if res.status() == StatusCode::NOT_FOUND || res.status().is_success() {
             return Ok(());
         }
@@ -259,8 +259,8 @@ impl R2Client {
         }
     }
 
-    // 쓰기 권한까지 실제로 확인 — HEAD(읽기)만으로는 Object Read only 토큰을 못 잡아
-    // "연결 성공"이 뜬 뒤 업로드가 403으로 실패한다. probe 객체를 PUT한 뒤 지운다.
+    // Actually verifies write permission too — HEAD (read) alone wouldn't catch an Object-Read-only token,
+    // leading to a "connection successful" message followed by uploads failing with 403. PUTs a probe object then deletes it.
     async fn verify_write(&self) -> ApiResult<()> {
         const PROBE_KEY: &str = ".mono-connection-probe";
         self.put(PROBE_KEY, b"ok".to_vec(), "text/plain").await.map_err(|error| match error {
@@ -269,13 +269,13 @@ impl R2Client {
             )),
             other => other,
         })?;
-        // 정리 실패는 무시 — 쓰기 검증은 이미 통과했고 남은 probe는 미디어 GC가 정리한다.
+        // Ignores a cleanup failure — write validation already passed, and a leftover probe gets cleaned up by the media GC.
         let _ = self.delete(PROBE_KEY).await;
         Ok(())
     }
 
-    // ListObjectsV2는 페이지당 최대 1000개 — IsTruncated면 continuation-token으로 이어 받는다.
-    // 미디어가 수천 개 쌓여도 전량을 세야 저장 용량 경고가 정확하다.
+    // ListObjectsV2 returns at most 1000 per page — if IsTruncated, continues via the continuation-token.
+    // Even with thousands of media items, the full count is needed for the storage-usage warning to be accurate.
     async fn list_all(&self) -> ApiResult<Vec<(String, i64)>> {
         let uri = format!("/{}", uri_encode(&self.bucket, true));
         let mut out = Vec::new();
@@ -304,7 +304,7 @@ impl R2Client {
     }
 }
 
-// ListObjectsV2 응답이 잘렸으면 다음 페이지 토큰을 돌려준다. base64 토큰이라 XML escape 없음.
+// Returns the next-page token if the ListObjectsV2 response was truncated. It's a base64 token, so no XML escaping is needed.
 fn next_continuation_token(xml: &str) -> Option<String> {
     if tag_text(xml, "IsTruncated").map(str::trim) != Some("true") {
         return None;
@@ -330,7 +330,7 @@ async fn expect_ok(res: reqwest::Response, what: &str) -> ApiResult<()> {
     }
 }
 
-// <Contents><Key>..</Key><Size>..</Size></Contents> 반복 블록에서 (key, size) 추출.
+// Extracts (key, size) from the repeating <Contents><Key>..</Key><Size>..</Size></Contents> blocks.
 fn parse_list_objects(xml: &str) -> Vec<(String, i64)> {
     let mut out = Vec::new();
     let mut idx = 0;
@@ -358,7 +358,7 @@ fn tag_text<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
     Some(&xml[start..start + rel_end])
 }
 
-// ---------- 오프사이트 백업용 미러 ----------
+// ---------- Mirror for offsite backup ----------
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct MediaMirror {
@@ -366,11 +366,11 @@ pub(crate) struct MediaMirror {
     pub(crate) skipped: usize,
 }
 
-// R2 미디어 버킷을 로컬 디렉터리로 증분 미러링한다. DB 백업 번들 옆에 두면
-// systemd의 rclone copy가 그대로 오프사이트로 쓸어담는다.
-// ponytail: copy-only, prune 없음 — list_all은 1000개에서 잘리므로 삭제를 넣으면
-//           1000번째 이후 로컬 사본을 날릴 수 있다. 고아 미러 파일은 무해한 용량일 뿐,
-//           원본 정리는 앱의 미디어 GC가 R2에서 한다.
+// Incrementally mirrors the R2 media bucket into a local directory. Placed next to the DB backup bundle,
+// systemd's rclone copy sweeps it offsite along with it.
+// ponytail: copy-only, no prune — since list_all truncates at 1000, adding deletion could
+//           wipe out local copies past the 1000th entry. Orphaned mirror files are just harmless extra space —
+//           the app's media GC cleans up the source in R2.
 pub(crate) async fn mirror_bucket(
     config: &R2Config,
     dir: &std::path::Path,
@@ -382,7 +382,7 @@ pub(crate) async fn mirror_bucket(
     let mut result = MediaMirror::default();
     for (key, size) in &remote {
         if require_media_id(key).is_err() {
-            continue; // probe 객체 등 uuid 아닌 키는 건너뛴다
+            continue; // skips non-uuid keys such as probe objects
         }
         let path = dir.join(key);
         if mirror_is_current(&path, *size) {
@@ -398,7 +398,7 @@ pub(crate) async fn mirror_bucket(
     Ok(result)
 }
 
-// 로컬 파일이 있고 크기가 R2와 같으면 이미 받은 것으로 본다(R2 객체는 불변).
+// If the local file exists and its size matches R2, it's treated as already fetched (R2 objects are immutable).
 fn mirror_is_current(path: &std::path::Path, remote_size: i64) -> bool {
     std::fs::metadata(path)
         .map(|meta| meta.len() as i64 == remote_size)
@@ -409,7 +409,7 @@ fn mirror_io_err(error: std::io::Error) -> ApiError {
     ApiError::BadRequest(format!("미디어 미러 파일 오류: {error}"))
 }
 
-// ---------- 미디어 참조 (media-reference-repository.ts) ----------
+// ---------- Media references (media-reference-repository.ts) ----------
 
 fn referenced_media_ids(conn: &Connection) -> ApiResult<HashSet<String>> {
     let mut ids = HashSet::new();
@@ -449,7 +449,7 @@ fn orphans_of(objects: &[(String, i64)], referenced: &HashSet<String>) -> Vec<(S
     objects.iter().filter(|(key, _)| !referenced.contains(key)).cloned().collect()
 }
 
-// mediaId는 R2 객체 키로 그대로 쓰인다 — uuid 형식만 허용해 경로·키 주입을 막는다.
+// mediaId is used directly as the R2 object key — only the uuid format is allowed, to prevent path/key injection.
 fn require_media_id(id: &str) -> ApiResult<()> {
     let valid = id.len() == 36
         && id.as_bytes().iter().enumerate().all(|(i, &b)| match i {
@@ -463,13 +463,13 @@ fn require_media_id(id: &str) -> ApiResult<()> {
     }
 }
 
-// ---------- 사용량 리포트 (Cloudflare GraphQL Analytics) ----------
-// Tier 1(list_all)은 근사 저장량만. 여기선 CF Analytics로 청구 기준 저장량 + 이번 달 op 수를
-// 받아 무료 한도(저장 10GB, Class A 100만, Class B 1000만) 대비 경고할 수 있게 한다.
+// ---------- Usage report (Cloudflare GraphQL Analytics) ----------
+// Tier 1 (list_all) gives only an approximate storage size. Here, CF Analytics is used to fetch billed storage + this month's op count,
+// so we can warn against the free tier limits (10GB storage, 1M Class A, 10M Class B).
 
 const GRAPHQL_ENDPOINT: &str = "https://api.cloudflare.com/client/v4/graphql";
 
-// op → 청구 클래스. https://developers.cloudflare.com/r2/pricing/ (2026). 미지의 actionType은 other로.
+// op → billing class. https://developers.cloudflare.com/r2/pricing/ (2026). An unknown actionType falls into other.
 const CLASS_A_ACTIONS: &[&str] = &[
     "ListBuckets", "PutBucket", "ListObjects", "PutObject", "CopyObject",
     "CompleteMultipartUpload", "CreateMultipartUpload", "LifecycleStorageTierTransition",
@@ -500,7 +500,7 @@ const USAGE_QUERY: &str = r#"query($tag: string!, $storageStart: Time!, $opsStar
 #[derive(Serialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct UsageReport {
-    // 계정 전체(모든 버킷 합산) — 무료 한도가 계정 단위라 버킷 필터를 걸지 않는다.
+    // The entire account (summed across all buckets) — no bucket filter is applied since the free tier limit is per-account.
     storage_bytes: i64,
     object_count: i64,
     sampled_at: Option<String>,
@@ -609,7 +609,7 @@ fn parse_usage_report(payload: &Value, month_start: String) -> ApiResult<UsageRe
     })
 }
 
-// ---------- 라우트 (routes/media.ts, /credentials/test는 프록시) ----------
+// ---------- Routes (routes/media.ts; /credentials/test is a proxy) ----------
 
 pub(super) fn routes(state: SecretState) -> Router {
     Router::new()
@@ -663,7 +663,7 @@ async fn upload_handler(
     let id = id.ok_or_else(|| ApiError::BadRequest("업로드할 파일이 없습니다.".into()))?;
     require_media_id(&id)?;
     let (bytes, content_type) = file.ok_or_else(|| ApiError::BadRequest("업로드할 파일이 없습니다.".into()))?;
-    // 0바이트를 그대로 R2에 올리면 "저장은 성공, 사진은 없음"이 되어 조용히 깨진다. 명시적으로 거부.
+    // Uploading 0 bytes to R2 as-is would silently break things — "saved successfully, but no photo". Explicitly rejected instead.
     if bytes.is_empty() {
         return Err(ApiError::validation("빈 파일은 업로드할 수 없습니다."));
     }
@@ -744,7 +744,7 @@ async fn gc_handler(State(state): State<SecretState>) -> ApiResult<Json<Value>> 
     Ok(Json(json!({ "deleted": keys.len() })))
 }
 
-// ---------- 테스트 ----------
+// ---------- Tests ----------
 
 #[cfg(test)]
 mod tests {
@@ -752,7 +752,7 @@ mod tests {
     use crate::db;
     use rusqlite::params;
 
-    // AWS 문서 "Example: GET Object" 서명 벡터 — canonical request + signing key 전체 검증.
+    // The AWS docs' "Example: GET Object" signing vector — verifies the full canonical request + signing key.
     #[test]
     fn sigv4_matches_aws_get_object_vector() {
         let auth = authorization_header(&SignInput {

@@ -9,7 +9,7 @@ import { useMediaStore } from "../../infrastructure/media/media-store-context";
 import { newMediaId } from "../../infrastructure/media/media-store";
 import type { DashboardRepository } from "./dashboard-repository";
 
-// 편집 중에는 원본(File+미리보기 data URL)을 메모리에만 들고, 제출 시 R2에 업로드하고 mediaId만 넘긴다.
+// While editing, keeps the original (File + preview data URL) only in memory, and on submit uploads it to R2 and passes only the mediaId.
 type PendingMedia = { name: string; mimeType: string; size: number; dataUrl: string; file: File };
 
 const moduleMeta: Record<PlatformModuleId, { name: string; color: string; icon: IconName }> = {
@@ -31,7 +31,7 @@ interface QuickCaptureProps {
 
 const maxCaptureImages = 4;
 const maxCaptureImageBytes = 10 * 1024 * 1024;
-// Gemini inline 요청은 전체 20MB 제한. Base64 팽창과 JSON 프롬프트 여유를 남긴다.
+// A Gemini inline request has an overall 20MB limit. Leaves headroom for Base64 inflation and the JSON prompt.
 const maxCaptureImageTotalBytes = 13 * 1024 * 1024;
 const maxCaptureVideos = 1;
 const maxCaptureVideoBytes = 100 * 1024 * 1024;
@@ -83,7 +83,7 @@ function captureVideoOf(file: File) {
   });
 }
 
-// 첨부 크기 표기는 도메인 공용 포매터를 쓴다. 이름은 기존 import 호환을 위해 유지.
+// Attachment size display uses the shared domain formatter. The name is kept for compatibility with existing imports.
 export const formatMediaSize = formatByteSize;
 
 export function QuickCapture({ autoFocus = false, repository, showHeading = false, snapshot }: QuickCaptureProps) {
@@ -104,7 +104,7 @@ export function QuickCapture({ autoFocus = false, repository, showHeading = fals
         await mediaStore.save(mediaId, file);
         return { ...meta, mediaId };
       };
-      // 이미지는 dataUrl을 실어 보낸다 — 서버가 캡처 분석(Gemini)에만 쓰고 영속화하지 않는다.
+      // Sends the image as a dataUrl — the server uses it only for capture analysis (Gemini) and does not persist it.
       const [images, videos] = await Promise.all([
         Promise.all(pending.images.map(async (image) => ({ ...(await persist(image)), dataUrl: image.dataUrl }))),
         Promise.all(pending.videos.map(persist)),

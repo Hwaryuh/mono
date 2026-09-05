@@ -9,8 +9,8 @@ mod runtime_server;
 use alarm::Alarm;
 use runtime_server::{RuntimeServer, ServerMode, StoredConnection};
 
-/// 실행 중인 앱이 실제로 사용하는 API 연결. `setup`에서 한 번 결정되고 바뀌지 않는다 —
-/// 설정을 바꾸면 `server.json`만 갱신되고, 적용은 다음 실행부터다.
+/// The API connection the running app actually uses. Decided once in `setup` and never changes —
+/// changing the setting only updates `server.json`; it takes effect starting from the next launch.
 struct RunningServer {
     api_base_url: String,
     api_token: Option<String>,
@@ -22,21 +22,21 @@ struct RunningServer {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ServerConnectionDto {
-    /// `server.json`에 저장된 모드("embedded" | "remote").
+    /// The mode stored in `server.json` ("embedded" | "remote").
     mode: &'static str,
-    /// 저장된 원격 주소. embedded이거나 미설정이면 빈 문자열.
+    /// The stored remote address. An empty string if embedded or unset.
     remote_url: String,
-    /// 저장된 베어러 토큰. 없으면 빈 문자열.
+    /// The stored bearer token. An empty string if none.
     remote_token: String,
-    /// 지금 실행 중인 앱이 사용하는 주소.
+    /// The address the currently running app uses.
     effective_api_base_url: String,
-    /// 지금 실행 중인 앱이 임베드 서버를 켰는지.
+    /// Whether the currently running app started the embedded server.
     running_embedded: bool,
-    /// `MONO_API_BASE_URL` 환경 변수가 설정되어 파일 설정이 무시되는 상태.
+    /// Whether the `MONO_API_BASE_URL` environment variable is set, overriding the file-based setting.
     env_override: bool,
-    /// 이 화면에서 설정을 바꿀 수 있는지(환경 변수 override 시 false).
+    /// Whether the setting can be changed from this screen (false when overridden by an environment variable).
     manageable: bool,
-    /// 저장된 설정과 실행 중인 연결이 달라, 적용하려면 재시작이 필요한지.
+    /// Whether the stored setting differs from the running connection, requiring a restart to apply.
     restart_required: bool,
 }
 
@@ -111,8 +111,8 @@ fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
-/// 미디어(사진·파일)를 사용자가 고른 경로에 저장한다. 취소하면 false.
-/// 웹뷰의 <a download>는 macOS에서 경로 선택 없이 다운로드 폴더로만 떨어져서, 여기서 처리한다.
+/// Saves media (photos/files) to a path the user chooses. Returns false if canceled.
+/// The webview's <a download> lands only in the Downloads folder without a path picker on macOS, so this handles it instead.
 #[tauri::command]
 async fn save_media_file(
     app: tauri::AppHandle,
@@ -120,7 +120,7 @@ async fn save_media_file(
     bytes: Vec<u8>,
 ) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
-    // async 커맨드는 메인 스레드가 아니므로 blocking 대화상자를 써도 된다.
+    // An async command doesn't run on the main thread, so it's fine to use a blocking dialog.
     let Some(target) = app.dialog().file().set_file_name(&name).blocking_save_file() else {
         return Ok(false);
     };
@@ -129,10 +129,10 @@ async fn save_media_file(
     Ok(true)
 }
 
-// 앱 상태 원본은 API 서버의 SQLite다(architecture-decisions.md §9).
-// 임베드 모드: mono_api::spawn이 127.0.0.1:4174를 점유한다 — 서버 없이도 단독 실행.
-// 멀티 기기 공유: crates/mono-api의 standalone 바이너리를 홈서버/VPS에서 돌리고
-// server.json(설정 > 서버) 또는 MONO_API_BASE_URL로 그쪽을 가리킨다.
+// The app's source of truth is the API server's SQLite (architecture-decisions.md §9).
+// Embedded mode: mono_api::spawn occupies 127.0.0.1:4174 — runs standalone without a separate server.
+// Multi-device sharing: run the crates/mono-api standalone binary on a home server/VPS and
+// point at it via server.json (Settings > Server) or MONO_API_BASE_URL.
 
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -140,7 +140,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init());
 
-    // 자동 업데이트는 데스크톱 전용. 모바일 타깃에는 updater/process 플러그인이 없다.
+    // Auto-update is desktop-only. Mobile targets don't have the updater/process plugins.
     #[cfg(desktop)]
     {
         builder = builder
@@ -170,7 +170,7 @@ pub fn run() {
 
             let server = RuntimeServer::load(&data_directory)?;
             if server.uses_embedded_server() {
-                // 임베드 API 서버. mono.secret.key는 비밀 복호화 마스터 키(§5).
+                // The embedded API server. mono.secret.key is the master key for decrypting secrets (§5).
                 mono_api::spawn(
                     data_directory.join("mono.sqlite"),
                     data_directory.join("mono.secret.key"),

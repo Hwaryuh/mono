@@ -14,7 +14,7 @@ use super::version::{ensure_versioned_update, expected_version};
 // apps/api/src/db/schema.ts SCRAP_OTHER_TAG
 const OTHER_TAG: &str = "기타";
 
-// ---------- DTO (packages/contracts/src/index.ts scrap* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts scrap* schemas) ----------
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,7 +106,7 @@ struct DeleteTagInput {
     replacement_tag: String,
 }
 
-// ---------- 검증 ----------
+// ---------- Validation ----------
 
 fn validated_title(raw: &str) -> ApiResult<String> {
     let title = raw.trim();
@@ -161,7 +161,7 @@ fn validated_media_id(raw: Option<&str>) -> ApiResult<Option<String>> {
     Ok(Some(id.to_string()))
 }
 
-// 첨부 파일은 media_id와 짝이어야 한다. 반환: (정규화된 이름, 크기).
+// An attachment file must be paired with a media_id. Returns: (normalized name, size).
 fn validated_scrap_file(
     media_id: Option<&str>,
     name: Option<&str>,
@@ -207,7 +207,7 @@ fn validated_comment(raw: &str) -> ApiResult<String> {
     Ok(text.to_string())
 }
 
-// 첨부가 있으면 본문은 비어 있어도 된다.
+// The body can be empty if there's an attachment.
 fn validated_comment_text(raw: &str, has_file: bool) -> ApiResult<String> {
     let text = raw.trim();
     if text.is_empty() {
@@ -241,7 +241,7 @@ fn validated_comment_file(input: Option<&CommentFileInput>) -> ApiResult<Option<
     Ok(Some(CommentFileInput { media_id, name: name.to_string(), size: file.size }))
 }
 
-// ---------- 저장소 로직 (apps/api/src/repositories/scrap-repository.ts 1:1) ----------
+// ---------- Repository logic (1:1 with apps/api/src/repositories/scrap-repository.ts) ----------
 
 fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
     let tags: Vec<String> = conn
@@ -362,8 +362,8 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     Ok(())
 }
 
-// media_id는 클라이언트가 보낸 값을 그대로 적용한다(없거나 null이면 사진 제거).
-// 데스크톱 수정 폼은 항상 현재 상태를 전부 실어 보낸다.
+// media_id is applied exactly as the client sent it (absent or null removes the photo).
+// The desktop edit form always sends the entire current state.
 fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiResult<()> {
     require_scrap(conn, id)?;
     let title = validated_title(&input.title)?;
@@ -488,7 +488,7 @@ fn delete_comment(conn: &Connection, scrap_id: &str, comment_id: &str) -> ApiRes
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/scrap.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/scrap.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -590,7 +590,7 @@ async fn delete_comment_handler(
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/scrap-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/scrap-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {
@@ -735,7 +735,7 @@ mod tests {
         create_scrap(&mut conn, input).unwrap();
         let id = first_scrap_id(&conn);
 
-        // 다른 사진으로 교체
+        // Replace with a different photo
         let mut swap = write_input("사진 교체", "", "사진");
         swap.media_id = Some("00000000-0000-4000-8000-000000000002".into());
         update_scrap(&mut conn, &id, swap).unwrap();
@@ -743,7 +743,7 @@ mod tests {
         assert_eq!(item.kind, "image");
         assert_eq!(item.media_id.as_deref(), Some("00000000-0000-4000-8000-000000000002"));
 
-        // media_id 없이 수정하면 사진 제거 → text
+        // Editing without a media_id removes the photo → text
         update_scrap(&mut conn, &id, write_input("사진 제거", "", "사진")).unwrap();
         let item = &get_snapshot(&conn).unwrap().items[0];
         assert_eq!(item.kind, "text");
@@ -784,7 +784,7 @@ mod tests {
         create_scrap(&mut conn, write_input("스크랩", "", "태그")).unwrap();
         let scrap_id = first_scrap_id(&conn);
 
-        // 본문 없이 파일만
+        // A file only, with no body
         add_comment(
             &conn,
             &scrap_id,
@@ -806,7 +806,7 @@ mod tests {
         assert_eq!(file.name, "보고서.pdf");
         assert_eq!(file.size, 2048);
 
-        // 본문도 파일도 없으면 거부
+        // Rejected if there's neither a body nor a file
         assert!(add_comment(&conn, &scrap_id, &text_comment("")).is_err());
     }
 

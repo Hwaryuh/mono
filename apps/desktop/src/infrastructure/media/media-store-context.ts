@@ -10,7 +10,7 @@ export function useMediaStore(): MediaStore {
   return useContext(MediaStoreContext);
 }
 
-/** mediaId로 data URL을 지연 로드한다. 렌더 시점에만 무거운 바이트를 가져온다. */
+/** Lazily loads a data URL by mediaId. Only fetches the heavy bytes at render time. */
 export function useMedia(mediaId: string | null | undefined) {
   const store = useMediaStore();
   return useQuery({

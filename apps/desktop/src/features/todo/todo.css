@@ -37,7 +37,7 @@
   letter-spacing: 0.07em;
 }
 
-/* 관리 버튼이 <legend> 안에 있으면 일부 WebView에서 클릭이 먹지 않아 <div>로 뺀다. */
+/* Pulled out into a <div> because a manage button inside <legend> doesn't register clicks in some WebViews. */
 .todo-filter-group__title {
   padding-right: 3px;
   display: flex;
@@ -170,7 +170,7 @@
   color: var(--color-text);
   text-align: left;
 }
-/* 행 전체를 덮는 편집 열기 히트 영역. 멘션 링크만 이 위로 올라온다. */
+/* The edit-open hit area covering the whole row. Only mention links sit above it. */
 .todo-item__hit {
   position: absolute;
   inset: 0;
@@ -335,7 +335,7 @@
   .todo-item--completion-feedback { animation: none; }
 }
 
-/* 스크랩 멘션 입력 (contenteditable). .ui-input 룩을 맞춘다. */
+/* The scrap-mention input (contenteditable). Matches the .ui-input look. */
 .scrap-mention-input {
   width: 100%;
   min-width: 0;
@@ -374,11 +374,11 @@
   white-space: nowrap;
 }
 .scrap-mention--missing { background: var(--color-hover); color: var(--color-text-faint); }
-/* 읽기 표면의 멘션: 스크랩 상세로 가는 링크. 행 히트 영역 위로 올린다. */
+/* A mention on a read-only surface: a link to the scrap detail view. Raised above the row's hit area. */
 a.scrap-mention--link { position: relative; z-index: 2; text-decoration: none; cursor: pointer; }
 a.scrap-mention--link:hover { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
 a.scrap-mention--link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
-/* 에디터 안의 칩도 클릭하면 이동한다(확인 후). */
+/* Clicking a chip inside the editor also navigates (after confirmation). */
 .scrap-mention-input .scrap-mention { cursor: pointer; }
 
 .scrap-mention-menu {

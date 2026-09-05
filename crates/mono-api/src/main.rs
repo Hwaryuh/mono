@@ -1,13 +1,13 @@
-// standalone mono API 서버. 홈서버/NAS/VPS에서 실행해 여러 데스크톱이 같은 DB를 공유한다.
-// 인증은 네트워크 레벨(Tailscale/WireGuard) 전제 — 앱 레벨 인증 없음.
-// 0.0.0.0 바인드는 같은 네트워크의 누구나 데이터를 읽을 수 있다는 뜻이니 사설망 안에서만 노출할 것.
+// The standalone mono API server. Run it on a home server/NAS/VPS so multiple desktops share the same DB.
+// Auth is assumed to happen at the network level (Tailscale/WireGuard) — there is no app-level auth.
+// Binding 0.0.0.0 means anyone on the same network can read the data, so only expose it inside a private network.
 //
 // env:
-//   MONO_BIND_ADDR        기본 0.0.0.0:4174
-//   MONO_DB_PATH          기본 ./mono.sqlite
-//   MONO_SECRET_KEY_PATH  기본 ./mono.secret.key
-//   MONO_CORS_ORIGINS     콤마 구분. 없으면 데스크톱 앱 기본 origin 목록.
-//   MONO_API_TOKEN        설정 시 /health 외 모든 요청에 Bearer 토큰 요구. 없으면 인증 없음.
+//   MONO_BIND_ADDR        default 0.0.0.0:4174
+//   MONO_DB_PATH          default ./mono.sqlite
+//   MONO_SECRET_KEY_PATH  default ./mono.secret.key
+//   MONO_CORS_ORIGINS     comma-separated. Falls back to the desktop app's default origin list if unset.
+//   MONO_API_TOKEN        if set, requires a Bearer token on every request except /health. No auth if unset.
 
 use std::path::PathBuf;
 use std::process::ExitCode;

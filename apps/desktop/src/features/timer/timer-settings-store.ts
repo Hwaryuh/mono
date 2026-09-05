@@ -1,5 +1,5 @@
 export const TIMER_SETTINGS_STORAGE_KEY = "mono:timer-settings";
-/** 설정 모달과 타이머 페이지가 같은 창에 있으므로 storage 이벤트가 안 온다. 저장 후 이 이벤트로 알린다. */
+/** No storage event fires because the settings modal and timer page are in the same window. This event notifies after saving instead. */
 export const TIMER_SETTINGS_EVENT = "mono:timer-settings-changed";
 
 export type TimerTodoScope = "all" | "today";
@@ -60,7 +60,7 @@ export class LocalStorageTimerSettingsStore implements TimerSettingsStore {
     try {
       this.storage.setItem(TIMER_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
     } catch {
-      // 저장소가 막혀도 이번 세션의 설정 변경은 유지한다.
+      // Even if storage is blocked, this session's setting change is kept.
     }
   }
 }

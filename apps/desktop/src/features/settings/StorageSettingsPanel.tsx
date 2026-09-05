@@ -8,8 +8,8 @@ import { translate } from "../../i18n/i18n";
 import { messageOf, SettingsHeading, useAsyncAction } from "./settings-shared";
 
 /**
- * 미사용 미디어 정리. R2 참조 여부는 서버가 자체 DB(수집함·스크랩)로 계산하므로 클라이언트는
- * 확인·정리 버튼만 누르면 된다 — keepIds를 직접 모아 넘기던 예전 방식은 없앴다.
+ * Cleans up unused media. Since the server computes R2 reference status from its own DB (inbox/scrap), the client
+ * only needs to click the check/clean buttons — the old approach of collecting and passing keepIds directly has been removed.
  */
 export function StorageSettingsPanel({ mediaMaintenance }: { mediaMaintenance: MediaMaintenance }) {
   const [usage, setUsage] = useState<OrphanMediaUsage | null>(null);
@@ -135,7 +135,7 @@ function usagePercent(value: number, limit: number) {
   return Math.round((value / limit) * 100);
 }
 
-/** Cloudflare Analytics 토큰으로 청구 기준 저장량 + 이번 달 Class A/B op를 무료 한도 대비 표시. */
+/** Uses the Cloudflare Analytics token to show billed storage + this month's Class A/B ops against the free tier limit. */
 export function R2UsageSection({ store }: { store: R2SettingsStore }) {
   const [token, setToken] = useState("");
   const [hasToken, setHasToken] = useState<boolean | null>(null);

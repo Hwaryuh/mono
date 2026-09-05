@@ -1,8 +1,8 @@
 import { translate } from "../../i18n/i18n";
 
-// 할 일 제목·메모 문자열에 인라인으로 박히는 스크랩 참조 토큰. id가 링크의 원본이고,
-// 표시 이름은 렌더 시 스크랩 스냅샷에서 매번 새로 조회한다(스크랩 개명이 자동 반영).
-// id는 서버 UUID(`uuid::Uuid::new_v4`) 또는 목 저장소의 `scrap-N` 둘 다 온다.
+// A scrap-reference token embedded inline in a todo's title/note string. The id is the source of the link,
+// and the display name is freshly looked up from the scrap snapshot on every render (so scrap renames are picked up automatically).
+// id can be either a server UUID (`uuid::Uuid::new_v4`) or the mock repository's `scrap-N`.
 export const scrapMentionPattern = /@\[scrap:([0-9a-zA-Z_-]+)\]/g;
 
 export type ScrapRef = { id: string; title: string };
@@ -38,7 +38,7 @@ export function displayNameOf(id: string, scraps: ScrapRef[]): string {
   return scrap.title.trim() || translate("todo.mention.untitled");
 }
 
-// 읽기 전용 표면(할 일 행, 대시보드, aria 라벨, 삭제 확인)용. 토큰 → "#표시이름" 평문.
+// For read-only surfaces (todo rows, dashboard, aria labels, delete confirmation). Converts a token → plain "#displayName" text.
 export function resolveScrapMentions(text: string, scraps: ScrapRef[]): string {
   return text.replace(scrapMentionPattern, (_, id: string) => `#${displayNameOf(id, scraps)}`);
 }

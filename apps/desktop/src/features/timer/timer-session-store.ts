@@ -1,7 +1,7 @@
 export const TIMER_SESSIONS_STORAGE_KEY = "mono:timer-sessions";
 
 export type TimerSession = {
-  /** 세션을 시작한 시각. "HH:MM" */
+  /** The time the session started. "HH:MM" */
   startedAt: string;
   todoId: string | null;
   minutes: number;
@@ -35,8 +35,8 @@ function parseLog(raw: string | null): StoredLog | null {
   }
 }
 
-/** ponytail: 오늘 하루치만 남긴다. 날짜가 바뀌면 이전 기록은 버린다 —
- *  기간별 통계가 필요해지면 그때 서버(세션 엔티티)로 올린다. */
+/** ponytail: keeps only today's records. Once the date changes, older records are discarded —
+ *  if period-based stats become necessary, move this up to the server (a session entity) then. */
 export class LocalStorageTimerSessionStore implements TimerSessionStore {
   private constructor(private readonly storage: Storage) {}
 
@@ -58,7 +58,7 @@ export class LocalStorageTimerSessionStore implements TimerSessionStore {
     try {
       this.storage.setItem(TIMER_SESSIONS_STORAGE_KEY, JSON.stringify({ date, sessions } satisfies StoredLog));
     } catch {
-      // 저장소가 막혀도 이번 세션의 화면 기록은 유지한다.
+      // Even if storage is blocked, this session's on-screen record is kept.
     }
     return sessions;
   }

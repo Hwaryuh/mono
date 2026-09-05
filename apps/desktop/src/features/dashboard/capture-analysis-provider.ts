@@ -6,7 +6,7 @@ export interface CaptureAnalysisRequest {
   context?: CaptureAnalysisContext;
 }
 
-/** AI 분석 경계. 영상은 이 요청 타입에 포함될 수 없다. */
+/** The AI analysis boundary. A video cannot be included in this request type. */
 export interface CaptureAnalysisProvider {
   analyze(request: CaptureAnalysisRequest): Promise<CaptureAnalysisResult>;
 }

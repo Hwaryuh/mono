@@ -1,2 +1,2 @@
-/** vite.config.ts의 define으로 주입되는 앱 버전(package.json). */
+/** The app version (package.json), injected via vite.config.ts's define. */
 declare const __APP_VERSION__: string;

@@ -15,7 +15,7 @@ export class RealtimeQuerySync {
   start(): () => void {
     return this.source.connect({
       onChange: ({ modules }) => this.invalidate(modules),
-      // 연결 중 빠진 이벤트가 있을 수 있으므로 최초 연결과 재연결을 같은 방식으로 보정한다.
+      // Since an event could be missed while connecting, the initial connect and a reconnect are corrected the same way.
       onOpen: () => this.invalidate(realtimeModuleIds),
       onResync: () => this.invalidate(realtimeModuleIds),
     });

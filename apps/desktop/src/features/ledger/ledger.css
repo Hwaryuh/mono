@@ -58,7 +58,7 @@
 .ledger-list-card.ledger-skeleton { min-height: 220px; }
 
 .ledger-expense-modal { width: min(440px, 100%); border: 1px solid var(--color-border-strong); }
-/* DatePicker 팝업이 모달 밖으로 넘칠 수 있게 — 스크롤 컨테이너에 클리핑되지 않도록. 일정·할 일 모달과 동일. */
+/* Lets the DatePicker popup overflow outside the modal — so it isn't clipped by the scroll container. Same as the calendar/todo modals. */
 .ledger-expense-modal,
 .ledger-expense-modal .ui-overlay__body { overflow: visible; }
 .ledger-expense-modal .ui-overlay__header { min-height: 0; padding: 13px 16px; }

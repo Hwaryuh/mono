@@ -3,16 +3,16 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::json;
 
-// apps/api/src/server.ts setErrorHandler 와 같은 시맨틱:
+// The same semantics as apps/api/src/server.ts's setErrorHandler:
 //   ZodError            -> 422  {"error": [{"message": ...}, ...]}
-//   "...찾을 수 없습니다" -> 404  {"error": "..."}
-//   그 외                -> 400  {"error": "..."}
+//   "...not found" -> 404  {"error": "..."}
+//   everything else      -> 400  {"error": "..."}
 #[derive(Debug)]
 pub enum ApiError {
     NotFound(String),
     Validation(Vec<String>),
     BadRequest(String),
-    // 낙관적 동시성 충돌 — 다른 기기가 먼저 같은 레코드를 수정했다. If-Match 버전 불일치.
+    // An optimistic concurrency conflict — another device edited the same record first. An If-Match version mismatch.
     Conflict(String),
     Internal(String),
 }

@@ -2,14 +2,14 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
-// jsdom은 object URL을 구현하지 않는다 — 미디어·링크 미리보기 이미지가 쓴다.
+// jsdom doesn't implement object URLs — used by media and link-preview images.
 if (typeof URL.createObjectURL !== "function") {
   URL.createObjectURL = () => "blob:mock";
   URL.revokeObjectURL = () => {};
 }
 
-// 일부 Node 런타임은 경로 없이 활성화된 내장 localStorage를 노출한다. jsdom 대신 잡히면
-// Storage 메서드가 없으므로 테스트용 구현으로 교체한다.
+// Some Node runtimes expose a built-in localStorage enabled without a path. If it gets picked up instead of jsdom's,
+// it lacks the Storage methods, so it's swapped for a test implementation.
 if (typeof localStorage.clear !== "function") {
   const values = new Map<string, string>();
   const testLocalStorage: Storage = {

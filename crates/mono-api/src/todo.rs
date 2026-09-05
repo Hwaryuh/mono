@@ -12,7 +12,7 @@ use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::version::{ensure_versioned_update, expected_version};
 
-// todo 라벨은 routine 과 같은 풀을 공유한다. 공통 CRUD 설정.
+// Todo labels share the same pool as routine. The shared CRUD config.
 const CATS: Categories = Categories {
     table: "todo_labels",
     not_found: "라벨을 찾을 수 없습니다",
@@ -21,7 +21,7 @@ const CATS: Categories = Categories {
     reorder_mismatch: "라벨 순서에 현재 라벨이 정확히 한 번씩 포함되어야 합니다.",
 };
 
-// ---------- DTO (packages/contracts/src/index.ts todo* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts todo* schemas) ----------
 
 #[derive(Serialize)]
 struct TodoLabel {
@@ -43,7 +43,7 @@ struct TodoItem {
     note: String,
     done: bool,
     completed_at: Option<String>,
-    // Routine 경계가 넘어오기 전까지 항상 null.
+    // Always null until the Routine boundary hands it over.
     routine_id: Option<String>,
     occurrence_date: Option<String>,
     priority: i64,
@@ -90,7 +90,7 @@ struct DeleteLabelInput {
     replacement_label_id: String,
 }
 
-// ---------- 검증 ----------
+// ---------- Validation ----------
 
 fn validated_title(raw: &str) -> ApiResult<String> {
     let title = raw.trim();
@@ -110,7 +110,7 @@ fn validated_note(raw: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-// ---------- 저장소 로직 (apps/api/src/repositories/todo-repository.ts 1:1) ----------
+// ---------- Repository logic (1:1 with apps/api/src/repositories/todo-repository.ts) ----------
 
 fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     let labels = conn
@@ -143,8 +143,8 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
-    // read-model join: 오늘 스케줄된 루틴 occurrence를 todo item처럼 맨 앞에 붙인다.
-    // (apps/desktop mock-routine-occurrences.ts routineTodoItems 와 동일)
+    // read-model join: prepends today's scheduled routine occurrences to the front, shaped like todo items.
+    // (Same as apps/desktop mock-routine-occurrences.ts's routineTodoItems)
     let mut items: Vec<TodoItem> = super::routine::today_todo_rows(conn)?
         .into_iter()
         .map(|r| TodoItem {
@@ -204,7 +204,7 @@ fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult
         "UPDATE todo_items SET label_id = ?1, version = version + 1 WHERE label_id = ?2",
         params![replacement, id],
     )?;
-    // 루틴도 같은 라벨 풀을 쓴다 — 죽은 label_id가 남지 않도록 함께 옮긴다 (mock deleteLabel).
+    // Routines use the same label pool too — moved together so no dead label_id is left behind (mock deleteLabel).
     tx.execute(
         "UPDATE routine_items SET label_id = ?1, version = version + 1 WHERE label_id = ?2",
         params![replacement, id],
@@ -249,8 +249,8 @@ fn update_item(conn: &Connection, id: &str, input: TodoWriteInput, expected: Opt
 }
 
 pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
-    // todo 스냅샷에 섞여 나온 루틴 occurrence면 그쪽을 토글한다 (mock toggleComplete).
-    // dashboard toggleTask도 이 함수를 그대로 쓴다 (동일 시맨틱).
+    // If it's a routine occurrence mixed into the todo snapshot, toggles that instead (mock toggleComplete).
+    // dashboard toggleTask uses this same function directly (identical semantics).
     if super::routine::toggle_occurrence_by_id(conn, id)? {
         return Ok(());
     }
@@ -279,7 +279,7 @@ fn delete_item(conn: &Connection, id: &str) -> ApiResult<()> {
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/todo.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/todo.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -377,7 +377,7 @@ async fn delete_label_handler(
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/todo-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/todo-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {

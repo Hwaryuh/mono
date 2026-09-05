@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { translate } from "../../i18n/i18n";
 import { displayNameOf, parseScrapMentions, scrapMentionToken, type ScrapRef } from "./scrap-mention";
 
-// "#" 뒤 캐럿까지의 검색어. 단어 경계에서 시작한 것만 트리거로 본다.
+// The search term from "#" up to the caret. Only treated as a trigger if it starts at a word boundary.
 const TRIGGER = /(?:^|\s)#([^\s#@]*)$/;
 const MAX_SUGGESTIONS = 8;
 const ZW = "​";
@@ -38,13 +38,13 @@ function renderInto(host: HTMLElement, value: string, scraps: ScrapRef[]) {
     if (segment.type === "text") host.append(document.createTextNode(segment.text));
     else host.append(makeChip(segment.id, displayNameOf(segment.id, scraps)));
   }
-  // 캐럿이 마지막 칩 뒤에 설 자리를 보장한다.
+  // Ensures the caret has a place to sit right after the last chip.
   if (host.lastChild && (host.lastChild as HTMLElement).dataset?.scrapId) {
     host.append(document.createTextNode(ZW));
   }
 }
 
-// contentEditable="plaintext-only" 이라 자식은 텍스트 노드 + 우리 칩 span + 가끔 <br> 뿐이다.
+// Since contentEditable="plaintext-only", the children are just text nodes + our chip spans + the occasional <br>.
 function serialize(host: HTMLElement): string {
   let out = "";
   for (const node of Array.from(host.childNodes)) {
@@ -73,7 +73,7 @@ export function ScrapMentionInput({
         .slice(0, MAX_SUGGESTIONS)
     : [];
 
-  // 편집 중이 아닐 때만 DOM을 value/scraps 로 다시 그린다(타이핑을 깨지 않는다).
+  // Only re-renders the DOM from value/scraps when not actively editing (so typing isn't disrupted).
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host || document.activeElement === host) return;
@@ -95,7 +95,7 @@ export function ScrapMentionInput({
     let next = serialize(host);
     if (!multiline) next = next.replace(/\n/g, " ");
     if (next.length > maxLength) {
-      // 초과분은 통째로 되돌린다. 토큰이 잘리는 것보다 안전하다.
+      // Reverts the excess wholesale. Safer than letting a token get truncated.
       renderInto(host, lastValueRef.current ?? "", scraps);
       placeCaretAtEnd(host);
       return;

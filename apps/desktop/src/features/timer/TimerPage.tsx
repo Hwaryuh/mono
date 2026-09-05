@@ -60,20 +60,20 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
 
   const [settings, setSettings] = useState<TimerSettings>(() => preferences.read());
   const [remaining, setRemaining] = useState(() => preferences.read().focusMinutes * 60);
-  // 실행 중이면 끝나는 시각(epoch ms). 남은 초를 매 틱 다시 계산해야 setInterval 오차가 쌓이지 않는다.
+  // The end time (epoch ms) while running. Remaining seconds must be recomputed on every tick, or setInterval drift accumulates.
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const selectedTodoIdRef = useRef<string | null>(null);
-  // 방금 집중이 끝나 울리고 있는지. 끄기 전까지 다음 세션으로 넘어가지 않는다.
+  // Whether focus just ended and the alarm is currently ringing. Won't move to the next session until it's turned off.
   const [ringing, setRinging] = useState(false);
-  // 큰 숫자를 눌러 길이를 고치는 중인지. 입력값은 커밋(blur·Enter) 때만 숫자로 좁힌다.
+  // Whether the duration is being edited by tapping the large number. The input is only narrowed to a number on commit (blur/Enter).
   const [editingMinutes, setEditingMinutes] = useState(false);
   const [minutesDraft, setMinutesDraft] = useState<string | null>(null);
 
   const total = settings.focusMinutes * 60;
   const running = endsAt !== null;
-  // 카운트다운 중도, 울리는 중도 아닐 때만 길이를 고칠 수 있다(시작 전·일시정지 포함).
+  // The duration can only be edited when neither counting down nor ringing (includes before start and while paused).
   const canEditMinutes = !running && !ringing;
 
   const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
@@ -90,8 +90,8 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
 
   useEffect(() => {
     if (endsAt === null) return;
-    // setEndsAt(null) 만으로는 이 effect 가 정리되기 전에 다음 틱이 또 돌아 세션이 여러 번 기록된다.
-    // 끝나는 순간 이 interval 을 직접 멈추고 플래그로 재진입을 막는다.
+    // setEndsAt(null) alone isn't enough — the next tick can fire again before this effect is cleaned up, recording the session multiple times.
+    // At the moment it ends, stop this interval directly and use a flag to prevent re-entry.
     let finished = false;
     const tick = () => {
       if (finished) return;
@@ -109,16 +109,16 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     const timer = window.setInterval(tick, TICK_MS);
     tick();
     return () => window.clearInterval(timer);
-    // finishFocus 는 렌더마다 새로 만들어지므로 의존성에 넣지 않는다 — 값은 settings 로 들어온다.
+    // finishFocus is recreated on every render, so it's not put in the dependency array — the value comes in via settings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endsAt, settings]);
 
-  // 설정 모달은 같은 창에 있어서 storage 이벤트가 오지 않는다. 저장 시 발행되는 이벤트를 듣는다.
+  // The settings modal is in the same window, so no storage event fires. Listens for the event dispatched on save instead.
   useEffect(() => {
     const reload = () => {
       const next = preferences.read();
       setSettings(next);
-      // 돌고 있는 세션은 건드리지 않는다. 멈춰 있을 때만 새 길이로 맞춘다.
+      // Doesn't touch a session that's currently running. Only applies the new duration while stopped.
       setEndsAt((current) => {
         if (current === null) setRemaining(next.focusMinutes * 60);
         return current;
@@ -128,10 +128,10 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     return () => window.removeEventListener(TIMER_SETTINGS_EVENT, reload);
   }, [preferences]);
 
-  // 페이지를 벗어나면 울리던 알람을 멈춘다.
+  // Stops a ringing alarm when leaving the page.
   useEffect(() => () => alarm.stop(), [alarm]);
 
-  // 알림 배너를 클릭하면 앱 창을 앞으로 가져온다.
+  // Brings the app window to the front when the notification banner is clicked.
   useEffect(() => {
     let disposed = false;
     let dispose = () => {};

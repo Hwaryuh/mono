@@ -3,15 +3,15 @@ import { Button, Modal } from "@mono/ui";
 import { useEffect, useState } from "react";
 import { checkForUpdate, type PendingUpdate } from "../../infrastructure/updater";
 
-/** 설정 > 정보의 "지금 업데이트 확인" 버튼이 쏘는 이벤트. AppUpdater 하나만 듣는다. */
+/** The event fired by the "Check for updates now" button in Settings > About. Only AppUpdater listens for it. */
 export const CHECK_UPDATE_EVENT = "mono:check-update";
 
 type Phase = "idle" | "checking" | "available" | "downloading" | "ready" | "uptodate" | "error";
 
 /**
- * 시작 시 한 번 업데이트를 확인하고, 있으면 모달로 알린다. "지금 업데이트"를 누르면
- * 내려받아 설치하고 재시작한다. 수동 확인(CHECK_UPDATE_EVENT)은 결과와 무관하게 모달을 연다.
- * Tauri 밖에서는 checkForUpdate가 null을 반환하므로 아무것도 렌더하지 않는다.
+ * Checks for an update once on startup and shows a modal if one is available. Clicking "Update now"
+ * downloads, installs, and restarts. A manual check (CHECK_UPDATE_EVENT) opens the modal regardless of the result.
+ * Outside Tauri, checkForUpdate returns null, so nothing is rendered.
  */
 export function AppUpdater() {
   const [update, setUpdate] = useState<PendingUpdate | null>(null);
@@ -57,8 +57,8 @@ export function AppUpdater() {
     }
   }
 
-  // 자동 확인은 업데이트가 있을 때만 뜬다(시작 시 확인 실패로 사용자를 귀찮게 하지 않는다).
-  // 설치를 시작한 뒤의 오류는 update가 있으므로 계속 보인다. 수동 확인은 결과와 무관하게 뜬다.
+  // The automatic check only shows up when an update is available (so a startup check failure doesn't bother the user).
+  // An error after installation starts stays visible since an update exists. A manual check shows up regardless of the result.
   const open = phase === "available" || phase === "downloading" || phase === "ready"
     || (phase === "error" && (manual || update !== null))
     || (manual && (phase === "checking" || phase === "uptodate"));

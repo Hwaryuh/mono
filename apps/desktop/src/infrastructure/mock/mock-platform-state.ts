@@ -17,7 +17,7 @@ import {
 } from "@mono/contracts";
 import type { CalendarException } from "../../features/calendar/recurrence";
 
-/** 저장된 상태의 정규화 버전. 스키마 기본값·색상 정규화 규칙이 바뀌면 올린다. */
+/** The normalized version of the stored state. Bump this when schema defaults or color-normalization rules change. */
 export const STATE_VERSION = 1;
 
 export type MockPlatformState = {

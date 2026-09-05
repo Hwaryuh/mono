@@ -16,8 +16,8 @@ use super::secret::{self, SecretState};
 use super::{routine, todo};
 use super::common::*;
 
-// getSnapshot·toggleTask·capture 모두 네이티브. capture의 AI 분석은 ai.rs가 처리하고
-// 실패 시 Node와 동일하게 status:"failed" 수집함 항목을 만든다(201은 그대로 반환).
+// getSnapshot, toggleTask, and capture are all native. capture's AI analysis is handled by ai.rs, and
+// on failure it creates a status:"failed" inbox item, same as Node (still returns 201).
 
 const OTHER_COLOR: &str = "oklch(0.645 0.009 106.643)";
 
@@ -93,7 +93,7 @@ struct DashboardSnapshot {
     scraps: Vec<ScrapSummary>,
 }
 
-// ---------- 로직 (apps/api/src/repositories/dashboard-repository.ts getSnapshot 1:1) ----------
+// ---------- Logic (1:1 with apps/api/src/repositories/dashboard-repository.ts getSnapshot) ----------
 
 // domain koreanDateLabel(iso, "long")
 fn korean_date_label(iso: &str) -> String {
@@ -168,7 +168,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         |row| row.get(0),
     )?;
 
-    // 루틴 occurrence를 todo task보다 앞에 (routine.rs가 오늘 occurrence를 멱등 생성).
+    // Routine occurrences come before todo tasks (routine.rs idempotently creates today's occurrence).
     let mut tasks: Vec<Task> = routine::today_todo_rows(conn)?
         .into_iter()
         .map(|r| {
@@ -207,7 +207,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         });
     }
 
-    // 오늘 일정, 시작시간 오름차순(없으면 "" 취급, 안정 정렬로 seq 순서 유지)
+    // Today's events, ascending by start time (treated as "" if absent, stable sort keeps seq order)
     let cal_colors: HashMap<String, String> = conn
         .prepare("SELECT id, color FROM calendar_categories")?
         .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
@@ -226,7 +226,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         })
         .collect();
 
-    // 루틴 요약(최근 3), week는 done occurrence만
+    // Routine summary (latest 3); week reflects done occurrences only
     let done_occurrences: HashSet<(String, String)> = conn
         .prepare("SELECT routine_id, occurrence_date FROM routine_occurrences WHERE done = 1")?
         .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
@@ -250,7 +250,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         })
         .collect();
 
-    // 스크랩 요약(최근 3)
+    // Scrap summary (latest 3)
     let scraps: Vec<ScrapSummary> = conn
         .prepare("SELECT id, title, kind FROM scrap_items ORDER BY seq DESC LIMIT 3")?
         .query_map([], |row| {
@@ -268,7 +268,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
         })
         .collect::<ApiResult<Vec<_>>>()?;
 
-    // 이번 달 지출: date가 "YYYY-MM-" 으로 시작하는 것
+    // This month's expenses: date starting with "YYYY-MM-"
     let month_prefix = format!("{}-", &today[..7]);
     let expenses = conn
         .prepare("SELECT amount_won, category_id FROM ledger_expenses WHERE date LIKE ?1")?
@@ -374,7 +374,7 @@ async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
         format!("사진 {}장", input.images.len())
     };
 
-    // 영상은 고정 분석(mock·Node 동일), 그 외는 활성 provider로.
+    // A video gets a fixed analysis (same as mock/Node); everything else uses the active provider.
     let analysis: Result<ai::CaptureAnalysisResult, String> = if has_video {
         Ok(ai::CaptureAnalysisResult {
             target: "scrap".into(),
@@ -481,7 +481,7 @@ async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/dashboard.ts) ----------
+// ---------- Routes (apps/api/src/routes/dashboard.ts) ----------
 
 pub fn routes(state: SecretState) -> Router {
     Router::new()
@@ -511,7 +511,7 @@ async fn toggle_handler(
     Ok(Json(json!({ "ok": true })))
 }
 
-// ---------- 테스트 (apps/api/src/repositories/dashboard-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/dashboard-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {
@@ -651,7 +651,7 @@ mod tests {
 
         let snap = get_snapshot(&conn).unwrap();
         assert_eq!(snap.routines[0].week.len(), 7);
-        assert!(snap.routines[0].week[6]); // today = 마지막 칸
+        assert!(snap.routines[0].week[6]); // today = the last slot
         assert_eq!(snap.routines[0].period, "∞");
     }
 

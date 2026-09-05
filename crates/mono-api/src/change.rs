@@ -47,7 +47,7 @@ impl ChangeHub {
             revision,
             modules: modules.iter().map(|module| (*module).to_string()).collect(),
         };
-        // 구독자가 없는 것은 정상이다. 변경 저장 성공 여부와 알림 연결 여부는 결합하지 않는다.
+        // Having no subscribers is normal. Whether the change was saved successfully and whether the notification was delivered aren't coupled.
         let _ = self.sender.send(event);
     }
 
@@ -84,7 +84,7 @@ async fn events_handler(
                     return Some((Ok(event), receiver));
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => {
-                    // 느린 클라이언트는 빠진 이벤트를 병합하려 하지 않고 전체 재검증한다.
+                    // A slow client doesn't try to merge missed events — it just revalidates everything.
                     return Some((Ok(Event::default().event("resync").data("{}")), receiver));
                 }
                 Err(broadcast::error::RecvError::Closed) => return None,
@@ -159,15 +159,15 @@ mod tests {
         assert!(modules_for_path("/settings/ai").is_empty());
     }
 
-    // 클라이언트 realtimeChangeEventSchema(packages/contracts 의 realtimeModuleIds)와 반드시 같아야
-    // 하는 정식 모듈 집합. Rust가 이 밖의 이름을 publish하면 SSE 이벤트가 클라이언트 Zod parse에서
-    // 조용히 드롭돼 화면이 stale해진다. 두 언어의 유일한 계약 지점이라 이 테스트로 drift를 막는다.
+    // The canonical module set that must exactly match the client's realtimeChangeEventSchema
+    // (packages/contracts's realtimeModuleIds). If Rust publishes a name outside this set, the SSE event
+    // is silently dropped at the client's Zod parse and the screen goes stale. This is the one contract point between the two languages, so this test guards against drift.
     const REALTIME_MODULE_IDS: [&str; 7] =
         ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger"];
 
     #[test]
     fn published_modules_match_client_realtime_set() {
-        // 각 모듈의 대표 mutating 경로. modules_for_path는 prefix 매칭이라 대표 하나면 충분하다.
+        // A representative mutating path for each module. Since modules_for_path does prefix matching, one representative is enough.
         let mutating_paths = [
             "/todo/items",
             "/routine/items",
@@ -187,7 +187,7 @@ mod tests {
                 seen.insert(*module);
             }
         }
-        // 반대 방향: 모든 realtime 모듈이 최소 한 경로에서 실제 갱신 신호를 받는지도 확인한다.
+        // The reverse direction: also confirms every realtime module actually receives an update signal from at least one path.
         for id in REALTIME_MODULE_IDS {
             assert!(seen.contains(id), "realtime 모듈 {id:?}이 어떤 경로에서도 publish되지 않음");
         }

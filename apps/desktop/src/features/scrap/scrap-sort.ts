@@ -18,11 +18,11 @@ export function loadSortKey(): SortKey {
   try {
     const stored = localStorage.getItem(sortStorageKey);
     if (stored && (sortKeys as string[]).includes(stored)) return stored as SortKey;
-  } catch { /* localStorage 불가 환경 — 기본 정렬 */ }
+  } catch { /* environment without localStorage — falls back to default sort */ }
   return "recent";
 }
 
-// savedAt은 ISO 8601 문자열이라 사전순 비교가 곧 시간순 비교다.
+// savedAt is an ISO 8601 string, so lexicographic comparison is equivalent to chronological comparison.
 export function sortItems(items: ScrapItem[], key: SortKey): ScrapItem[] {
   const sorted = [...items];
   if (key === "oldest") return sorted.sort((a, b) => a.savedAt.localeCompare(b.savedAt));

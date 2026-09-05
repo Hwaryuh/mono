@@ -26,7 +26,7 @@
 @keyframes timer-ring { 50% { opacity: 0.4; } }
 @media (prefers-reduced-motion: reduce) { .timer-digits--ringing { animation: none; } }
 
-/* 큰 숫자를 눌러 세션 길이를 직접 고친다. 시작 전·일시정지 상태에서만 나타난다. */
+/* Tap the large number to edit the session duration directly. Only appears before starting or while paused. */
 .timer-digits__edit,
 .timer-digits__input {
   padding: 0;

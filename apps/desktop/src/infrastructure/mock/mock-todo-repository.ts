@@ -29,7 +29,7 @@ class MockTodoRepository implements TodoRepository {
     const parsed = todoLabelWriteInputSchema.parse(input);
     this.assertUniqueLabelName(parsed.name);
     const label = { id: `label-${this.state.nextTodoLabelId++}`, ...parsed };
-    // "기타"는 항상 마지막에 남긴다.
+    // "Other" is always left at the end.
     const fallbackIndex = this.state.todo.labels.findIndex((candidate) => candidate.id === "other");
     if (fallbackIndex < 0) this.state.todo.labels = [...this.state.todo.labels, label];
     else this.state.todo.labels = [...this.state.todo.labels.slice(0, fallbackIndex), label, ...this.state.todo.labels.slice(fallbackIndex)];

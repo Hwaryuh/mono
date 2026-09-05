@@ -17,9 +17,9 @@ type CategoryCommand =
   | { type: "delete"; categoryId: string; replacementCategoryId: string };
 
 /**
- * 캘린더 분류(카테고리) 관리 — 목록/추가/수정/순서변경/삭제 두 모달을 자체 상태·mutation으로
- * 굴린다. 낙관적 버전 충돌 복구도 여기서 처리하고, 부모(CalendarPage)에는 생성·삭제 결과만
- * 알려 편집 중인 일정 초안(draft.categoryId)이 따라가게 한다.
+ * Manages calendar categories — runs the list/add/edit/reorder/delete pair of modals on its own state and mutations.
+ * It also handles optimistic version-conflict recovery here, and only notifies the parent (CalendarPage) of
+ * create/delete results so the in-progress event draft (draft.categoryId) can follow along.
  */
 export function CalendarCategoryManager({ open, onClose, snapshot, repository, onCategoryCreated, onCategoryDeleted }: {
   open: boolean;
@@ -37,7 +37,7 @@ export function CalendarCategoryManager({ open, onClose, snapshot, repository, o
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [replacementCategoryId, setReplacementCategoryId] = useState("");
 
-  // 열릴 때마다 편집 상태를 초기화한다(예전 openCategoryManager가 하던 일).
+  // Resets the edit state every time it opens (what the old openCategoryManager used to do).
   useEffect(() => {
     if (open) { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }
   }, [open]);
@@ -48,7 +48,7 @@ export function CalendarCategoryManager({ open, onClose, snapshot, repository, o
       queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
   };
-  // 스냅샷 쿼리 키에 표시 범위가 붙어 있어 고정 키로 읽을 수 없다 — 무효화 뒤 캐시된 범위들에서 찾는다.
+  // The snapshot query key carries the displayed range, so it can't be read with a fixed key — after invalidation, look it up among the cached ranges.
   const resyncCalendarVersion = async (pick: (snapshot: CalendarSnapshot) => { version?: number } | undefined): Promise<number | null> => {
     await invalidateSnapshots();
     for (const [, snapshot] of queryClient.getQueriesData<CalendarSnapshot>({ queryKey: calendarQueryKey })) {

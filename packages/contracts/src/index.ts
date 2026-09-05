@@ -11,7 +11,7 @@ export const realtimeChangeEventSchema = z.object({
 export type RealtimeModuleId = (typeof realtimeModuleIds)[number];
 export type RealtimeChangeEvent = z.infer<typeof realtimeChangeEventSchema>;
 
-// 서버 우선 배포 기간에는 구버전 snapshot도 읽는다. 새 서버는 항상 version을 반환한다.
+// During a server-first rollout window, an older-shaped snapshot is also read. A new server always returns version.
 const recordVersionSchema = z.number().int().positive().optional();
 
 export const oklchColorSchema = z.string().transform((value, context) => {
@@ -81,13 +81,13 @@ export const dashboardSnapshotSchema = z.object({
   scraps: z.array(scrapSummarySchema),
 });
 
-// 미디어 원본은 상태 blob이 아니라 별도 media 테이블에 저장되고, 여기엔 참조 id + 메타만 둔다.
+// The original media isn't part of the state blob — it's stored in a separate media table, with only the reference id + metadata kept here.
 export const captureImageSchema = z.object({
   name: z.string().trim().min(1).max(255),
   mimeType: z.string().regex(/^image\//),
   size: z.number().int().nonnegative().max(10 * 1024 * 1024),
   mediaId: z.string().min(1),
-  // 캡처 분석 요청에서만 실어 보내는 임시 필드(base64 data URL). 서버는 분석에만 쓰고 영속화하지 않는다.
+  // A transient field (base64 data URL) sent only with the capture-analysis request. The server uses it only for analysis and does not persist it.
   dataUrl: z.string().optional(),
 });
 
@@ -125,8 +125,8 @@ export const captureAnalysisResultSchema = z.object({
 
 export type CaptureAnalysisResult = z.infer<typeof captureAnalysisResultSchema>;
 
-// AI 분석에 주입하는 유저 데이터 컨텍스트. 모델이 라벨을 지어내지 않고 기존 목록에서 고르게,
-// 상대 날짜를 today 기준으로 환산하게 grounding한다. names만 실어 토큰을 아낀다.
+// The user-data context injected into the AI analysis. Grounds the model so it picks from the existing list instead of inventing labels,
+// and converts relative dates based on today. Only names are included, to save tokens.
 export const captureAnalysisContextSchema = z.object({
   today: z.string(),
   todoLabels: z.array(z.string()),
@@ -271,8 +271,8 @@ export const calendarCategoryOrderSchema = z.array(z.string().min(1)).min(1);
 
 export const recurrenceFreqSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
 
-// 반복 규칙. weekdays는 weekly에서만 의미 있고 [] 이면 시작일의 요일을 쓴다.
-// 종료: until(이 날짜까지 포함) 또는 count(횟수) 중 하나, 둘 다 null 이면 무한.
+// The recurrence rule. weekdays is meaningful only for weekly, and [] means the start date's weekday is used.
+// End condition: either until (inclusive of that date) or count (a number of occurrences); infinite if both are null.
 export const calendarRecurrenceSchema = z.object({
   freq: recurrenceFreqSchema,
   interval: z.number().int().min(1).max(999),
@@ -294,9 +294,9 @@ export const calendarEventSchema = z.object({
   location: z.string(),
   categoryId: z.string(),
   note: z.string(),
-  // 반복 시리즈의 규칙(마스터·전개된 occurrence 모두에 실림). 단발 일정은 null.
+  // The recurring series' rule (carried on both the master and expanded occurrences). null for a single event.
   recurrence: calendarRecurrenceSchema.nullable().default(null),
-  // 전개된 occurrence면 마스터 이벤트 id와 그 occurrence의 원래 슬롯 날짜. 단발 일정은 null.
+  // For an expanded occurrence, the master event's id and that occurrence's original slot date. null for a single event.
   seriesId: z.string().nullable().default(null),
   occurrenceDate: z.string().nullable().default(null),
 });
@@ -328,7 +328,7 @@ export type CalendarWriteInput = z.infer<typeof calendarWriteInputSchema>;
 export const scrapKindSchema = z.enum(["image", "url", "text", "video", "file"]);
 export const scrapFileMaxBytes = 50 * 1024 * 1024;
 
-// 댓글 첨부 파일. 원본 바이트는 media 테이블(R2), 여기엔 참조 id + 표시용 메타만.
+// A comment's attachment file. The original bytes live in the media table (R2); only the reference id + display metadata are here.
 export const scrapCommentFileSchema = z.object({
   mediaId: z.string().min(1),
   name: z.string().trim().min(1).max(255),
@@ -352,7 +352,7 @@ export const scrapItemSchema = z.object({
   savedAt: z.string(),
   url: z.string().nullable(),
   mediaId: z.string().nullable().default(null),
-  // 이미지가 아닌 첨부 파일(kind "file")의 원본 이름·크기. 이미지면 둘 다 null.
+  // The original name/size of a non-image attachment (kind "file"). Both null if it's an image.
   fileName: z.string().nullable().default(null),
   fileSize: z.number().int().nonnegative().nullable().default(null),
   comments: z.array(scrapCommentSchema),

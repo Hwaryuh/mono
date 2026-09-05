@@ -1,5 +1,5 @@
-/* 전역 스타일 배럴. 실제 규칙은 feature별 파일에 있다. @import 순서 = 캐스케이드 순서.
-   @mono/ui(tokens·components)는 main.tsx에서 이 파일보다 먼저 로드된다. */
+/* The global styles barrel. The actual rules live in per-feature files. @import order = cascade order.
+   @mono/ui (tokens/components) is loaded before this file, in main.tsx. */
 @import "./base.css";
 @import "../shell/shell.css";
 @import "../features/dashboard/dashboard.css";

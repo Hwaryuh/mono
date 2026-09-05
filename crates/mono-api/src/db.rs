@@ -3,13 +3,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use rusqlite::Connection;
 
-// 단일 사용자 로컬 앱: 커넥션 하나를 Mutex로 감싼다.
-// ponytail: 풀 대신 전역 락. 처리량이 문제되면 r2d2_sqlite로 승격.
+// A single-user local app: wraps one connection in a Mutex.
+// ponytail: a global lock instead of a pool. Upgrade to r2d2_sqlite if throughput becomes a problem.
 pub type Db = Arc<Mutex<Connection>>;
 
 pub trait DbExt {
-    /// 커넥션 가드. poison된 락도 복구한다 — 한 핸들러의 panic이 이후 모든 요청을
-    /// 벽돌로 만들지 않도록(`.lock().unwrap()`이면 poison 후 전부 panic).
+    /// A connection guard. Recovers even a poisoned lock — so one handler's panic doesn't
+    /// brick every request after it (with `.lock().unwrap()`, a poison would panic everything).
     fn conn(&self) -> MutexGuard<'_, Connection>;
 }
 
@@ -19,7 +19,7 @@ impl DbExt for Db {
     }
 }
 
-// apps/api/src/db/client.ts 의 DDL 을 그대로 옮긴다(idempotent — 매 실행 안전).
+// Carries over the DDL from apps/api/src/db/client.ts as-is (idempotent — safe to run every time).
 const DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS todo_labels (
   id TEXT PRIMARY KEY,
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS dashboard_captures (
 );
 "#;
 
-// 모든 모듈에 "기타"를 예약 항목으로 항상 존재시킨다(mock-platform-state와 동일).
+// Ensures "Other" always exists as a reserved item in every module (same as mock-platform-state).
 const SEED: &str = r#"
 INSERT OR IGNORE INTO ledger_categories (id, name, color, order_index)
 VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
@@ -189,7 +189,7 @@ VALUES ('other', '기타', 'oklch(0.645 0.009 106.643)', 999999);
 INSERT OR IGNORE INTO scrap_tags (tag) VALUES ('기타');
 "#;
 
-// 편집 충돌 방지용 낙관적 버전 컬럼을 갖는 테이블. 기존 DB에는 시작 시 누락 컬럼을 추가한다.
+// Tables that carry an optimistic version column to prevent edit conflicts. On an existing DB, the missing column is added at startup.
 const VERSIONED_TABLES: [&str; 8] = [
     "todo_labels",
     "todo_items",
@@ -210,7 +210,7 @@ fn migrate_version_columns(conn: &Connection) -> rusqlite::Result<()> {
             .iter()
             .any(|column| column == "version");
         if !has_version {
-            // table 이름은 위의 고정 상수에서만 오므로 SQL 식별자 주입 경로가 없다.
+            // Since the table name only ever comes from the fixed constants above, there's no path for SQL identifier injection.
             conn.execute_batch(&format!(
                 "ALTER TABLE {table} ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
             ))?;
@@ -219,7 +219,7 @@ fn migrate_version_columns(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-// 이미 존재하는 DB에 빠진 컬럼을 채운다. 컬럼 이름·선언은 고정 상수라 식별자 주입 경로 없음.
+// Backfills a missing column on an already-existing DB. The column name/declaration are fixed constants, so there's no identifier-injection path.
 fn migrate_add_columns(conn: &Connection, table: &str, columns: &[(&str, &str)]) -> rusqlite::Result<()> {
     let existing = conn
         .prepare(&format!("PRAGMA table_info({table})"))?

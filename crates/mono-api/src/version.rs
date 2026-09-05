@@ -5,7 +5,7 @@ use crate::error::{ApiError, ApiResult};
 
 pub fn expected_version(headers: &HeaderMap) -> ApiResult<Option<i64>> {
     let Some(value) = headers.get(IF_MATCH) else {
-        // 서버 우선 배포 기간에는 구버전 클라이언트를 허용한다.
+        // During a server-first rollout window, an older client is allowed.
         return Ok(None);
     };
     let raw = value

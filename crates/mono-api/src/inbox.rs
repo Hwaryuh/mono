@@ -12,7 +12,7 @@ use super::ledger::{self, LedgerWriteInput};
 use super::common::*;
 use super::version::{ensure_versioned_update, expected_version};
 
-// ---------- DTO (packages/contracts/src/index.ts inbox* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts inbox* schemas) ----------
 
 #[derive(Serialize, Deserialize, Clone)]
 struct InboxField {
@@ -61,7 +61,7 @@ struct ApproveHighConfidenceInput {
 // domain inboxTargetModuleIds
 const TARGET_MODULES: [&str; 4] = ["todo", "calendar", "scrap", "ledger"];
 
-// ---------- 필드 파싱 (inbox-repository.ts fieldValue/labelValue/findByName) ----------
+// ---------- Field parsing (inbox-repository.ts fieldValue/labelValue/findByName) ----------
 
 fn field_value(fields: &[InboxField], label: &str) -> String {
     fields
@@ -84,12 +84,12 @@ fn label_value(fields: &[InboxField]) -> String {
     by("태그")
 }
 
-// 공백 제거 + 소문자. "집안 일" == "집안일".
+// Strips whitespace + lowercases. "house work" == "housework".
 fn normalize_name(name: &str) -> String {
     name.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase()
 }
 
-// (id, name) 목록에서 이름으로 매칭. target이 비면 None.
+// Matches by name in an (id, name) list. None if target is empty.
 fn find_by_name(candidates: &[(String, String)], target: &str) -> Option<String> {
     if target.trim().is_empty() {
         return None;
@@ -101,7 +101,7 @@ fn find_by_name(candidates: &[(String, String)], target: &str) -> Option<String>
         .map(|(id, _)| id.clone())
 }
 
-// JS /\d{4}-\d{2}-\d{2}/g — 바이트 스캔(비ASCII는 자동 스킵).
+// Equivalent to JS /\d{4}-\d{2}-\d{2}/g — a byte scan (non-ASCII is automatically skipped).
 fn all_iso_dates(s: &str) -> Vec<String> {
     let b = s.as_bytes();
     let mut out = Vec::new();
@@ -123,8 +123,8 @@ fn all_iso_dates(s: &str) -> Vec<String> {
     out
 }
 
-// JS /\d{1,2}:\d{2}/g. ponytail: 병리적 입력("123:45")에서 JS와 매칭 위치가 다를 수 있으나
-// 실제 일시 문자열엔 무해. 필요하면 정규식 크레이트로 승격.
+// Equivalent to JS /\d{1,2}:\d{2}/g. ponytail: on a pathological input ("123:45") the match position can differ from JS's, but
+// it's harmless for real datetime strings. Upgrade to the regex crate if this ever matters.
 fn all_times(s: &str) -> Vec<String> {
     let b = s.as_bytes();
     let mut out = Vec::new();
@@ -154,7 +154,7 @@ fn all_times(s: &str) -> Vec<String> {
     out
 }
 
-// ---------- 저장소 로직 (apps/api/src/repositories/inbox-repository.ts 1:1) ----------
+// ---------- Repository logic (1:1 with apps/api/src/repositories/inbox-repository.ts) ----------
 
 struct InboxRow {
     source: String,
@@ -450,7 +450,7 @@ fn discard(conn: &Connection, id: &str) -> ApiResult<()> {
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/inbox.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/inbox.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -493,7 +493,7 @@ async fn discard_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiRes
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/inbox-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/inbox-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {
@@ -599,7 +599,7 @@ mod tests {
         );
 
         approve_item(&conn, "inbox-1").unwrap();
-        // order_index ASC 첫 라벨 = "misc" (other는 999999)
+        // The first label by order_index ASC = "misc" (other is 999999)
         assert_eq!(first_todo_label(&conn), "misc");
     }
 

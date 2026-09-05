@@ -14,7 +14,7 @@ import { addDays, weekdayOf } from "./recurrence";
 export const calendarQueryKey = ["calendar"] as const;
 const dayNames = [translate("routine.weekday.sun"), translate("routine.weekday.mon"), translate("routine.weekday.tue"), translate("routine.weekday.wed"), translate("routine.weekday.thu"), translate("routine.weekday.fri"), translate("routine.weekday.sat")];
 const maxVisibleEventsPerDay = 3;
-// 월간 셀에서 이어지는 일정 막대를 몇 줄까지 그릴지. 넘치는 건 날짜별 일정 창에서 본다.
+// How many rows of continuing event bars to draw in a month cell. Overflow is viewed in the per-day schedule panel.
 const maxSpanLanes = 3;
 
 type EditorItem = CalendarEvent | "new" | null;
@@ -156,8 +156,8 @@ type SpanSegment = {
   continuesRight: boolean;
 };
 
-// 여러 날 이어지는 일정을 주 단위로 잘라, 겹치지 않게 줄(lane)을 배정한 막대 세그먼트로 만든다.
-// laneByDate: 각 날짜 셀이 위쪽에 비워 둬야 할 막대 줄 수(그만큼 단일 일정 칩을 아래로 민다).
+// Cuts multi-day events into weekly segments and assigns them non-overlapping lanes as bar segments.
+// laneByDate: the number of bar rows each date cell must leave empty at the top (single-event chips are pushed down by that much).
 function computeMonthSpans(cells: Array<{ date: string }>, snapshot: CalendarSnapshot) {
   const multiDay = snapshot.events.filter(isMultiDay);
   const segments: SpanSegment[] = [];
@@ -218,7 +218,7 @@ function gridRange(visibleMonth: string): { from: string; to: string } {
   const first = dateOf(year, month - 1, 1);
   const gridStart = dateOf(year, month - 1, 1 - first.getUTCDay());
   const start = isoDate(gridStart);
-  // 6주 그리드 42일 + 앞뒤 1주 여유.
+  // The 6-week grid's 42 days, plus a 1-week margin on each side.
   return { from: addDays(start, -7), to: addDays(start, 48) };
 }
 
@@ -226,13 +226,13 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
   const [store] = useState(() => viewStateStore ?? calendarViewStateStoreOf());
   const [viewState, setViewState] = useState(() => store.read());
   const { view, visibleMonth } = viewState;
-  // 월 전환 애니메이션 방향: 1 = 다음 달(왼쪽으로 슬라이드), -1 = 이전 달, 0 = 애니메이션 없음.
+  // Month-transition animation direction: 1 = next month (slides left), -1 = previous month, 0 = no animation.
   const [slideDir, setSlideDir] = useState<-1 | 0 | 1>(0);
   const [dayDialogDate, setDayDialogDate] = useState<string | null>(null);
   const [editorItem, setEditorItem] = useState<EditorItem>(null);
   const [draft, setDraft] = useState<Draft>({ title: "", startDate: "", startTime: "", endDate: "", endTime: "", location: "", categoryId: "", note: "", recurrence: null });
   const [formError, setFormError] = useState<string | null>(null);
-  // 반복 시리즈의 occurrence를 저장/삭제할 때 범위를 고르는 다이얼로그.
+  // The dialog for choosing the scope when saving/deleting an occurrence of a recurring series.
   const [scopePrompt, setScopePrompt] = useState<{ mode: "save" | "delete"; event: CalendarEvent; input?: CalendarWriteInput } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
@@ -250,8 +250,8 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     });
   }, [store]);
 
-  // macOS 트랙패드 두 손가락 좌우 스와이프로 이전/다음 달 이동. 세로 스크롤과 모달 위에서는 무시.
-  // 콜백 ref로 붙여 로딩 → 로드 전환 시점에도 확실히 리스너가 걸리게 한다.
+  // Moves to the previous/next month via a macOS trackpad two-finger horizontal swipe. Ignored during vertical scroll and over a modal.
+  // Attached via a callback ref so the listener is reliably wired even across the loading → loaded transition.
   const wheelNavCleanup = useRef<(() => void) | undefined>(undefined);
   const attachWheelNav = useCallback((node: HTMLDivElement | null) => {
     wheelNavCleanup.current?.();
@@ -294,7 +294,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
       queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
   };
-  // 스냅샷 쿼리 키에 표시 범위가 붙어 있어 고정 키로 읽을 수 없다 — 무효화 뒤 캐시된 범위들에서 찾는다.
+  // The snapshot query key carries the displayed range, so it can't be read with a fixed key — after invalidation, look it up among the cached ranges.
   const resyncCalendarVersion = async (pick: (snapshot: CalendarSnapshot) => { version?: number } | undefined): Promise<number | null> => {
     await invalidateSnapshots();
     for (const [, snapshot] of queryClient.getQueriesData<CalendarSnapshot>({ queryKey: calendarQueryKey })) {
@@ -419,14 +419,14 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     if (!input) return;
     if (editorItem === "new") { createMutation.mutate(input); return; }
     if (!editingEvent) return;
-    // 반복 시리즈의 한 회차를 고치는 중이면 범위를 먼저 묻는다.
+    // If editing one occurrence of a recurring series, ask for the scope first.
     if (editingEvent.seriesId) { setScopePrompt({ mode: "save", event: editingEvent, input }); return; }
     updateMutation.mutate({ eventId: editingEvent.id, input, expectedVersion: editingEvent.version ?? 1 });
   }
 
   function requestDelete() {
     if (!editingEvent) return;
-    // 반복 일정은 범위 선택 다이얼로그가 확인 단계를 겸한다. 단발 일정은 확인 모달.
+    // For recurring events, the scope-selection dialog doubles as the confirmation step. For a single event, it's the confirmation modal.
     if (editingEvent.seriesId) { setScopePrompt({ mode: "delete", event: editingEvent }); return; }
     setDeleteConfirm(true);
   }
@@ -640,7 +640,7 @@ function monthCells(visibleMonth: string, today: string, events: CalendarEvent[]
   return Array.from({ length: 42 }, (_, index) => {
     const date = dateOf(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + index);
     const key = isoDate(date);
-    // 여러 날 일정은 셀 칩이 아니라 이어지는 막대로 그린다.
+    // Multi-day events are drawn as a continuous bar rather than a cell chip.
     return { date: key, inMonth: key.startsWith(visibleMonth), today: key === today, events: sortEvents(events.filter((event) => event.startDate === key && !isMultiDay(event))) };
   });
 }

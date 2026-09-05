@@ -61,7 +61,7 @@ li {
   text-wrap: pretty;
 }
 
-/* 텍스트 선택도 사용자 강조색을 따른다 — 기본 브라우저 파랑이 뜨면 조립한 티가 난다. */
+/* Text selection also follows the user's accent color — the default browser blue would give away that it's assembled. */
 ::selection {
   background: color-mix(in srgb, var(--color-accent) 25%, transparent);
   color: var(--color-text);
@@ -80,7 +80,7 @@ li {
 }
 
 
-/* 라우트 에러 화면 (app/RouteErrorScreen) — feature 아님, 전역 */
+/* The route error screen (app/RouteErrorScreen) — not a feature, global */
 .route-error {
   display: flex;
   flex-direction: column;

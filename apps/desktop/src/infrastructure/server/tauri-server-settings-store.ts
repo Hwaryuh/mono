@@ -10,7 +10,7 @@ import {
 const PROBE_TIMEOUT_MS = 4_000;
 const WEB_PREVIEW_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4174";
 
-/** Tauri 밖(브라우저 `npm run dev`)에서 화면이 깨지지 않도록 하는 읽기 전용 상태. */
+/** A read-only state that keeps the screen from breaking outside Tauri (browser `npm run dev`). */
 function webPreviewConnection(): ServerConnection {
   return {
     mode: "embedded",
@@ -43,14 +43,14 @@ export class TauriServerSettingsStore implements ServerSettingsStore {
     const base = trimBaseUrl(baseUrl);
     const bearer = (token ?? "").trim();
 
-    // 1. 도달 가능성 + mono 서버인지 — /health는 인증 없음.
+    // 1. Reachability + whether it's a mono server — /health requires no auth.
     const health = await this.fetchWithTimeout(`${base}/health`);
     if (!health.ok) throw new Error(translate("server.error.httpStatus", { status: health.status }));
     if ((await health.text()).trim() !== "ok") {
       throw new Error(translate("server.validation.notMonoApi"));
     }
 
-    // 2. 토큰 유효성 — 인증 걸린 엔드포인트가 401이면 토큰이 없거나 틀린 것.
+    // 2. Token validity — a 401 from the authenticated endpoint means the token is missing or wrong.
     const authed = await this.fetchWithTimeout(
       `${base}/todo/snapshot`,
       bearer ? { headers: { Authorization: `Bearer ${bearer}` } } : {},

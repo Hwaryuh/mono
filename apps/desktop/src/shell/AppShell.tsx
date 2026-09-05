@@ -30,19 +30,19 @@ type NavigationItem = {
 
 const MIN_SIDEBAR_WIDTH = 168;
 const MAX_SIDEBAR_WIDTH = 224;
-const COLLAPSED_SIDEBAR_WIDTH = 56; // .app-shell--collapsed 의 첫 열 폭과 같아야 한다
+const COLLAPSED_SIDEBAR_WIDTH = 56; // must match .app-shell--collapsed's first-column width
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
-// 드래그를 놓았을 때 이 폭보다 좁으면 접힘, 넓으면 펼침으로 붙는다.
+// If narrower than this width when the drag is released, it snaps to collapsed; if wider, to expanded.
 const SIDEBAR_SNAP_AT = 120;
-// 이 폭 이하에서는 라벨과 들여쓰기 보간이 끝나고 아이콘-only 상태를 유지한다.
+// At or below this width, the label and indentation interpolation finishes and it stays icon-only.
 const SIDEBAR_LABEL_GONE_AT = COLLAPSED_SIDEBAR_WIDTH + 24;
 
 function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
 }
 
-// 펼침(0) ↔ 접힘(1) 진행도. 드래그 폭이 좁을수록 1에 가까워지고, CSS가 이 값 하나로
-// 라벨 투명도·너비·아이콘 위치를 보간한다.
+// The expanded(0) ↔ collapsed(1) progress. The narrower the drag width, the closer to 1, and CSS uses this single value to
+// interpolate the label opacity, width, and icon position.
 function sidebarCollapseProgress(width: number): number {
   return Math.max(0, Math.min(1, (MIN_SIDEBAR_WIDTH - width) / (MIN_SIDEBAR_WIDTH - SIDEBAR_LABEL_GONE_AT)));
 }
@@ -52,7 +52,7 @@ function readSidebarWidth(): number {
     const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
     if (Number.isFinite(stored) && stored > 0) return clampSidebarWidth(stored);
   } catch {
-    // 저장소가 차단되면 기본 폭으로 시작한다.
+    // Starts at the default width if storage is blocked.
   }
   return MAX_SIDEBAR_WIDTH;
 }
@@ -61,7 +61,7 @@ function writeSidebarWidth(width: number): void {
   try {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(width)));
   } catch {
-    // 저장소가 차단돼도 현재 세션 폭은 유지한다.
+    // Even if storage is blocked, the current session's width is kept.
   }
 }
 
@@ -222,15 +222,15 @@ export function AppShell({
     setCollapsed(true);
   }
 
-  // 드래그하는 동안 사이드바 폭이 포인터를 그대로 따라간다(56–224px, transition 없음).
-  // 놓는 순간의 폭만 보고 접힘/펼침 중 가까운 쪽으로 붙는다 — 자동 격발 지점은 없다.
+  // While dragging, the sidebar width follows the pointer directly (56–224px, no transition).
+  // On release, it snaps to whichever of collapsed/expanded the width is closer to — there's no automatic trigger point.
   function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const handle = event.currentTarget;
     const originLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
     const widthAt = (clientX: number) =>
       Math.min(MAX_SIDEBAR_WIDTH, Math.max(COLLAPSED_SIDEBAR_WIDTH, Math.round(clientX - originLeft)));
-    try { handle.setPointerCapture(event.pointerId); } catch { /* 캡처 미지원 환경 */ }
+    try { handle.setPointerCapture(event.pointerId); } catch { /* environment without capture support */ }
     setDragWidth(collapsed ? COLLAPSED_SIDEBAR_WIDTH : sidebarWidth);
 
     const onMove = (move: PointerEvent) => setDragWidth(widthAt(move.clientX));
@@ -238,7 +238,7 @@ export function AppShell({
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", endDrag);
       handle.removeEventListener("pointercancel", endDrag);
-      try { handle.releasePointerCapture(up.pointerId); } catch { /* 이미 해제됨 */ }
+      try { handle.releasePointerCapture(up.pointerId); } catch { /* already released */ }
       const finalWidth = widthAt(up.clientX);
       setDragWidth(null);
       if (finalWidth < SIDEBAR_SNAP_AT) {

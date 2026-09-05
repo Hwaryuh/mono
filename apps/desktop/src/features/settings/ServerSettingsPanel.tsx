@@ -24,9 +24,9 @@ function CurrentConnectionBadge({ status }: { status: CurrentConnectionStatus })
 }
 
 /**
- * 이 기기가 어느 mono API 서버를 쓸지 정한다. 설정은 server.json에 저장되고 적용은 다음
- * 실행부터다 — lib.rs가 실행 시 한 번만 연결을 결정한다. 그래서 "저장"과 "다시 시작"이
- * 분리돼 있고, restartRequired로 둘의 어긋남을 드러낸다.
+ * Decides which mono API server this device uses. The setting is stored in server.json and takes effect
+ * starting from the next launch — lib.rs decides the connection only once, at startup. That's why "Save" and "Restart"
+ * are separate, with restartRequired surfacing any mismatch between the two.
  */
 export function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   const [connection, setConnection] = useState<ServerConnection | null>(null);
@@ -56,8 +56,8 @@ export function ServerSettingsPanel({ store }: { store: ServerSettingsStore }) {
   }, [store]);
 
   const effectiveApiBaseUrl = connection?.effectiveApiBaseUrl;
-  // 원격 연결이면 저장된 토큰으로 프로브해야 한다 — 안 그러면 토큰이 걸린 서버가
-  // 정상인데도 인증 엔드포인트가 401이라 "응답 없음"으로 뜬다. 임베드는 토큰 없음.
+  // For a remote connection, the probe must use the stored token — otherwise a server that requires a token
+  // shows as "no response" because the auth endpoint returns 401, even though it's actually fine. Embedded mode has no token.
   const effectiveToken = connection && !connection.runningEmbedded
     ? connection.remoteToken || undefined
     : undefined;

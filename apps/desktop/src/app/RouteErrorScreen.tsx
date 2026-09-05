@@ -5,7 +5,7 @@ import { useRouteError } from "react-router";
 
 export function RouteErrorScreen() {
   const error = useRouteError();
-  // 로그만 남기고 재시도는 새로고침에 맡긴다. 별도 리포팅 붙일 때 여기 확장.
+  // Just logs it and leaves retrying to a page refresh. Extend here when adding dedicated reporting.
   console.error(error);
 
   return (

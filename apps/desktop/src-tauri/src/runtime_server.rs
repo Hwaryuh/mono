@@ -12,7 +12,7 @@ struct ServerSettings {
     mode: ServerMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     api_base_url: Option<String>,
-    /// remote 모드에서 서버가 `MONO_API_TOKEN`을 요구할 때 보낼 베어러 토큰. 없으면 미전송.
+    /// The bearer token to send when the server requires `MONO_API_TOKEN` in remote mode. Not sent if absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     api_token: Option<String>,
 }
@@ -24,13 +24,13 @@ pub(super) enum ServerMode {
     Remote,
 }
 
-/// `server.json`의 원본 내용. 파일이 없으면 embedded로 본다. 실행 중인 서버가 아니라
-/// "다음 실행에 적용될" 설정을 그대로 나타낸다.
+/// The raw contents of `server.json`. Treated as embedded if the file doesn't exist. Represents the
+/// setting that will apply "on the next launch", not the currently running server.
 #[derive(Debug, PartialEq)]
 pub(super) struct StoredConnection {
     pub(super) mode: ServerMode,
     pub(super) remote_url: String,
-    /// 저장된 베어러 토큰. 없으면 빈 문자열.
+    /// The stored bearer token. An empty string if none.
     pub(super) remote_token: String,
 }
 
@@ -117,7 +117,7 @@ impl RuntimeServer {
     }
 }
 
-/// 현재 저장된 `server.json`을 읽는다. 파일이 없으면 embedded. 형식이 깨졌으면 오류.
+/// Reads the currently stored `server.json`. Treated as embedded if the file doesn't exist. An error if the format is malformed.
 pub(super) fn read_stored_connection(app_data_directory: &Path) -> Result<StoredConnection, String> {
     let settings_path = app_data_directory.join(SETTINGS_FILE);
     if !settings_path.exists() {
@@ -135,15 +135,15 @@ pub(super) fn read_stored_connection(app_data_directory: &Path) -> Result<Stored
     })
 }
 
-/// 공백만 있거나 빈 토큰은 "없음"으로 취급한다.
+/// A whitespace-only or empty token is treated as "none".
 fn normalize_token(value: Option<String>) -> Option<String> {
     value
         .map(|token| token.trim().to_string())
         .filter(|token| !token.is_empty())
 }
 
-/// `server.json`을 원자적으로 교체한다(임시 파일 → rename). remote 주소는 저장 전에
-/// 정규화·검증한다. 반환값은 파일에 실제로 기록된 정규화 형태의 연결 설정이다.
+/// Atomically replaces `server.json` (temp file → rename). The remote address is
+/// normalized and validated before saving. The return value is the normalized connection setting actually written to the file.
 pub(super) fn write_stored_connection(
     app_data_directory: &Path,
     mode: ServerMode,
@@ -188,7 +188,7 @@ pub(super) fn write_stored_connection(
     })
 }
 
-/// 저장된 설정이 다음 실행에서 만들 `api_base_url`. 재시작 필요 여부 판단에 쓴다.
+/// The `api_base_url` the stored setting would produce on the next launch. Used to determine whether a restart is needed.
 pub(super) fn target_api_base_url(stored: &StoredConnection) -> Result<String, String> {
     match stored.mode {
         ServerMode::Embedded => Ok(DEFAULT_API_BASE_URL.to_string()),
@@ -321,7 +321,7 @@ mod tests {
         let stored = read_stored_connection(&directory).unwrap();
         assert_eq!(stored, written);
 
-        // 파일은 유효한 RuntimeServer로 다시 로드된다.
+        // The file reloads as a valid RuntimeServer.
         let config = RuntimeServer::load_with_override(&directory, None).unwrap();
         assert_eq!(config.api_base_url(), "http://100.80.12.34:4174");
         assert_eq!(config.api_token(), Some("s3cr3t"));
@@ -372,7 +372,7 @@ mod tests {
             write_stored_connection(&directory, ServerMode::Remote, Some("ftp://host:4174"), None)
                 .is_err()
         );
-        // 실패한 저장은 파일을 만들지 않는다.
+        // A failed save does not create the file.
         assert!(!directory.join(SETTINGS_FILE).exists());
         std::fs::remove_dir_all(directory).unwrap();
     }

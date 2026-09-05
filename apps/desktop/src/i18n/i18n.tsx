@@ -44,7 +44,7 @@ function translateForLocale(locale: Locale, key: TranslationKey, values?: Interp
   });
 }
 
-/** React 밖의 저장소·상수에서도 동일한 번역 카탈로그를 사용한다. */
+/** Uses the same translation catalog even outside React, from stores and constants. */
 export function translate(key: TranslationKey, values?: InterpolationValues) {
   return translateForLocale(activeLocale, key, values);
 }
@@ -130,7 +130,7 @@ export function I18nProvider({ children, storage = window.localStorage }: { chil
     try {
       storage.setItem(LOCALE_STORAGE_KEY, locale);
     } catch {
-      // 저장소가 차단되어도 현재 세션의 언어 설정은 유지한다.
+      // Even if storage is blocked, the current session's language setting is kept.
     }
   }, [locale, storage]);
 

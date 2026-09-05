@@ -13,7 +13,7 @@ use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
 use super::version::{ensure_versioned_update, expected_version};
 
-// (id, name, color, order_index) 카테고리 공통 CRUD 설정. 로직은 category::Categories.
+// The shared (id, name, color, order_index) category CRUD config. The logic lives in category::Categories.
 const CATS: Categories = Categories {
     table: "calendar_categories",
     not_found: "일정 라벨을 찾을 수 없습니다",
@@ -22,7 +22,7 @@ const CATS: Categories = Categories {
     reorder_mismatch: "분류 순서에 현재 분류가 정확히 한 번씩 포함되어야 합니다.",
 };
 
-// ---------- DTO (packages/contracts/src/index.ts calendar* 스키마) ----------
+// ---------- DTO (packages/contracts/src/index.ts calendar* schemas) ----------
 
 #[derive(Serialize)]
 struct CalendarCategory {
@@ -38,7 +38,7 @@ struct Recurrence {
     freq: String, // daily | weekly | monthly | yearly
     interval: u32,
     #[serde(default)]
-    weekdays: Vec<i64>, // 0=일 ~ 6=토, weekly에서만 의미. [] 이면 시작일 요일.
+    weekdays: Vec<i64>, // 0=Sun ~ 6=Sat, meaningful only for weekly. [] means the start date's weekday.
     until: Option<String>,
     count: Option<u32>,
 }
@@ -83,7 +83,7 @@ struct CalendarWriteInput {
     note: String,
     #[serde(default)]
     recurrence: Option<Recurrence>,
-    // 반복 일정을 수정/삭제할 때의 범위. "this" | "future" | "all". 단발 일정은 무시.
+    // The scope when editing/deleting a recurring event. "this" | "future" | "all". Ignored for a single event.
     #[serde(default)]
     scope: Option<String>,
 }
@@ -118,7 +118,7 @@ struct DeleteCategoryInput {
     replacement_category_id: String,
 }
 
-// ---------- 검증 ----------
+// ---------- Validation ----------
 
 fn validated_title(raw: &str) -> ApiResult<String> {
     let title = raw.trim();
@@ -138,7 +138,7 @@ fn validated_len(raw: &str, max: usize, label: &str) -> ApiResult<String> {
     Ok(raw.to_string())
 }
 
-// ---------- 저장소 로직 ----------
+// ---------- Repository logic ----------
 
 fn parse_date(raw: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(raw, "%Y-%m-%d").ok()
@@ -148,7 +148,7 @@ fn date_str(date: NaiveDate) -> String {
     date.format("%Y-%m-%d").to_string()
 }
 
-// 마스터 이벤트 행 + (있으면) 반복 규칙.
+// The master event row + (if present) its recurrence rule.
 struct MasterRow {
     id: String,
     title: String,
@@ -242,7 +242,7 @@ fn load_exceptions(conn: &Connection) -> ApiResult<Vec<ExceptionRow>> {
     Ok(rows)
 }
 
-// 규칙에 따라 window_end 까지의 occurrence 슬롯 날짜를 오름차순으로. count·until 을 존중한다.
+// Yields occurrence slot dates up to window_end in ascending order, per the rule. Honors count and until.
 fn occurrence_slots(rule: &Recurrence, start: NaiveDate, window_end: NaiveDate) -> Vec<NaiveDate> {
     let until = rule.until.as_deref().and_then(parse_date);
     let limit = rule.count.unwrap_or(u32::MAX) as usize;
@@ -300,7 +300,7 @@ fn occurrence_slots(rule: &Recurrence, start: NaiveDate, window_end: NaiveDate) 
                 else {
                     break;
                 };
-                // 그 달에 같은 '일'이 없으면(예: 매월 31일 → 2월) 건너뛴다.
+                // Skipped if that month has no matching day-of-month (e.g. the 31st → February).
                 let Some(date) = NaiveDate::from_ymd_opt(anchor.year(), anchor.month(), day) else {
                     continue;
                 };
@@ -415,7 +415,7 @@ fn expand_master(
     let to_str = date_str(to);
 
     let Some(rule) = &master.recurrence else {
-        // 단발: [start, end] 가 window 와 겹치면 그대로.
+        // Single event: passes through as-is if [start, end] overlaps the window.
         if master.end_date >= from_str && master.start_date <= to_str {
             return vec![to_event(master, None, span_days)];
         }
@@ -452,7 +452,7 @@ fn expand_master(
 fn get_snapshot(conn: &Connection, from: Option<&str>, to: Option<&str>) -> ApiResult<CalendarSnapshot> {
     let today = today_iso();
     let today_date = parse_date(&today).unwrap_or_else(|| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
-    // 클라이언트가 창을 주지 않으면 이번 달 그리드를 넉넉히 덮는 ±45일.
+    // If the client doesn't provide a window, defaults to ±45 days, generously covering this month's grid.
     let from_date = from
         .and_then(parse_date)
         .unwrap_or_else(|| today_date - chrono::Duration::days(45));
@@ -486,7 +486,7 @@ fn expand_all(conn: &Connection, from: NaiveDate, to: NaiveDate) -> ApiResult<Ve
 // (id, title, start_time, category_id)
 pub(super) type DashboardEventRow = (String, String, Option<String>, String);
 
-// dashboard 경계: 그 날짜에 시작하는 일정(반복 occurrence 포함).
+// The dashboard boundary: events starting on that date (including recurring occurrences).
 pub(super) fn events_starting_on(conn: &Connection, date: &str) -> ApiResult<Vec<DashboardEventRow>> {
     let Some(day) = parse_date(date) else { return Ok(vec![]) };
     Ok(expand_all(conn, day, day)?
@@ -531,7 +531,7 @@ fn delete_category(conn: &mut Connection, id: &str, replacement: &str) -> ApiRes
     Ok(())
 }
 
-// 검증된 이벤트 컬럼. contracts calendarWriteInputSchema — startDate/endDate는 형식 검증 없음.
+// Validated event columns. contracts calendarWriteInputSchema — startDate/endDate have no format validation.
 struct EventColumns {
     title: String,
     start_date: String,
@@ -683,7 +683,7 @@ fn load_master(conn: &Connection, id: &str) -> ApiResult<MasterRow> {
         .ok_or_else(|| ApiError::NotFound(format!("일정을 찾을 수 없습니다: {id}")))
 }
 
-// id 는 "uuid" 또는 "uuid::YYYY-MM-DD"(전개된 occurrence).
+// id is either "uuid" or "uuid::YYYY-MM-DD" (an expanded occurrence).
 fn split_event_id(raw: &str) -> (String, Option<String>) {
     match raw.split_once("::") {
         Some((master, occ)) => (master.to_string(), Some(occ.to_string())),
@@ -724,8 +724,8 @@ fn upsert_exception(
     Ok(())
 }
 
-// 시리즈를 이 occurrence 직전까지로 자른다. 첫 occurrence 이면 시리즈 자체를 지운다.
-// 잘렸으면 true, 통째로 지웠으면 false.
+// Truncates the series to just before this occurrence. If it's the first occurrence, deletes the series entirely.
+// Returns true if truncated, false if deleted wholesale.
 fn truncate_series_before(conn: &Connection, master: &MasterRow, occurrence_date: &str) -> ApiResult<bool> {
     if occurrence_date <= master.start_date.as_str() {
         delete_series(conn, &master.id)?;
@@ -738,7 +738,7 @@ fn truncate_series_before(conn: &Connection, master: &MasterRow, occurrence_date
         "UPDATE calendar_recurrences SET until_date = ?1, count_n = NULL WHERE event_id = ?2",
         params![date_str(cutoff), master.id],
     )?;
-    // 잘린 구간 뒤의 예외는 의미가 없으니 정리.
+    // Exceptions after the truncated range are meaningless, so they're cleaned up.
     conn.execute(
         "DELETE FROM calendar_event_exceptions WHERE master_id = ?1 AND occurrence_date >= ?2",
         params![master.id, occurrence_date],
@@ -760,7 +760,7 @@ fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput, expe
     let recurrence = input.recurrence.as_ref().map(validated_recurrence).transpose()?;
     let scope = input.scope.as_deref().unwrap_or("all");
 
-    // 단발 일정: 그대로 수정.
+    // A single event: edited in place.
     if master.recurrence.is_none() && occ.is_none() {
         set_master_columns(conn, &master_id, &event, expected)?;
         set_recurrence(conn, &master_id, recurrence.as_ref())?;
@@ -773,18 +773,18 @@ fn update_event(conn: &Connection, raw_id: &str, input: CalendarWriteInput, expe
             upsert_exception(conn, &master_id, &occurrence_date, "modified", Some(&event))?;
         }
         "future" => {
-            // 이 occurrence 부터: 기존 시리즈를 직전까지 자르고, 여기서 새 시리즈 시작.
+            // From this occurrence on: truncates the existing series up to just before it, and starts a new series here.
             let still_exists = truncate_series_before(conn, &master, &occurrence_date)?;
             let new_recurrence = recurrence.or_else(|| master.recurrence.clone());
             if still_exists {
                 insert_event(conn, &uuid::Uuid::new_v4().to_string(), &event, new_recurrence.as_ref())?;
             } else {
-                // 첫 occurrence 였으면 시리즈가 통째로 지워졌으니 새로 만든다(= all 과 동일 효과).
+                // If it was the first occurrence, the series was deleted wholesale, so create a new one (same effect as "all").
                 insert_event(conn, &uuid::Uuid::new_v4().to_string(), &event, new_recurrence.as_ref())?;
             }
         }
         _ => {
-            // all: 마스터 갱신, 개별 예외는 정리.
+            // all: updates the master, and clears out the individual exceptions.
             set_master_columns(conn, &master_id, &event, expected)?;
             set_recurrence(conn, &master_id, recurrence.or_else(|| master.recurrence.clone()).as_ref())?;
             conn.execute("DELETE FROM calendar_event_exceptions WHERE master_id = ?1", [master_id.as_str()])?;
@@ -813,7 +813,7 @@ fn delete_event(conn: &Connection, raw_id: &str, scope: Option<&str>) -> ApiResu
     Ok(())
 }
 
-// ---------- 라우트 (apps/api/src/routes/calendar.ts 경로 그대로) ----------
+// ---------- Routes (matches apps/api/src/routes/calendar.ts paths exactly) ----------
 
 pub fn routes(db: Db) -> Router {
     Router::new()
@@ -902,7 +902,7 @@ async fn delete_category_handler(
     Ok(ok())
 }
 
-// ---------- 테스트 (apps/api/src/repositories/calendar-repository.test.ts 이식) ----------
+// ---------- Tests (ported from apps/api/src/repositories/calendar-repository.test.ts) ----------
 
 #[cfg(test)]
 mod tests {
@@ -929,7 +929,7 @@ mod tests {
     }
 
     fn snapshot(conn: &Connection) -> CalendarSnapshot {
-        // 테스트는 넓은 창으로 본다.
+        // The test looks at a wide window.
         get_snapshot(conn, Some("2000-01-01"), Some("2100-01-01")).unwrap()
     }
 
@@ -983,7 +983,7 @@ mod tests {
         let db = db::open_memory();
         let conn = db.lock().unwrap();
         let category = seed_category(&conn, "업무");
-        // 2026-08-03 은 월요일. 매주 월요일.
+        // 2026-08-03 is a Monday. Every Monday.
         create_event(&conn, recurring_input("주간 회의", &category, "2026-08-03", weekly(1, vec![1], None, None)))
             .unwrap();
 
@@ -1025,7 +1025,7 @@ mod tests {
         let occ = snap.events.iter().find(|e| e.occurrence_date.as_deref() == Some("2026-08-10")).unwrap();
         assert_eq!(occ.title, "스탠드업(연기)");
         assert_eq!(occ.start_time.as_deref(), Some("14:00"));
-        // 다른 occurrence 는 그대로.
+        // Other occurrences are unaffected.
         assert_eq!(
             snap.events.iter().find(|e| e.occurrence_date.as_deref() == Some("2026-08-17")).unwrap().title,
             "스탠드업"
@@ -1070,7 +1070,7 @@ mod tests {
         assert_eq!(by_date("2026-08-10").unwrap().title, "회의");
         assert_eq!(by_date("2026-08-17").unwrap().title, "회의(새 시간)");
         assert_eq!(by_date("2026-08-24").unwrap().title, "회의(새 시간)");
-        // 두 시리즈로 쪼개졌다.
+        // Split into two series.
         let series: std::collections::HashSet<_> =
             snap.events.iter().filter_map(|e| e.series_id.clone()).collect();
         assert_eq!(series.len(), 2);

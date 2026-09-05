@@ -7,9 +7,9 @@ import { errorMessage } from "../../i18n/error-message";
 import { scrapQueryKey, type ScrapRepository } from "./scrap-repository";
 
 /**
- * 스크랩 태그(라벨) 관리 — 목록/이름변경/추가/삭제 두 모달을 자체 상태로 굴린다.
- * 부모(ScrapPage)에는 태그 변경 결과만 rename/add/delete 이벤트로 알려서, 부모가
- * 필터(activeTag)·작성 초안(draft.tag)을 따라가게 한다. 저장소 갱신은 여기서 직접 한다.
+ * Manages scrap tags (labels) — runs the list/rename/add/delete pair of modals on its own state.
+ * Only notifies the parent (ScrapPage) of tag-change results via rename/add/delete events, so the parent
+ * can follow along on the filter (activeTag) and the draft being composed (draft.tag). The repository update happens directly here.
  */
 export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRenamed, onTagAdded, onTagDeleted }: {
   open: boolean;
@@ -30,7 +30,7 @@ export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRena
   const [tagDeletePending, setTagDeletePending] = useState(false);
   const [tagDeleteError, setTagDeleteError] = useState<string | null>(null);
 
-  // 열릴 때마다 편집 상태를 초기화한다(예전 openTagManager가 하던 일).
+  // Resets the edit state every time it opens (what the old openTagManager used to do).
   useEffect(() => {
     if (open) { setTagInput(""); setTagError(null); setEditingTag(null); }
   }, [open]);

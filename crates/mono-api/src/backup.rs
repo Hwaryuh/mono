@@ -112,8 +112,8 @@ fn write_backup(
     let source = Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     source.backup(MAIN_DB, &database_backup_path, None)?;
 
-    // 원본의 WAL 설정도 함께 복제된다. 백업 묶음은 단일 DB 파일이어야 하므로 DELETE 모드로
-    // checkpoint해 빈 -wal/-shm 보조 파일을 남기지 않는다. 복원 후 서버가 다시 WAL로 연다.
+    // The source's WAL setting is copied along with it. Since a backup bundle must be a single DB file, it checkpoints
+    // in DELETE mode so no empty -wal/-shm side files are left behind. After a restore, the server reopens it in WAL mode.
     let backup = Connection::open(&database_backup_path)?;
     backup.pragma_update(None, "journal_mode", "DELETE")?;
     let integrity: String = backup.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;

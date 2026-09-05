@@ -1,15 +1,15 @@
-// todo_labels / ledger_categories / calendar_categories 는 (id, name, color, order_index)
-// 스키마가 같고 CRUD 로직도 대부분 같다. 테이블명·에러 문구만 다른 조각을 여기 모은다.
-// 삭제 시맨틱(대체 라벨 필요 여부·의존 테이블)은 모듈마다 달라 각자 둔다.
+// todo_labels / ledger_categories / calendar_categories share the same (id, name, color, order_index)
+// schema, and most of the CRUD logic is the same. This gathers just the pieces that differ — table names and error text.
+// Delete semantics (whether a replacement label is required, dependent tables) differ per module, so those stay separate.
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::common::validated_color;
 use super::error::{ApiError, ApiResult};
 
-// "기타" 예약 항목의 id — 항상 존재하고 마지막 순서에 남는다(db.rs SEED).
+// The id of the reserved "Other" item — always exists and stays last in order (db.rs SEED).
 pub const RESERVED_ID: &str = "other";
 
-/// 이름 검증: 트림 후 1~100자. (todo 라벨 / ledger·calendar 분류 공통 문구)
+/// Name validation: 1-100 characters after trimming. (Shared wording for todo labels / ledger·calendar categories)
 pub fn validated_name(raw: &str) -> ApiResult<String> {
     let name = raw.trim();
     if name.is_empty() {
@@ -21,16 +21,16 @@ pub fn validated_name(raw: &str) -> ApiResult<String> {
     Ok(name.to_string())
 }
 
-// 모듈별로 다른 부분(테이블명·문구)만 선언으로 담는다. 나머지 로직은 메서드가 공유.
+// Only the parts that differ per module (table name, wording) are held as declarations. The rest of the logic is shared by the methods.
 pub struct Categories {
     pub table: &'static str,
-    /// require() 실패 시 "{not_found}: {id}".
+    /// "{not_found}: {id}" on a require() failure.
     pub not_found: &'static str,
-    /// 이름 중복 시 문구.
+    /// The wording for a duplicate name.
     pub clash: &'static str,
-    /// reorder 입력 자체가 비었/빈 id 포함.
+    /// The reorder input itself is empty, or contains an empty id.
     pub reorder_invalid: &'static str,
-    /// reorder 목록이 현재 집합과 불일치.
+    /// The reorder list doesn't match the current set.
     pub reorder_mismatch: &'static str,
 }
 
@@ -54,9 +54,9 @@ impl Categories {
         name: &str,
         except_id: Option<&str>,
     ) -> ApiResult<()> {
-        // ponytail: SQLite lower()는 ASCII만 접는다. 한글은 대소문자가 없어 무관하고
-        //           영문 대소문자 중복도 잡힌다. 라틴 확장(é 등)까지 접으려면 앱 단 재비교.
-        // id는 UUID 또는 "other"라 빈 문자열이 sentinel로 안전(생성 시 except 없음).
+        // ponytail: SQLite's lower() only folds ASCII. That's irrelevant for Korean since it has no case, and
+        //           English case-duplicates are still caught. Folding extended Latin (é etc.) too would need an app-side recheck.
+        // Since id is either a UUID or "other", an empty string is a safe sentinel (no id is excepted on create).
         let sql = format!(
             "SELECT 1 FROM {} WHERE lower(name) = lower(?1) AND id != ?2 LIMIT 1",
             self.table
@@ -71,7 +71,7 @@ impl Categories {
         Ok(())
     }
 
-    /// 이름·색 검증 + 중복 확인 + 삽입. "기타"보다 뒤 순서로 붙인다.
+    /// Validates name/color + checks for duplicates + inserts. Appended with an order after "Other".
     pub fn insert(&self, conn: &Connection, name_raw: &str, color_raw: &str) -> ApiResult<()> {
         let name = validated_name(name_raw)?;
         let color = validated_color(color_raw)?;
