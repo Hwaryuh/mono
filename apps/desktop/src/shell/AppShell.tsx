@@ -32,6 +32,7 @@ const MIN_SIDEBAR_WIDTH = 168;
 const MAX_SIDEBAR_WIDTH = 224;
 const COLLAPSED_SIDEBAR_WIDTH = 56; // must match .app-shell--collapsed's first-column width
 const SIDEBAR_WIDTH_STORAGE_KEY = "mono:sidebar-width";
+const THEME_STORAGE_KEY = "mono:theme";
 // If narrower than this width when the drag is released, it snaps to collapsed; if wider, to expanded.
 const SIDEBAR_SNAP_AT = 120;
 // At or below this width, the label and indentation interpolation finishes and it stays icon-only.
@@ -65,6 +66,16 @@ function writeSidebarWidth(width: number): void {
   }
 }
 
+function readTheme(): Theme {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch {
+    // Starts light if storage is blocked.
+  }
+  return "light";
+}
+
 const accentColorPreferenceStore = LocalStorageAccentColorPreferenceStore.of(window.localStorage);
 const defaultAiSettingsStore = new InMemoryAiSettingsStore();
 const defaultMediaMaintenance = new InMemoryMediaMaintenance();
@@ -94,7 +105,7 @@ export function AppShell({
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(readTheme);
   const [accentColor, setAccentColor] = useState(() => accentColorPreferenceStore.read());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
@@ -169,6 +180,11 @@ export function AppShell({
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Even if storage is blocked, the current session's theme is kept.
+    }
   }, [theme]);
 
   useEffect(() => {

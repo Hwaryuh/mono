@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>mono</title>
+    <script>
+      // Apply the saved theme before first paint so an update/restart doesn't flash light.
+      try {
+        var t = localStorage.getItem("mono:theme");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

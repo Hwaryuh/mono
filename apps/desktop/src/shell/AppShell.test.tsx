@@ -267,6 +267,20 @@ describe("AppShell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "설정" })).not.toBeInTheDocument());
   });
 
+  it("remembers the dark theme across an app restart", async () => {
+    window.localStorage.removeItem("mono:theme");
+    const first = renderShell();
+    fireEvent.click(await screen.findByRole("button", { name: "설정 열기" }));
+    fireEvent.click(screen.getByRole("radio", { name: "다크" }));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+    expect(window.localStorage.getItem("mono:theme")).toBe("dark");
+
+    first.unmount();
+    delete document.documentElement.dataset.theme;
+    renderShell();
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+  });
+
   it("changes the accent color in settings and restores it on the next launch", async () => {
     const firstRender = renderShell();
     fireEvent.click(screen.getByRole("button", { name: "설정 열기" }));
