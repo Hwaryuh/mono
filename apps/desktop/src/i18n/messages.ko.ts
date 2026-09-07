@@ -186,6 +186,7 @@ export const koMessages = {
   "placeholder.scope.title": "이번 세션 구현 범위",
   "placeholder.scope.description": "앱 셸과 라우팅만 연결했다. 상세 화면 구현은 대시보드 이후 단계다.",
   "placeholder.action.dashboard": "대시보드로",
+  "scrap.sort.recentlyUpdated": "최근 수정순",
   "scrap.sort.newest": "최신순",
   "scrap.sort.oldest": "오래된순",
   "scrap.sort.name": "이름순",

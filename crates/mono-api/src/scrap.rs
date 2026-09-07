@@ -43,6 +43,7 @@ struct ScrapItem {
     memo: String,
     tag: String,
     saved_at: String,
+    updated_at: String,
     url: Option<String>,
     media_id: Option<String>,
     file_name: Option<String>,
@@ -251,7 +252,8 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
 
     let mut items = conn
         .prepare(
-            "SELECT id, kind, title, memo, tag, saved_at, url, media_id, file_name, file_size \
+            "SELECT id, kind, title, memo, tag, saved_at, url, media_id, file_name, file_size, \
+             COALESCE(NULLIF(updated_at, ''), saved_at) \
              FROM scrap_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
@@ -266,6 +268,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
                 media_id: row.get(7)?,
                 file_name: row.get(8)?,
                 file_size: row.get(9)?,
+                updated_at: row.get(10)?,
                 comments: Vec::new(),
             })
         })?
@@ -312,6 +315,12 @@ fn require_scrap(conn: &Connection, id: &str) -> ApiResult<()> {
         .map_err(|_| ApiError::NotFound(format!("스크랩을 찾을 수 없습니다: {id}")))
 }
 
+// Bumps the parent scrap's updated_at so comment activity floats it up in "recently updated" order.
+fn touch_scrap(conn: &Connection, id: &str) -> ApiResult<()> {
+    conn.execute("UPDATE scrap_items SET updated_at = ?1 WHERE id = ?2", params![now_iso(), id])?;
+    Ok(())
+}
+
 fn require_comment(conn: &Connection, scrap_id: &str, comment_id: &str) -> ApiResult<()> {
     let owner: Option<String> = conn
         .query_row("SELECT scrap_id FROM scrap_comments WHERE id = ?1", [comment_id], |row| row.get(0))
@@ -341,9 +350,10 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
     let next_seq: i64 =
         tx.query_row("SELECT COALESCE(MAX(seq), 0) FROM scrap_items", [], |row| row.get(0))?;
+    let stamp = now_iso();
     tx.execute(
-        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, url, media_id, file_name, file_size) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, updated_at, url, media_id, file_name, file_size) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -351,7 +361,8 @@ fn create_scrap(conn: &mut Connection, input: ScrapWriteInput) -> ApiResult<()> 
             title,
             memo,
             tag,
-            now_iso(),
+            stamp,
+            stamp,
             if url.is_empty() { None } else { Some(url) },
             media_id,
             file.as_ref().map(|f| f.0.clone()),
@@ -378,7 +389,7 @@ fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiR
     tx.execute("INSERT OR IGNORE INTO scrap_tags (tag) VALUES (?1)", [&tag])?;
     tx.execute(
         "UPDATE scrap_items SET kind = ?1, title = ?2, memo = ?3, tag = ?4, url = ?5, media_id = ?6, \
-         file_name = ?7, file_size = ?8 WHERE id = ?9",
+         file_name = ?7, file_size = ?8, updated_at = ?9 WHERE id = ?10",
         params![
             kind,
             title,
@@ -388,6 +399,7 @@ fn update_scrap(conn: &mut Connection, id: &str, input: ScrapWriteInput) -> ApiR
             media_id,
             file.as_ref().map(|f| f.0.clone()),
             file.as_ref().map(|f| f.1),
+            now_iso(),
             id,
         ],
     )?;
@@ -467,6 +479,7 @@ fn add_comment(conn: &Connection, scrap_id: &str, input: &CommentInput) -> ApiRe
             file.as_ref().map(|f| f.size),
         ],
     )?;
+    touch_scrap(conn, scrap_id)?;
     Ok(())
 }
 
@@ -478,7 +491,8 @@ fn update_comment(conn: &Connection, scrap_id: &str, comment_id: &str, text: &st
         "UPDATE scrap_comments SET text = ?1, version = version + 1 WHERE id = ?2 AND (?3 IS NULL OR version = ?3)",
         params![text, comment_id, expected],
     )?;
-    ensure_versioned_update(changed, expected)
+    ensure_versioned_update(changed, expected)?;
+    touch_scrap(conn, scrap_id)
 }
 
 fn delete_comment(conn: &Connection, scrap_id: &str, comment_id: &str) -> ApiResult<()> {
@@ -758,6 +772,30 @@ mod tests {
             update_scrap(&mut conn, "nope", write_input("x", "", "태그")).unwrap_err(),
             ApiError::NotFound(_)
         ));
+    }
+
+    #[test]
+    fn updated_at_starts_at_saved_at_and_moves_on_edit_or_comment() {
+        let db = db::open_memory();
+        let mut conn = db.lock().unwrap();
+        create_scrap(&mut conn, write_input("스크랩", "", "태그")).unwrap();
+        let id = first_scrap_id(&conn);
+
+        let item = get_snapshot(&conn).unwrap().items.remove(0);
+        assert_eq!(item.updated_at, item.saved_at);
+        let created = item.updated_at;
+
+        let bump = || std::thread::sleep(std::time::Duration::from_millis(5));
+
+        bump();
+        update_scrap(&mut conn, &id, write_input("수정", "", "태그")).unwrap();
+        let edited = get_snapshot(&conn).unwrap().items[0].updated_at.clone();
+        assert!(edited > created, "edit should move updated_at forward");
+
+        bump();
+        add_comment(&conn, &id, &text_comment("댓글")).unwrap();
+        let commented = get_snapshot(&conn).unwrap().items[0].updated_at.clone();
+        assert!(commented > edited, "a new comment should move updated_at forward");
     }
 
     #[test]

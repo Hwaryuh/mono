@@ -6,15 +6,20 @@ function item(over: Partial<ScrapItem>): ScrapItem {
   return { id: "x", kind: "text", title: "", memo: "", tag: "수집", savedAt: "2026-01-01T00:00:00Z", url: null, mediaId: null, fileName: null, fileSize: null, comments: [], ...over };
 }
 
-const a = item({ id: "a", title: "가나다", savedAt: "2026-03-01T00:00:00Z", comments: [] });
+const a = item({ id: "a", title: "가나다", savedAt: "2026-03-01T00:00:00Z", updatedAt: "2026-06-01T00:00:00Z", comments: [] });
 const b = item({ id: "b", title: "하나", savedAt: "2026-01-15T00:00:00Z", comments: [{ id: "c1", createdAt: "", text: "", file: null }, { id: "c2", createdAt: "", text: "", file: null }] });
-const c = item({ id: "c", title: "다라마", savedAt: "2026-05-20T00:00:00Z", comments: [{ id: "c3", createdAt: "", text: "", file: null }] });
+const c = item({ id: "c", title: "다라마", savedAt: "2026-05-20T00:00:00Z", updatedAt: "2026-05-21T00:00:00Z", comments: [{ id: "c3", createdAt: "", text: "", file: null }] });
 
 const ids = (items: ScrapItem[]) => items.map((i) => i.id);
 
 describe("sortItems", () => {
   it("recent: newest savedAt first", () => {
     expect(ids(sortItems([a, b, c], "recent"))).toEqual(["c", "a", "b"]);
+  });
+
+  it("updated: newest updatedAt first, falling back to savedAt when absent", () => {
+    // a edited 6/1, c edited 5/21, b never edited → savedAt 1/15
+    expect(ids(sortItems([a, b, c], "updated"))).toEqual(["a", "c", "b"]);
   });
 
   it("oldest: oldest savedAt first", () => {

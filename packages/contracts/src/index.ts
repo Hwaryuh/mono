@@ -350,6 +350,8 @@ export const scrapItemSchema = z.object({
   memo: z.string(),
   tag: z.string(),
   savedAt: z.string(),
+  // Last time the scrap was touched (edited, or a comment added/edited). Absent from pre-0.7 servers — fall back to savedAt.
+  updatedAt: z.string().optional(),
   url: z.string().nullable(),
   mediaId: z.string().nullable().default(null),
   // The original name/size of a non-image attachment (kind "file"). Both null if it's an image.

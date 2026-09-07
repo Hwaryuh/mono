@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS scrap_items (
   memo TEXT NOT NULL DEFAULT '',
   tag TEXT NOT NULL,
   saved_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT '',
   url TEXT,
   media_id TEXT,
   file_name TEXT,
@@ -243,7 +244,11 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
         "scrap_comments",
         &[("file_media_id", "TEXT"), ("file_name", "TEXT"), ("file_size", "INTEGER")],
     )?;
-    migrate_add_columns(conn, "scrap_items", &[("file_name", "TEXT"), ("file_size", "INTEGER")])?;
+    migrate_add_columns(
+        conn,
+        "scrap_items",
+        &[("file_name", "TEXT"), ("file_size", "INTEGER"), ("updated_at", "TEXT NOT NULL DEFAULT ''")],
+    )?;
     migrate_add_columns(conn, "todo_items", &[("priority", "INTEGER NOT NULL DEFAULT 0")])?;
     conn.execute_batch(SEED)?;
     Ok(())

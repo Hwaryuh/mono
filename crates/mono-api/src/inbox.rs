@@ -341,9 +341,10 @@ fn approve_to_scrap(conn: &Connection, row: &InboxRow, fields: &[InboxField]) ->
         if m.is_empty() { row.raw.clone() } else { m }
     };
     let url = if row.source == "url" { Some(row.raw.clone()) } else { None };
+    let stamp = now_iso();
     conn.execute(
-        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, url, media_id) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, updated_at, url, media_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -351,7 +352,8 @@ fn approve_to_scrap(conn: &Connection, row: &InboxRow, fields: &[InboxField]) ->
             title,
             memo,
             tag,
-            now_iso(),
+            stamp,
+            stamp,
             url,
             first_media_id(&row.images_json, &row.videos_json),
         ],

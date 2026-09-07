@@ -31,6 +31,7 @@ class MockScrapRepository implements ScrapRepository {
       memo: parsed.memo,
       tag: parsed.tag,
       savedAt: "방금",
+      updatedAt: "방금",
       url: parsed.url || null,
       mediaId: parsed.mediaId ?? null,
       fileName: parsed.fileName ?? null,
@@ -51,6 +52,7 @@ class MockScrapRepository implements ScrapRepository {
     scrap.fileName = parsed.fileName ?? null;
     scrap.fileSize = parsed.fileSize ?? null;
     scrap.kind = scrapKind(parsed);
+    scrap.updatedAt = "방금";
   }
 
   async delete(scrapId: string) {
@@ -85,6 +87,7 @@ class MockScrapRepository implements ScrapRepository {
     const scrap = requireScrap(this.state, scrapId);
     const parsed = scrapCommentInputSchema.parse(input);
     scrap.comments.push({ id: `comment-${this.state.nextScrapCommentId++}`, createdAt: "오늘", text: parsed.text, file: parsed.file ?? null });
+    scrap.updatedAt = "방금";
   }
 
   async updateComment(scrapId: string, commentId: string, input: Parameters<ScrapRepository["updateComment"]>[2]) {
@@ -93,6 +96,7 @@ class MockScrapRepository implements ScrapRepository {
     if (!comment) throw new Error(`댓글을 찾을 수 없습니다: ${commentId}`);
     const parsed = scrapCommentInputSchema.parse(input);
     comment.text = parsed.text;
+    scrap.updatedAt = "방금";
   }
 
   async deleteComment(scrapId: string, commentId: string) {
