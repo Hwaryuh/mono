@@ -2,17 +2,13 @@ export const TIMER_SETTINGS_STORAGE_KEY = "mono:timer-settings";
 /** No storage event fires because the settings modal and timer page are in the same window. This event notifies after saving instead. */
 export const TIMER_SETTINGS_EVENT = "mono:timer-settings-changed";
 
-export type TimerTodoScope = "all" | "today";
-
 export type TimerSettings = {
   focusMinutes: number;
-  todoScope: TimerTodoScope;
   alarmEnabled: boolean;
 };
 
 export const defaultTimerSettings: TimerSettings = {
   focusMinutes: 25,
-  todoScope: "all",
   alarmEnabled: true,
 };
 
@@ -29,7 +25,6 @@ export function normalizeTimerSettings(value: unknown): TimerSettings {
   const raw = value as Partial<TimerSettings>;
   return {
     focusMinutes: clamp(raw.focusMinutes, defaultTimerSettings.focusMinutes, timerMinuteBounds),
-    todoScope: raw.todoScope === "today" ? "today" : "all",
     alarmEnabled: typeof raw.alarmEnabled === "boolean" ? raw.alarmEnabled : defaultTimerSettings.alarmEnabled,
   };
 }

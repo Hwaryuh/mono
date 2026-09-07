@@ -40,9 +40,9 @@ describe("timer settings", () => {
   it("reads back a saved value", () => {
     const storage = storageOf();
     const store = LocalStorageTimerSettingsStore.of(storage);
-    store.write({ ...defaultTimerSettings, focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
+    store.write({ ...defaultTimerSettings, focusMinutes: 50, alarmEnabled: false });
 
-    expect(store.read()).toMatchObject({ focusMinutes: 50, alarmEnabled: false, todoScope: "today" });
+    expect(store.read()).toMatchObject({ focusMinutes: 50, alarmEnabled: false });
   });
 
   it("reads a corrupted stored value as the default", () => {

@@ -51,7 +51,7 @@ export function createAppRouter(
         { path: "inbox", element: <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={inboxRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} viewStateStore={inboxViewStateStore} /> },
         { path: "todo", element: <TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} /> },
         { path: "routine", element: <RoutinePage repository={routineRepository} todoRepository={todoRepository} /> },
-        { path: "timer", element: <TimerPage repository={todoRepository} /> },
+        { path: "timer", element: <TimerPage /> },
         { path: "calendar", element: <CalendarPage repository={calendarRepository} viewStateStore={calendarViewStateStore} /> },
         { path: "scrap", element: <ScrapPage repository={scrapRepository} viewStateStore={scrapViewStateStore} /> },
         { path: "ledger", element: <LedgerPage repository={ledgerRepository} viewStateStore={ledgerViewStateStore} /> },

@@ -3,7 +3,6 @@ export const TIMER_SESSIONS_STORAGE_KEY = "mono:timer-sessions";
 export type TimerSession = {
   /** The time the session started. "HH:MM" */
   startedAt: string;
-  todoId: string | null;
   minutes: number;
 };
 
@@ -18,8 +17,7 @@ function isSession(value: unknown): value is TimerSession {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<TimerSession>;
   return typeof session.startedAt === "string"
-    && typeof session.minutes === "number"
-    && (session.todoId === null || typeof session.todoId === "string");
+    && typeof session.minutes === "number";
 }
 
 function parseLog(raw: string | null): StoredLog | null {
@@ -75,13 +73,4 @@ export class InMemoryTimerSessionStore implements TimerSessionStore {
     this.log = { date, sessions: [...this.read(date), session] };
     return this.log.sessions;
   }
-}
-
-export function sessionCountsByTodo(sessions: TimerSession[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const session of sessions) {
-    if (!session.todoId) continue;
-    counts[session.todoId] = (counts[session.todoId] ?? 0) + 1;
-  }
-  return counts;
 }

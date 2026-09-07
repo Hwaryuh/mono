@@ -1,8 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { currentIsoDate } from "@mono/domain";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
 import { I18nProvider } from "../../i18n/i18n";
 import type { Alarm } from "./timer-alarm";
 import { InMemoryTimerSessionStore } from "./timer-session-store";
@@ -14,13 +12,10 @@ function renderTimer(settings?: Partial<TimerSettings>) {
   const settingsStore = new InMemoryTimerSettingsStore();
   if (settings) settingsStore.write({ ...settingsStore.read(), ...settings });
   const alarm: Alarm = { start: vi.fn(), stop: vi.fn() };
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <TimerPage repository={createMockTodoRepository()} sessionStore={sessionStore} settingsStore={settingsStore} alarm={alarm} />
-      </I18nProvider>
-    </QueryClientProvider>,
+    <I18nProvider>
+      <TimerPage sessionStore={sessionStore} settingsStore={settingsStore} alarm={alarm} />
+    </I18nProvider>,
   );
   return { sessionStore, settingsStore, alarm };
 }
@@ -119,16 +114,11 @@ describe("TimerPage", () => {
     expect(sessionStore.read(currentIsoDate())).toHaveLength(0);
   });
 
-  it("attaches the session to the selected todo", async () => {
-    const { sessionStore } = renderTimer({ focusMinutes: 1 });
-    const tasks = await screen.findAllByRole("button", { pressed: false });
-    const target = tasks.find((task) => task.classList.contains("timer-task"))!;
-    fireEvent.click(target);
+  it("records a finished focus session in the history", () => {
+    const { sessionStore } = renderTimer({ focusMinutes: 1, alarmEnabled: false });
     fireEvent.click(screen.getByRole("button", { name: /시작/ }));
     act(() => { vi.advanceTimersByTime(61_000); });
 
-    const [session] = sessionStore.read(currentIsoDate());
-    expect(session.todoId).not.toBeNull();
-    expect(within(target).getByText("1세션")).toBeInTheDocument();
+    expect(sessionStore.read(currentIsoDate())).toHaveLength(1);
   });
 });

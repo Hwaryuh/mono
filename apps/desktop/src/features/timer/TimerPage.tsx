@@ -1,13 +1,9 @@
 import { translate } from "../../i18n/i18n";
-import type { TodoItem, TodoLabel } from "@mono/contracts";
 import { currentIsoDate } from "@mono/domain";
 import { Button, Icon, IconButton } from "@mono/ui";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { TodoRepository } from "../todo/todo-repository";
+import { useEffect, useMemo, useState } from "react";
 import {
   LocalStorageTimerSessionStore,
-  sessionCountsByTodo,
   type TimerSession,
   type TimerSessionStore,
 } from "./timer-session-store";
@@ -34,18 +30,13 @@ function startedAtOf(now: Date) {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-function dueOrder(item: TodoItem) {
-  return item.dueDate ?? "9999-12-31";
-}
-
 interface TimerPageProps {
-  repository: TodoRepository;
   sessionStore?: TimerSessionStore;
   settingsStore?: TimerSettingsStore;
   alarm?: Alarm;
 }
 
-export function TimerPage({ repository, sessionStore, settingsStore, alarm: alarmProp }: TimerPageProps) {
+export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: TimerPageProps) {
   const store = useMemo(
     () => sessionStore ?? LocalStorageTimerSessionStore.of(window.localStorage),
     [sessionStore],
@@ -56,15 +47,12 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   );
   const alarm = useMemo(() => alarmProp ?? createAlarm(), [alarmProp]);
   const today = currentIsoDate();
-  const snapshotQuery = useQuery({ queryKey: ["todo"], queryFn: () => repository.getSnapshot() });
 
   const [settings, setSettings] = useState<TimerSettings>(() => preferences.read());
   const [remaining, setRemaining] = useState(() => preferences.read().focusMinutes * 60);
   // The end time (epoch ms) while running. Remaining seconds must be recomputed on every tick, or setInterval drift accumulates.
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
-  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
-  const selectedTodoIdRef = useRef<string | null>(null);
   // Whether focus just ended and the alarm is currently ringing. Won't move to the next session until it's turned off.
   const [ringing, setRinging] = useState(false);
   // Whether the duration is being edited by tapping the large number. The input is only narrowed to a number on commit (blur/Enter).
@@ -76,17 +64,7 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
   // The duration can only be edited when neither counting down nor ringing (includes before start and while paused).
   const canEditMinutes = !running && !ringing;
 
-  const labels = new Map<string, TodoLabel>((snapshotQuery.data?.labels ?? []).map((label) => [label.id, label]));
-  const candidates = [...(snapshotQuery.data?.items ?? [])]
-    .filter((item) => !item.done)
-    .filter((item) => settings.todoScope === "all" || (item.dueDate !== null && item.dueDate <= today))
-    .sort((first, second) => dueOrder(first).localeCompare(dueOrder(second)));
-  const activeTodoId = selectedTodoId ?? candidates[0]?.id ?? null;
-  selectedTodoIdRef.current = activeTodoId;
-
-  const counts = sessionCountsByTodo(sessions);
   const focusedMinutes = sessions.reduce((sum, session) => sum + session.minutes, 0);
-  const titles = new Map(candidates.map((item) => [item.id, item.title]));
 
   useEffect(() => {
     if (endsAt === null) return;
@@ -154,7 +132,6 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
     if (record) {
       setSessions(store.append(today, {
         startedAt: startedAtOf(new Date(Date.now() - settings.focusMinutes * 60_000)),
-        todoId: selectedTodoIdRef.current,
         minutes: settings.focusMinutes,
       }));
       if (settings.alarmEnabled) {
@@ -250,7 +227,6 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
         <div className="timer-bar" hidden={editingMinutes && canEditMinutes}>
           <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
         </div>
-        <span className="timer-phase">{translate("timer.phase.focus")}</span>
 
         <div className="timer-tally">
           <span>{translate("todo.filter.today")}</span>
@@ -287,50 +263,12 @@ export function TimerPage({ repository, sessionStore, settingsStore, alarm: alar
       </section>
 
       <aside className="timer-side">
-        <div className="timer-side__title">
-          <span>{translate("app.navigation.todo")}</span>
-          <span>{candidates.length}</span>
-        </div>
-
-        <div className="timer-tasks">
-          {candidates.map((item) => {
-            const label = labels.get(item.labelId);
-            const count = counts[item.id] ?? 0;
-            return (
-              <button
-                aria-pressed={item.id === activeTodoId}
-                className={item.id === activeTodoId ? "timer-task timer-task--active" : "timer-task"}
-                key={item.id}
-                onClick={() => setSelectedTodoId(item.id)}
-                type="button"
-              >
-                <i style={{ background: label?.color ?? "var(--color-border-strong)" }} />
-                <span className="timer-task__copy">
-                  <strong>{item.title}</strong>
-                  <span>
-                    <span>{label?.name ?? translate("timer.todo.noLabel")}</span>
-                    <span className="timer-task__count">{count === 0 ? translate("timer.todo.noSessions") : translate("timer.todo.sessionCount", { count })}</span>
-                  </span>
-                </span>
-                {item.id === activeTodoId && <Icon name="clock" size={16} />}
-              </button>
-            );
-          })}
-          {candidates.length === 0 && (
-            <div className="timer-tasks__empty">
-              <Icon name="todo" size={22} strokeWidth={1.4} />
-              <span>{translate("timer.todo.empty")}</span>
-            </div>
-          )}
-        </div>
-
         <div className="timer-log">
           <div className="timer-side__title">{translate("timer.history.title")}</div>
           {sessions.length === 0 && <p className="timer-log__empty">{translate("timer.history.empty")}</p>}
           {sessions.map((session, index) => (
             <div className="timer-log__row" key={`${session.startedAt}-${index}`}>
               <span className="timer-log__time">{session.startedAt}</span>
-              <span className="timer-log__title">{session.todoId ? titles.get(session.todoId) ?? translate("timer.history.deletedTodo") : translate("timer.history.noTodo")}</span>
               <span className="timer-log__minutes">{translate("timer.duration.minutes", { minutes: session.minutes })}</span>
             </div>
           ))}

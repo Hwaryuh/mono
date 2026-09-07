@@ -1,4 +1,4 @@
-import { Checkbox, Select } from "@mono/ui";
+import { Checkbox } from "@mono/ui";
 import { useState } from "react";
 import { useI18n } from "../../i18n/i18n";
 import {
@@ -6,7 +6,6 @@ import {
   TIMER_SETTINGS_EVENT,
   type TimerSettings,
   type TimerSettingsStore,
-  type TimerTodoScope,
 } from "./timer-settings-store";
 
 export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
@@ -38,23 +37,6 @@ export function TimerSettingsPanel({ store }: { store: TimerSettingsStore }) {
             checked={settings.alarmEnabled}
             label={t("settings.timer.alarm.title")}
             onCheckedChange={(checked) => commit({ ...settings, alarmEnabled: checked })}
-          />
-        </div>
-      </section>
-
-      <section className="settings-group">
-        <header>
-          <strong>{t("settings.timer.scope.title")}</strong>
-        </header>
-        <div className="settings-locale-control">
-          <Select
-            label={t("settings.timer.scope.title")}
-            onChange={(value) => commit({ ...settings, todoScope: value as TimerTodoScope })}
-            options={[
-              { value: "all", label: t("settings.timer.scope.all") },
-              { value: "today", label: t("settings.timer.scope.today") },
-            ]}
-            value={settings.todoScope}
           />
         </div>
       </section>
