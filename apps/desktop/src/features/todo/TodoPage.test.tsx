@@ -280,8 +280,8 @@ describe("TodoPage", () => {
       today: "2026-08-05",
       labels: [{ id: "home", name: "집안일", color: "oklch(0.7 0.1 250)" }],
       items: [
-        { id: "aged", title: "오래된 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), routineId: null, occurrenceDate: null, priority: 0 },
-        { id: "fresh", title: "방금 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date().toISOString(), routineId: null, occurrenceDate: null, priority: 0 },
+        { id: "aged", title: "오래된 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(), routineId: null, occurrenceDate: null, priority: 0, parentId: null },
+        { id: "fresh", title: "방금 완료", labelId: "home", dueDate: null, dueTime: null, note: "", done: true, completedAt: new Date().toISOString(), routineId: null, occurrenceDate: null, priority: 0, parentId: null },
       ],
     };
     renderTodo(repositoryOf(base, { getSnapshot: async () => snapshot }));
@@ -329,5 +329,43 @@ describe("TodoPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "렌즈 주문 우선순위 2단계로 설정" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "렌즈 주문 우선순위 1단계로 설정" })).toHaveAttribute("aria-pressed", "false"));
     expect(titlesInOrder()[0]).not.toBe("렌즈 주문");
+  });
+
+  it("adds subtasks under a todo, rolls completion up, and warns before a cascade delete", async () => {
+    renderTodo();
+    await screen.findByRole("radio", { name: /전체 7/ });
+
+    // Start a subtask list on a plain todo.
+    fireEvent.click(screen.getByRole("button", { name: "설거지 하기에 하위 항목 추가" }));
+    const input = await screen.findByPlaceholderText("하위 항목 추가");
+    fireEvent.change(input, { target: { value: "수세미 사기" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await screen.findByText("수세미 사기");
+
+    fireEvent.change(screen.getByPlaceholderText("하위 항목 추가"), { target: { value: "행주 삶기" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("하위 항목 추가"), { key: "Enter" });
+    await screen.findByText("행주 삶기");
+
+    // Subtasks stay out of the status counts.
+    expect(screen.getByRole("radio", { name: /전체 7/ })).toBeInTheDocument();
+    expect(screen.getByText("0/2")).toBeInTheDocument();
+
+    // Checking every subtask completes the parent.
+    fireEvent.click(screen.getByRole("checkbox", { name: "수세미 사기 완료 처리" }));
+    await screen.findByText("1/2");
+    fireEvent.click(screen.getByRole("checkbox", { name: "행주 삶기 완료 처리" }));
+    await screen.findByText("2/2");
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "설거지 하기 미완료 처리" })).toHaveAttribute("aria-checked", "true"));
+
+    // Deleting the parent warns that its subtasks go too.
+    fireEvent.click(screen.getByRole("button", { name: "설거지 하기 수정" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "할 일 수정" })).getByRole("button", { name: "삭제" }));
+    const confirm = await screen.findByRole("dialog", { name: "이 할 일을 삭제할까요?" });
+    expect(within(confirm).getByText("하위 항목 2개도 함께 삭제됩니다.")).toBeInTheDocument();
+
+    fireEvent.click(within(confirm).getByRole("button", { name: "삭제" }));
+    await screen.findByRole("radio", { name: /전체 6/ });
+    expect(screen.queryByText("수세미 사기")).not.toBeInTheDocument();
+    expect(screen.queryByText("행주 삶기")).not.toBeInTheDocument();
   });
 });

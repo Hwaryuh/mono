@@ -75,6 +75,12 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pendingMention, setPendingMention] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const toggleExpanded = (id: string) => setExpandedIds((current) => {
+    const next = new Set(current);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  });
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
   const handledNewParamRef = useRef(false);
   const focusAfterDeleteRef = useRef(false);
@@ -148,13 +154,25 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
   const snapshot = snapshotQuery.data;
 
   const now = Date.now();
+  // Subtasks never surface in the status tabs or the flat list — they only appear nested under their parent.
+  const topLevelItems = snapshot.items.filter((item) => item.parentId === null);
+  const subtasksByParent = new Map<string, TodoItem[]>();
+  for (const item of snapshot.items) {
+    if (item.parentId === null) continue;
+    const siblings = subtasksByParent.get(item.parentId) ?? [];
+    siblings.push(item);
+    subtasksByParent.set(item.parentId, siblings);
+  }
+  // The snapshot is newest-first; a checklist reads better oldest-first.
+  for (const siblings of subtasksByParent.values()) siblings.reverse();
+
   const counts = Object.fromEntries(todoStatusOrder.map((statusId) => [
     statusId,
     statusId === "all"
-      ? snapshot.items.filter((item) => !isAgedDone(item, now)).length
-      : snapshot.items.filter((item) => statusOf(item, snapshot.today) === statusId).length,
+      ? topLevelItems.filter((item) => !isAgedDone(item, now)).length
+      : topLevelItems.filter((item) => statusOf(item, snapshot.today) === statusId).length,
   ])) as Record<TodoStatus, number>;
-  const filteredItems = snapshot.items.filter((item) => {
+  const filteredItems = topLevelItems.filter((item) => {
     const statusMatches = status === "all" ? !isAgedDone(item, now) : statusOf(item, snapshot.today) === status;
     return statusMatches && (labelIds.length === 0 || labelIds.includes(item.labelId));
   });
@@ -306,7 +324,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
                 type="button"
               >
                 <span className="todo-filter__dot" style={{ backgroundColor: label.color }} /><span>{label.name}</span>
-                <small>{snapshot.items.filter((item) => item.labelId === label.id).length}</small>
+                <small>{topLevelItems.filter((item) => item.labelId === label.id).length}</small>
               </button>
             );
           })}
@@ -328,7 +346,18 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
         <div className="todo-list">
           {visibleItems.map((item) => {
             const label = snapshot.labels.find((candidate) => candidate.id === item.labelId) ?? snapshot.labels[0];
-            return <TodoRow item={item} key={item.id} label={label} onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)} repository={repository} scraps={scraps} snapshot={snapshot} />;
+            return <TodoRow
+              expanded={expandedIds.has(item.id)}
+              item={item}
+              key={item.id}
+              label={label}
+              onOpen={() => item.routineId ? navigate(`/routine?modal=edit&id=${encodeURIComponent(item.routineId)}`) : openEditor(item)}
+              onToggleExpanded={() => toggleExpanded(item.id)}
+              repository={repository}
+              scraps={scraps}
+              snapshot={snapshot}
+              subtasks={subtasksByParent.get(item.id) ?? []}
+            />;
           })}
           {visibleItems.length === 0 && snapshot.items.length > 0 && (
             <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.filteredTitle")}</strong><span>{translate("todo.empty.filteredDescription")}</span></div>
@@ -398,6 +427,9 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       >
         <p>{translate("todo.delete.warning")}</p>
         <blockquote>{activeEditorItem ? resolveScrapMentions(activeEditorItem.title, scraps) : null}</blockquote>
+        {activeEditorItem && (subtasksByParent.get(activeEditorItem.id)?.length ?? 0) > 0 && (
+          <p className="todo-delete-modal__cascade"><Icon name="alert" size={12} />{translate("todo.delete.withSubtasks", { count: subtasksByParent.get(activeEditorItem.id)!.length })}</p>
+        )}
         {formError && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
@@ -428,9 +460,23 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
   );
 }
 
-function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: TodoItem; label: TodoLabel; snapshot: TodoSnapshot; repository: TodoRepository; scraps: ScrapRef[]; onOpen: () => void }) {
+function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded, onToggleExpanded, onOpen }: {
+  item: TodoItem;
+  label: TodoLabel;
+  snapshot: TodoSnapshot;
+  repository: TodoRepository;
+  scraps: ScrapRef[];
+  subtasks: TodoItem[];
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  onOpen: () => void;
+}) {
   const displayTitle = resolveScrapMentions(item.title, scraps);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  // Set when the "add subtask" affordance is used on a row with no subtasks yet, so the new input takes focus.
+  const [focusAddOnExpand, setFocusAddOnExpand] = useState(false);
+  const hasSubtasks = subtasks.length > 0;
+  const doneSubtasks = subtasks.filter((sub) => sub.done).length;
   const rowRef = useRef<HTMLElement>(null);
   const previousTopRef = useRef<number | null>(null);
   const previousDoneRef = useRef(item.done);
@@ -483,43 +529,175 @@ function TodoRow({ item, label, snapshot, repository, scraps, onOpen }: { item: 
     );
   });
 
+  const checkboxChecked = hasSubtasks ? doneSubtasks === subtasks.length : item.done;
+  const checkboxPartial = hasSubtasks && doneSubtasks > 0 && doneSubtasks < subtasks.length;
+
   return (
     <article
       aria-busy={toggleMutation.isPending}
-      className={`todo-item ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
+      className={`todo-item ${hasSubtasks ? "todo-item--parent" : ""} ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
       ref={rowRef}
     >
-      <Checkbox checked={item.done} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
-      <div className="todo-item__open">
-        <span className="todo-item__copy">
-          <strong><ScrapText scraps={scraps} text={item.title} /></strong>
-          <span>
-            <time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time>
-            <span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>
-            {item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}
-            {!item.routineId && (
-              <span className="todo-item__stars">
-                {[1, 2, 3].map((level) => (
-                  <button
-                    aria-label={translate("todo.action.setPriority", { title: displayTitle, level })}
-                    aria-pressed={item.priority >= level}
-                    className={item.priority >= level ? "todo-item__star todo-item__star--active" : "todo-item__star"}
-                    disabled={priorityMutation.isPending}
-                    key={level}
-                    onClick={() => priorityMutation.mutate(item.priority === level ? 0 : level)}
-                    type="button"
-                  >
-                    <Icon fill={item.priority >= level ? "currentColor" : "none"} name="star" size={13} />
-                  </button>
-                ))}
-              </span>
-            )}
-          </span>
+      <div className="todo-item__main">
+        <span className="todo-item__gutter">
+          {hasSubtasks ? (
+            <button
+              aria-expanded={expanded}
+              aria-label={translate("todo.subtask.toggle", { title: displayTitle })}
+              className={`todo-item__chevron ${expanded ? "todo-item__chevron--open" : ""}`}
+              onClick={onToggleExpanded}
+              type="button"
+            >
+              <Icon name="chevronRight" size={14} strokeWidth={2} />
+            </button>
+          ) : !item.routineId && (
+            <button
+              aria-label={translate("todo.subtask.addFirst", { title: displayTitle })}
+              className="todo-item__add-sub"
+              onClick={() => { if (!expanded) onToggleExpanded(); setFocusAddOnExpand(true); }}
+              type="button"
+            >
+              <Icon name="plus" size={13} strokeWidth={1.8} />
+            </button>
+          )}
         </span>
-        <button aria-label={translate("todo.action.editLabel", { title: displayTitle })} className="todo-item__hit" disabled={toggleMutation.isPending} onClick={onOpen} type="button" />
+        <Checkbox checked={checkboxChecked} className={checkboxPartial ? "todo-item__cb--partial" : undefined} disabled={toggleMutation.isPending} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: checkboxChecked ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggleMutation.mutate()} />
+        <div className="todo-item__open">
+          <span className="todo-item__copy">
+            <strong><ScrapText scraps={scraps} text={item.title} /></strong>
+            <span>
+              <time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time>
+              <span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>
+              {item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}
+              {hasSubtasks && (
+                <span className={`todo-item__progress ${doneSubtasks === subtasks.length ? "todo-item__progress--full" : ""}`}>
+                  <span className="todo-item__progress-bar"><i style={{ width: `${Math.round((doneSubtasks / subtasks.length) * 100)}%` }} /></span>
+                  {doneSubtasks}/{subtasks.length}
+                </span>
+              )}
+              {!item.routineId && (
+                <span className="todo-item__stars">
+                  {[1, 2, 3].map((level) => (
+                    <button
+                      aria-label={translate("todo.action.setPriority", { title: displayTitle, level })}
+                      aria-pressed={item.priority >= level}
+                      className={item.priority >= level ? "todo-item__star todo-item__star--active" : "todo-item__star"}
+                      disabled={priorityMutation.isPending}
+                      key={level}
+                      onClick={() => priorityMutation.mutate(item.priority === level ? 0 : level)}
+                      type="button"
+                    >
+                      <Icon fill={item.priority >= level ? "currentColor" : "none"} name="star" size={13} />
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
+          </span>
+          <button aria-label={translate("todo.action.editLabel", { title: displayTitle })} className="todo-item__hit" disabled={toggleMutation.isPending} onClick={onOpen} type="button" />
+        </div>
       </div>
+
+      {expanded && (
+        <div className="todo-subtasks">
+          {subtasks.map((sub) => <SubtaskRow item={sub} key={sub.id} repository={repository} scraps={scraps} />)}
+          <SubtaskAdd autoFocus={focusAddOnExpand} parentId={item.id} repository={repository} />
+        </div>
+      )}
+
       {mutationError && <div className="todo-item__error" role="alert"><Icon name="alert" size={12} />{mutationError}</div>}
     </article>
+  );
+}
+
+function SubtaskRow({ item, repository, scraps }: { item: TodoItem; repository: TodoRepository; scraps: ScrapRef[] }) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const displayTitle = resolveScrapMentions(item.title, scraps);
+  const invalidate = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+    queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
+  ]);
+  const toggle = useMutation({
+    mutationFn: () => repository.toggleComplete(item.id),
+    onMutate: () => setError(null),
+    onSuccess: invalidate,
+    onError: (mutationErr) => setError(errorMessage(mutationErr)),
+  });
+  const remove = useMutation({
+    mutationFn: () => repository.delete(item.id),
+    onMutate: () => setError(null),
+    onSuccess: invalidate,
+    onError: (mutationErr) => setError(errorMessage(mutationErr)),
+  });
+  const rename = useMutation({
+    mutationFn: (title: string) => repository.update(item.id, { title, labelId: item.labelId, dueDate: null, dueTime: null, note: "" }, item.version),
+    onMutate: () => setError(null),
+    onSuccess: async () => { setEditing(false); await invalidate(); },
+    onError: (mutationErr) => setError(errorMessage(mutationErr)),
+  });
+  const busy = toggle.isPending || remove.isPending || rename.isPending;
+
+  return (
+    <div aria-busy={busy} className={`todo-subtask ${item.done ? "todo-subtask--done" : ""}`}>
+      <Checkbox checked={item.done} className="todo-subtask__check" disabled={busy} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggle.mutate()} />
+      {editing ? (
+        <input
+          autoFocus
+          className="todo-subtask__input"
+          defaultValue={item.title}
+          maxLength={500}
+          onBlur={(event) => { const next = event.target.value.trim(); if (next && next !== item.title) rename.mutate(next); else setEditing(false); }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") { event.currentTarget.value = item.title; setEditing(false); }
+          }}
+        />
+      ) : (
+        <button className="todo-subtask__title" onClick={() => setEditing(true)} type="button"><ScrapText scraps={scraps} text={item.title} /></button>
+      )}
+      <button aria-label={translate("todo.subtask.deleteLabel", { title: displayTitle })} className="todo-subtask__delete" disabled={busy} onClick={() => remove.mutate()} type="button">
+        <Icon name="close" size={12} strokeWidth={2.4} />
+      </button>
+      {error && <span className="todo-subtask__error" role="alert"><Icon name="alert" size={11} />{error}</span>}
+    </div>
+  );
+}
+
+function SubtaskAdd({ parentId, repository, autoFocus }: { parentId: string; repository: TodoRepository; autoFocus: boolean }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (autoFocus) inputRef.current?.focus(); }, [autoFocus]);
+  const add = useMutation({
+    mutationFn: (title: string) => repository.create({ title, labelId: "", dueDate: null, dueTime: null, note: "", parentId }),
+    onMutate: () => setError(null),
+    onSuccess: async () => {
+      setValue("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+        queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
+      ]);
+      inputRef.current?.focus();
+    },
+    onError: (mutationErr) => setError(errorMessage(mutationErr)),
+  });
+  return (
+    <div aria-busy={add.isPending} className="todo-subtask-add">
+      <span className="todo-subtask-add__bullet"><Icon name="plus" size={12} strokeWidth={1.8} /></span>
+      <input
+        className="todo-subtask-add__input"
+        maxLength={500}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => { if (event.key === "Enter" && value.trim()) { event.preventDefault(); add.mutate(value.trim()); } }}
+        placeholder={translate("todo.subtask.addPlaceholder")}
+        ref={inputRef}
+        value={value}
+      />
+      {error && <span className="todo-subtask__error" role="alert"><Icon name="alert" size={11} />{error}</span>}
+    </div>
   );
 }
 

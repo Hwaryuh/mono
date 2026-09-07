@@ -66,8 +66,20 @@ class MockTodoRepository implements TodoRepository {
   async create(input: Parameters<TodoRepository["create"]>[0]) {
     const parsed = todoWriteInputSchema.parse(input);
     const id = `task-${this.state.nextTodoId++}`;
+    const parentId = parsed.parentId ?? null;
+    if (parentId) {
+      const parent = requireItem(this.state.todo.items, parentId);
+      if (parent.parentId) throw new Error("하위 항목 아래에는 다시 하위 항목을 만들 수 없습니다.");
+      this.state.todo.items = [
+        { id, title: parsed.title, labelId: parent.labelId, dueDate: null, dueTime: null, note: "",
+          done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: 0, parentId },
+        ...this.state.todo.items.map((item) => item.id === parentId ? { ...item, done: false, completedAt: null } : item),
+      ];
+      return;
+    }
     this.state.todo.items = [
-      { id, ...parsed, done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: 0 },
+      { id, title: parsed.title, labelId: parsed.labelId, dueDate: parsed.dueDate, dueTime: parsed.dueTime,
+        note: parsed.note, done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: 0, parentId: null },
       ...this.state.todo.items,
     ];
   }
@@ -75,20 +87,39 @@ class MockTodoRepository implements TodoRepository {
   async update(itemId: string, input: Parameters<TodoRepository["update"]>[1]) {
     requireItem(this.state.todo.items, itemId);
     const parsed = todoWriteInputSchema.parse(input);
-    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, ...parsed } : item);
+    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, title: parsed.title, labelId: parsed.labelId, dueDate: parsed.dueDate, dueTime: parsed.dueTime, note: parsed.note } : item);
   }
 
   async toggleComplete(itemId: string) {
     if (toggleRoutineOccurrence(this.state, itemId)) return;
-    requireItem(this.state.todo.items, itemId);
-    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId
-      ? { ...item, done: !item.done, completedAt: item.done ? null : "방금" }
-      : item);
+    const item = requireItem(this.state.todo.items, itemId);
+    const children = this.state.todo.items.filter((candidate) => candidate.parentId === itemId);
+    if (children.length > 0) {
+      const target = !children.every((child) => child.done);
+      const completedAt = target ? "방금" : null;
+      this.state.todo.items = this.state.todo.items.map((candidate) =>
+        candidate.id === itemId || candidate.parentId === itemId ? { ...candidate, done: target, completedAt } : candidate);
+      return;
+    }
+    const done = !item.done;
+    this.state.todo.items = this.state.todo.items.map((candidate) =>
+      candidate.id === itemId ? { ...candidate, done, completedAt: done ? "방금" : null } : candidate);
+    if (item.parentId) this.resyncParent(item.parentId);
   }
 
   async delete(itemId: string) {
-    requireItem(this.state.todo.items, itemId);
-    this.state.todo.items = this.state.todo.items.filter((item) => item.id !== itemId);
+    const item = requireItem(this.state.todo.items, itemId);
+    const parentId = item.parentId;
+    this.state.todo.items = this.state.todo.items.filter((candidate) => candidate.id !== itemId && candidate.parentId !== itemId);
+    if (parentId) this.resyncParent(parentId);
+  }
+
+  private resyncParent(parentId: string) {
+    const kids = this.state.todo.items.filter((candidate) => candidate.parentId === parentId);
+    if (kids.length === 0) return;
+    const allDone = kids.every((kid) => kid.done);
+    this.state.todo.items = this.state.todo.items.map((candidate) =>
+      candidate.id === parentId ? { ...candidate, done: allDone, completedAt: allDone ? "방금" : null } : candidate);
   }
 
   async setPriority(itemId: string, priority: number) {

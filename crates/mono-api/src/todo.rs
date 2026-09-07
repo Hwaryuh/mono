@@ -47,6 +47,8 @@ struct TodoItem {
     routine_id: Option<String>,
     occurrence_date: Option<String>,
     priority: i64,
+    // Set on a subtask; points at its parent todo. One level only.
+    parent_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -65,6 +67,8 @@ struct TodoWriteInput {
     due_time: Option<String>,
     #[serde(default)]
     note: String,
+    #[serde(default)]
+    parent_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -123,7 +127,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
     let own_items = conn
         .prepare(
             "SELECT id, version, title, label_id, due_date, due_time, note, done, completed_at, \
-             routine_id, occurrence_date, priority FROM todo_items ORDER BY seq DESC",
+             routine_id, occurrence_date, priority, parent_id FROM todo_items ORDER BY seq DESC",
         )?
         .query_map([], |row| {
             Ok(TodoItem {
@@ -139,6 +143,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
                 routine_id: row.get(9)?,
                 occurrence_date: row.get(10)?,
                 priority: row.get(11)?,
+                parent_id: row.get(12)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -160,6 +165,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
             routine_id: Some(r.routine_id),
             occurrence_date: Some(r.occurrence_date),
             priority: 0,
+            parent_id: None,
         })
         .collect();
     items.extend(own_items);
@@ -172,6 +178,33 @@ fn require_item(conn: &Connection, id: &str) -> ApiResult<bool> {
         Ok(row.get::<_, i64>(0)? != 0)
     })
     .map_err(|_| ApiError::NotFound(format!("할 일을 찾을 수 없습니다: {id}")))
+}
+
+fn item_parent(conn: &Connection, id: &str) -> ApiResult<Option<String>> {
+    conn.query_row("SELECT parent_id FROM todo_items WHERE id = ?1", [id], |row| row.get(0))
+        .map_err(|_| ApiError::NotFound(format!("할 일을 찾을 수 없습니다: {id}")))
+}
+
+fn child_done_states(conn: &Connection, parent_id: &str) -> ApiResult<Vec<bool>> {
+    Ok(conn
+        .prepare("SELECT done FROM todo_items WHERE parent_id = ?1")?
+        .query_map([parent_id], |row| Ok(row.get::<_, i64>(0)? != 0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+// Recomputes a parent's done/completed_at from its subtasks. No-op when it has none.
+fn resync_parent(conn: &Connection, parent_id: &str) -> ApiResult<()> {
+    let states = child_done_states(conn, parent_id)?;
+    if states.is_empty() {
+        return Ok(());
+    }
+    let all_done = states.iter().all(|&d| d);
+    let stamp = if all_done { Some(now_iso()) } else { None };
+    conn.execute(
+        "UPDATE todo_items SET done = ?1, completed_at = ?2 WHERE id = ?3",
+        params![all_done as i64, stamp, parent_id],
+    )?;
+    Ok(())
 }
 
 fn create_label(conn: &Connection, input: TodoLabelWriteInput) -> ApiResult<()> {
@@ -216,9 +249,31 @@ fn delete_label(conn: &mut Connection, id: &str, replacement: &str) -> ApiResult
 
 fn create_item(conn: &Connection, input: TodoWriteInput) -> ApiResult<()> {
     let title = validated_title(&input.title)?;
-    let note = validated_note(&input.note)?;
     let next_seq: i64 =
         conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM todo_items", [], |row| row.get(0))?;
+
+    // A subtask: inherits the parent's label, carries no due date / time / note.
+    if let Some(parent_id) = input.parent_id.as_deref().filter(|value| !value.is_empty()) {
+        if item_parent(conn, parent_id)?.is_some() {
+            return Err(ApiError::BadRequest("하위 항목 아래에는 다시 하위 항목을 만들 수 없습니다.".into()));
+        }
+        let label_id: String = conn
+            .query_row("SELECT label_id FROM todo_items WHERE id = ?1", [parent_id], |row| row.get(0))?;
+        conn.execute(
+            "INSERT INTO todo_items \
+             (id, seq, title, label_id, due_date, due_time, note, done, completed_at, routine_id, occurrence_date, parent_id) \
+             VALUES (?1, ?2, ?3, ?4, NULL, NULL, '', 0, NULL, NULL, NULL, ?5)",
+            params![uuid::Uuid::new_v4().to_string(), next_seq + 1, title, label_id, parent_id],
+        )?;
+        // The new subtask is incomplete, so the parent can no longer be complete.
+        conn.execute(
+            "UPDATE todo_items SET done = 0, completed_at = NULL WHERE id = ?1",
+            [parent_id],
+        )?;
+        return Ok(());
+    }
+
+    let note = validated_note(&input.note)?;
     conn.execute(
         "INSERT INTO todo_items \
          (id, seq, title, label_id, due_date, due_time, note, done, completed_at, routine_id, occurrence_date) \
@@ -255,12 +310,31 @@ pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
         return Ok(());
     }
     let done_now = require_item(conn, id)?;
+    let children = child_done_states(conn, id)?;
+
+    // A parent drives every subtask (and itself) to the opposite of "all subtasks done".
+    // ponytail: no explicit tx — one statement, single mutexed connection.
+    if !children.is_empty() {
+        let target = !children.iter().all(|&done| done);
+        let stamp = if target { Some(now_iso()) } else { None };
+        conn.execute(
+            "UPDATE todo_items SET done = ?1, completed_at = ?2 WHERE id = ?3 OR parent_id = ?3",
+            params![target as i64, stamp, id],
+        )?;
+        return Ok(());
+    }
+
     let done = !done_now;
     let completed_at = if done { Some(now_iso()) } else { None };
     conn.execute(
         "UPDATE todo_items SET done = ?1, completed_at = ?2 WHERE id = ?3",
         params![done as i64, completed_at, id],
     )?;
+
+    // Toggling a subtask rolls up into its parent (last one done ⇒ parent done).
+    if let Some(parent_id) = item_parent(conn, id)? {
+        resync_parent(conn, &parent_id)?;
+    }
     Ok(())
 }
 
@@ -275,7 +349,13 @@ fn set_priority(conn: &Connection, id: &str, priority: i64) -> ApiResult<()> {
 
 fn delete_item(conn: &Connection, id: &str) -> ApiResult<()> {
     require_item(conn, id)?;
-    conn.execute("DELETE FROM todo_items WHERE id = ?1", [id])?;
+    let parent_id = item_parent(conn, id)?;
+    // Deleting a parent takes its subtasks with it.
+    conn.execute("DELETE FROM todo_items WHERE id = ?1 OR parent_id = ?1", [id])?;
+    // Deleting a subtask can complete the parent (its last incomplete child is gone).
+    if let Some(parent_id) = parent_id {
+        resync_parent(conn, &parent_id)?;
+    }
     Ok(())
 }
 
@@ -395,7 +475,23 @@ mod tests {
             due_date: None,
             due_time: None,
             note: String::new(),
+            parent_id: None,
         }
+    }
+
+    fn subtask_input(title: &str, parent_id: &str) -> TodoWriteInput {
+        TodoWriteInput {
+            title: title.into(),
+            label_id: String::new(),
+            due_date: None,
+            due_time: None,
+            note: String::new(),
+            parent_id: Some(parent_id.into()),
+        }
+    }
+
+    fn find_item<'a>(snapshot: &'a TodoSnapshot, title: &str) -> &'a TodoItem {
+        snapshot.items.iter().find(|i| i.title == title).expect("item present")
     }
 
     fn seed_label(conn: &Connection, name: &str) -> String {
@@ -450,6 +546,7 @@ mod tests {
                 due_date: Some("2026-08-26".into()),
                 due_time: None,
                 note: "메모".into(),
+                parent_id: None,
             },
         )
         .unwrap();
@@ -580,5 +677,87 @@ mod tests {
         toggle_complete(&conn, &routine_item.id.clone()).unwrap();
         let after = get_snapshot(&conn).unwrap();
         assert!(after.items.iter().find(|i| i.routine_id.is_some()).unwrap().done);
+    }
+
+    #[test]
+    fn subtask_inherits_parent_label_and_rejects_deeper_nesting() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "집안일");
+        create_item(&conn, item_input("이사 준비", &label)).unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "이사 준비").id.clone();
+
+        create_item(&conn, subtask_input("관리비 정산", &parent)).unwrap();
+        let snapshot = get_snapshot(&conn).unwrap();
+        let child = find_item(&snapshot, "관리비 정산");
+        assert_eq!(child.parent_id.as_deref(), Some(parent.as_str()));
+        assert_eq!(child.label_id, label);
+        assert!(child.due_date.is_none());
+
+        let err = create_item(&conn, subtask_input("더 깊게", &child.id.clone())).unwrap_err();
+        assert!(matches!(err, ApiError::BadRequest(m) if m.contains("다시 하위 항목")));
+    }
+
+    #[test]
+    fn parent_completion_rolls_up_from_subtasks_both_ways() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("분기 보고서", &label)).unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "분기 보고서").id.clone();
+        create_item(&conn, subtask_input("지표 취합", &parent)).unwrap();
+        create_item(&conn, subtask_input("초안 작성", &parent)).unwrap();
+
+        let a = find_item(&get_snapshot(&conn).unwrap(), "지표 취합").id.clone();
+        let b = find_item(&get_snapshot(&conn).unwrap(), "초안 작성").id.clone();
+
+        // Checking every subtask completes the parent.
+        toggle_complete(&conn, &a).unwrap();
+        assert!(!find_item(&get_snapshot(&conn).unwrap(), "분기 보고서").done);
+        toggle_complete(&conn, &b).unwrap();
+        let done = get_snapshot(&conn).unwrap();
+        let parent_item = find_item(&done, "분기 보고서");
+        assert!(parent_item.done && parent_item.completed_at.is_some());
+
+        // Un-checking one re-opens the parent.
+        toggle_complete(&conn, &b).unwrap();
+        assert!(!find_item(&get_snapshot(&conn).unwrap(), "분기 보고서").done);
+
+        // Toggling the parent drives every subtask.
+        toggle_complete(&conn, &parent).unwrap();
+        let all = get_snapshot(&conn).unwrap();
+        assert!(all.items.iter().filter(|i| i.parent_id.is_some()).all(|i| i.done));
+        assert!(find_item(&all, "분기 보고서").done);
+    }
+
+    #[test]
+    fn deleting_a_parent_cascades_to_subtasks() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "집안일");
+        create_item(&conn, item_input("이사 준비", &label)).unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "이사 준비").id.clone();
+        create_item(&conn, subtask_input("인터넷 이전", &parent)).unwrap();
+        create_item(&conn, subtask_input("우편물 주소 이전", &parent)).unwrap();
+
+        delete_item(&conn, &parent).unwrap();
+        assert!(get_snapshot(&conn).unwrap().items.is_empty());
+    }
+
+    #[test]
+    fn deleting_the_last_open_subtask_completes_the_parent() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("배포", &label)).unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "배포").id.clone();
+        create_item(&conn, subtask_input("체크리스트 확인", &parent)).unwrap();
+        create_item(&conn, subtask_input("롤백 계획", &parent)).unwrap();
+        let checked = find_item(&get_snapshot(&conn).unwrap(), "체크리스트 확인").id.clone();
+        let open = find_item(&get_snapshot(&conn).unwrap(), "롤백 계획").id.clone();
+        toggle_complete(&conn, &checked).unwrap();
+
+        delete_item(&conn, &open).unwrap();
+        assert!(find_item(&get_snapshot(&conn).unwrap(), "배포").done);
     }
 }

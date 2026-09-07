@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS todo_items (
   routine_id TEXT,
   occurrence_date TEXT,
   priority INTEGER NOT NULL DEFAULT 0,
+  parent_id TEXT,
   version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS ledger_categories (
@@ -249,7 +250,11 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
         "scrap_items",
         &[("file_name", "TEXT"), ("file_size", "INTEGER"), ("updated_at", "TEXT NOT NULL DEFAULT ''")],
     )?;
-    migrate_add_columns(conn, "todo_items", &[("priority", "INTEGER NOT NULL DEFAULT 0")])?;
+    migrate_add_columns(
+        conn,
+        "todo_items",
+        &[("priority", "INTEGER NOT NULL DEFAULT 0"), ("parent_id", "TEXT")],
+    )?;
     conn.execute_batch(SEED)?;
     Ok(())
 }

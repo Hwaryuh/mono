@@ -193,6 +193,8 @@ export const todoItemSchema = z.object({
   routineId: z.string().nullable().default(null),
   occurrenceDate: z.string().nullable().default(null),
   priority: z.number().int().min(0).max(3).default(0),
+  // A subtask points at its parent todo. One level only — a todo with a parentId cannot itself have children.
+  parentId: z.string().nullable().default(null),
 });
 
 export const todoSnapshotSchema = z.object({
@@ -207,6 +209,8 @@ export const todoWriteInputSchema = z.object({
   dueDate: z.string().nullable(),
   dueTime: z.string().nullable(),
   note: z.string().max(4_000),
+  // Set only when creating a subtask. The server ignores due/time/note/label for subtasks and inherits the parent's label.
+  parentId: z.string().nullable().optional(),
 });
 
 export type TodoLabel = z.infer<typeof todoLabelSchema>;
