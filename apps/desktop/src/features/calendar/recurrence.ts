@@ -22,7 +22,7 @@ export function weekdayOf(iso: string): number {
   return toUtc(iso).getUTCDay();
 }
 
-export function daysBetween(from: string, to: string): number {
+function daysBetween(from: string, to: string): number {
   return Math.round((toUtc(to).getTime() - toUtc(from).getTime()) / 86_400_000);
 }
 
@@ -41,7 +41,7 @@ function addYears(iso: string, years: number): string | null {
   return probe.getUTCMonth() === month - 1 ? fromUtc(probe) : null; // Feb 29 → skipped in non-leap years
 }
 
-export function occurrenceSlots(rule: CalendarRecurrence, startDate: string, windowEnd: string): string[] {
+function occurrenceSlots(rule: CalendarRecurrence, startDate: string, windowEnd: string): string[] {
   const limit = rule.count ?? Number.MAX_SAFE_INTEGER;
   const interval = Math.max(1, rule.interval);
   const past = (date: string) => (rule.until != null && date > rule.until) || date > windowEnd;

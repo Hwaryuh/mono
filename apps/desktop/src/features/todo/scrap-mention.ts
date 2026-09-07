@@ -3,7 +3,7 @@ import { translate } from "../../i18n/i18n";
 // A scrap-reference token embedded inline in a todo's title/note string. The id is the source of the link,
 // and the display name is freshly looked up from the scrap snapshot on every render (so scrap renames are picked up automatically).
 // id can be either a server UUID (`uuid::Uuid::new_v4`) or the mock repository's `scrap-N`.
-export const scrapMentionPattern = /@\[scrap:([0-9a-zA-Z_-]+)\]/g;
+const scrapMentionPattern = /@\[scrap:([0-9a-zA-Z_-]+)\]/g;
 
 export type ScrapRef = { id: string; title: string };
 

@@ -11,7 +11,7 @@ import { TodoLabelManagerModal } from "../todo/TodoLabelManagerModal";
 import type { TodoRepository } from "../todo/todo-repository";
 import type { RoutineRepository } from "./routine-repository";
 
-export const routineQueryKey = ["routine"] as const;
+const routineQueryKey = ["routine"] as const;
 const dayNames = [translate("routine.weekday.sun"), translate("routine.weekday.mon"), translate("routine.weekday.tue"), translate("routine.weekday.wed"), translate("routine.weekday.thu"), translate("routine.weekday.fri"), translate("routine.weekday.sat")];
 
 type Draft = {

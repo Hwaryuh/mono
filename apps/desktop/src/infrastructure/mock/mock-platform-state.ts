@@ -18,7 +18,7 @@ import {
 import type { CalendarException } from "../../features/calendar/recurrence";
 
 /** The normalized version of the stored state. Bump this when schema defaults or color-normalization rules change. */
-export const STATE_VERSION = 1;
+const STATE_VERSION = 1;
 
 export type MockPlatformState = {
   stateVersion: number;

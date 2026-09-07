@@ -73,22 +73,21 @@ async fn events_handler(
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let receiver = hub.subscribe();
     let stream = stream::unfold(receiver, |mut receiver| async move {
-        loop {
-            match receiver.recv().await {
-                Ok(change) => {
-                    let event = Event::default()
-                        .event("change")
-                        .id(change.revision.to_string())
-                        .json_data(change)
-                        .expect("ChangeEvent JSON 직렬화 실패");
-                    return Some((Ok(event), receiver));
-                }
-                Err(broadcast::error::RecvError::Lagged(_)) => {
-                    // A slow client doesn't try to merge missed events — it just revalidates everything.
-                    return Some((Ok(Event::default().event("resync").data("{}")), receiver));
-                }
-                Err(broadcast::error::RecvError::Closed) => return None,
+        // unfold re-invokes this per item, so one recv per call — no inner loop needed.
+        match receiver.recv().await {
+            Ok(change) => {
+                let event = Event::default()
+                    .event("change")
+                    .id(change.revision.to_string())
+                    .json_data(change)
+                    .expect("ChangeEvent JSON 직렬화 실패");
+                Some((Ok(event), receiver))
             }
+            Err(broadcast::error::RecvError::Lagged(_)) => {
+                // A slow client doesn't try to merge missed events — it just revalidates everything.
+                Some((Ok(Event::default().event("resync").data("{}")), receiver))
+            }
+            Err(broadcast::error::RecvError::Closed) => None,
         }
     });
 

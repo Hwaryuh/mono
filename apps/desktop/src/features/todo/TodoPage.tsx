@@ -20,7 +20,7 @@ import {
   type TodoViewStateStore,
 } from "./todo-view-state-store";
 
-export const todoQueryKey = ["todo"] as const;
+const todoQueryKey = ["todo"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
 type Draft = {
   title: string;

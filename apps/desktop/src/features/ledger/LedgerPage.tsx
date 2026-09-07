@@ -12,7 +12,7 @@ import { LedgerAmountInput } from "./LedgerAmountInput";
 import { summarizeLedgerMonth } from "./ledger-summary";
 import { ledgerViewStateStoreOf, type LedgerViewStateStore } from "./ledger-view-state-store";
 
-export const ledgerQueryKey = ["ledger"] as const;
+const ledgerQueryKey = ["ledger"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
 
 type Draft = {

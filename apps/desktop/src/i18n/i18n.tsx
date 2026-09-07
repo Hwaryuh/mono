@@ -22,7 +22,7 @@ export const localeOptions: ReadonlyArray<{ value: Locale; labelKey: Translation
 
 type InterpolationValues = Record<string, string | number>;
 
-export function isSupportedLocale(value: string | null): value is Locale {
+function isSupportedLocale(value: string | null): value is Locale {
   return supportedLocales.includes(value as Locale);
 }
 

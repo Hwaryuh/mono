@@ -16,7 +16,7 @@ export const defaultTimerSettings: TimerSettings = {
   alarmEnabled: true,
 };
 
-export const timerMinuteBounds = { min: 1, max: 180 } as const;
+const timerMinuteBounds = { min: 1, max: 180 } as const;
 
 function clamp(value: unknown, fallback: number, bounds: { min: number; max: number }): number {
   const numeric = typeof value === "number" ? value : Number(value);

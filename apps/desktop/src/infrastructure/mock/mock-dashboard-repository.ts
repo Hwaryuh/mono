@@ -24,7 +24,7 @@ const scrapKindLabel = {
   file: "파일",
 } as const;
 
-export const mockCaptureAnalysisProvider: CaptureAnalysisProvider = {
+const mockCaptureAnalysisProvider: CaptureAnalysisProvider = {
   async analyze({ raw }) {
     return {
       target: "todo",

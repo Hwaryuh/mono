@@ -1,16 +1,16 @@
 import type { RoutineDefinition, RoutineOccurrence, TodoItem } from "@mono/contracts";
 import type { MockPlatformState } from "./mock-platform-state";
 
-export function occurrenceId(routineId: string, occurrenceDate: string) {
+function occurrenceId(routineId: string, occurrenceDate: string) {
   return `routine-occurrence:${routineId}:${occurrenceDate}`;
 }
 
-export function isRoutineScheduled(routine: RoutineDefinition, date: string) {
+function isRoutineScheduled(routine: RoutineDefinition, date: string) {
   if (date < routine.startDate || (routine.endDate && date > routine.endDate)) return false;
   return routine.days.includes(new Date(`${date}T00:00:00Z`).getUTCDay());
 }
 
-export function ensureRoutineOccurrence(state: MockPlatformState, routine: RoutineDefinition, date: string) {
+function ensureRoutineOccurrence(state: MockPlatformState, routine: RoutineDefinition, date: string) {
   if (!isRoutineScheduled(routine, date)) return null;
   const existing = state.routine.occurrences.find(
     (candidate) => candidate.routineId === routine.id && candidate.occurrenceDate === date,
@@ -34,7 +34,7 @@ export function todayRoutineOccurrences(state: MockPlatformState) {
   });
 }
 
-export function toggleOccurrence(state: MockPlatformState, occurrence: RoutineOccurrence) {
+function toggleOccurrence(state: MockPlatformState, occurrence: RoutineOccurrence) {
   state.routine.occurrences = state.routine.occurrences.map((candidate) => candidate.id === occurrence.id
     ? { ...candidate, done: !candidate.done, completedAt: candidate.done ? null : "방금" }
     : candidate);

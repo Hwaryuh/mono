@@ -8,7 +8,7 @@ interface LedgerAmountInputProps {
   value: string;
 }
 
-export function formatLedgerAmountInput(raw: string) {
+function formatLedgerAmountInput(raw: string) {
   const digits = raw.replace(/[^0-9]/g, "");
   return digits ? Number(digits).toLocaleString("ko-KR") : "";
 }

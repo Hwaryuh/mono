@@ -18,8 +18,6 @@ import { loadSortKey, sortItems, sortKeys, sortLabels, sortStorageKey, type Sort
 import { scrapViewStateStoreOf, type ScrapViewStateStore } from "./scrap-view-state-store";
 import { ScrapTagManager } from "./ScrapTagManager";
 
-export { scrapQueryKey };
-
 const kindMeta: Record<ScrapKind, { icon: IconName; label: string }> = {
   image: { icon: "image", label: translate("scrap.kind.image") },
   url: { icon: "layers", label: translate("scrap.kind.linkPreview") },

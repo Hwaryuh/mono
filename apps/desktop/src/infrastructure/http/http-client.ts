@@ -4,7 +4,7 @@ const DEFAULT_API_BASE_URL = "http://127.0.0.1:4174";
 export let API_BASE_URL = DEFAULT_API_BASE_URL;
 let apiToken = "";
 
-export class HttpError extends Error {
+class HttpError extends Error {
   constructor(message: string, readonly status: number, options?: ErrorOptions) {
     super(message, options);
     this.name = "HttpError";
