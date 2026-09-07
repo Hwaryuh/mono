@@ -160,7 +160,8 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
   });
   const visibleItems = [...filteredItems].sort((left, right) => {
     if (status === "all" && left.done !== right.done) return Number(left.done) - Number(right.done);
-    return right.priority - left.priority;
+    if (right.priority !== left.priority) return right.priority - left.priority;
+    return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
   });
   const title = labelIds.length > 0 ? translate("todo.list.filteredLabel") : statusMeta[status].title;
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
