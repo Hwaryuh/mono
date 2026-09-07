@@ -38,6 +38,8 @@ jobs:
       - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: .
@@ -46,6 +48,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - run: npm run version:check
+      # src-tauri는 Linux GTK/webkit dev 패키지가 있어야 컴파일되므로 test와 동일하게 mono-api만 검사.
+      - run: cargo clippy --locked -p mono-api --all-targets -- -D warnings
       - run: cargo test --locked -p mono-api
 
   # 전체 번들 — 릴리즈 커밋·수동 실행만. 일반 push에서는 안 돎(macOS 러너 분 아낌).
