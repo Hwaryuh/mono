@@ -194,7 +194,7 @@
 
 .todo-item__progress { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
 .todo-item__progress-bar { width: 34px; height: 3px; border-radius: 2px; overflow: hidden; background: var(--color-border); }
-.todo-item__progress-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1); }
+.todo-item__progress-bar > i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--color-accent); transform-origin: left; transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1); }
 .todo-item__progress--full { color: var(--color-accent); }
 .todo-item__progress--full .todo-item__progress-bar { background: var(--color-accent-soft); }
 
@@ -207,6 +207,36 @@
   flex-direction: column;
   gap: 1px;
 }
+
+/* Compact "add subtask" — collapsed at rest, revealed on hover/focus of the group.
+   Always shown when the group is otherwise empty (a parent mid-creation of its first subtask). */
+.todo-subtasks__add {
+  display: grid;
+  grid-template-rows: 0fr;
+  padding: 0 6px 0 4px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--color-text-faint);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  opacity: 0;
+  cursor: pointer;
+  transition: grid-template-rows 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 130ms ease-out, color 150ms ease-out;
+}
+.todo-subtasks__add > span { overflow: hidden; }
+.todo-subtasks__add-label { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+.todo-subtasks__add-label > svg { flex: none; }
+.todo-subtasks:hover .todo-subtasks__add,
+.todo-subtasks:focus-within .todo-subtasks__add,
+.todo-subtasks__add:focus-visible,
+.todo-subtasks__add:only-child { grid-template-rows: 1fr; opacity: 1; }
+.todo-subtasks__add:hover { color: var(--color-text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .todo-subtasks__add { transition: opacity 130ms ease-out; }
+}
+
 .todo-subtask {
   position: relative;
   min-height: 40px;

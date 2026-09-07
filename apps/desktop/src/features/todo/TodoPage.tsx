@@ -473,8 +473,8 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
 }) {
   const displayTitle = resolveScrapMentions(item.title, scraps);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  // Set when the "add subtask" affordance is used on a row with no subtasks yet, so the new input takes focus.
-  const [focusAddOnExpand, setFocusAddOnExpand] = useState(false);
+  // The trailing add-subtask input is only mounted while actively adding — at rest the group ends at the last subtask.
+  const [addActive, setAddActive] = useState(false);
   const hasSubtasks = subtasks.length > 0;
   const doneSubtasks = subtasks.filter((sub) => sub.done).length;
   const rowRef = useRef<HTMLElement>(null);
@@ -556,8 +556,8 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
               aria-label={translate(expanded ? "todo.subtask.addCancel" : "todo.subtask.addFirst", { title: displayTitle })}
               className="todo-item__add-sub"
               onClick={() => {
-                if (expanded) { onToggleExpanded(); setFocusAddOnExpand(false); }
-                else { setFocusAddOnExpand(true); onToggleExpanded(); }
+                if (expanded) { onToggleExpanded(); setAddActive(false); }
+                else { setAddActive(true); onToggleExpanded(); }
               }}
               type="button"
             >
@@ -575,7 +575,7 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
               {item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}
               {hasSubtasks && (
                 <span className={`todo-item__progress ${doneSubtasks === subtasks.length ? "todo-item__progress--full" : ""}`}>
-                  <span className="todo-item__progress-bar"><i style={{ width: `${Math.round((doneSubtasks / subtasks.length) * 100)}%` }} /></span>
+                  <span className="todo-item__progress-bar"><i style={{ transform: `scaleX(${doneSubtasks / subtasks.length})` }} /></span>
                   {doneSubtasks}/{subtasks.length}
                 </span>
               )}
@@ -604,8 +604,14 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
 
       {expanded && (
         <div className="todo-subtasks">
-          {subtasks.map((sub) => <SubtaskRow item={sub} key={sub.id} repository={repository} scraps={scraps} />)}
-          <SubtaskAdd autoFocus={focusAddOnExpand} parentId={item.id} repository={repository} />
+          {subtasks.map((sub) => <SubtaskRow item={sub} key={sub.id} onAddNext={() => setAddActive(true)} repository={repository} scraps={scraps} />)}
+          {addActive ? (
+            <SubtaskAdd onDone={() => setAddActive(false)} parentId={item.id} repository={repository} />
+          ) : (
+            <button className="todo-subtasks__add" onClick={() => setAddActive(true)} type="button">
+              <span><span className="todo-subtasks__add-label"><Icon name="plus" size={12} strokeWidth={1.8} />{translate("todo.subtask.add")}</span></span>
+            </button>
+          )}
         </div>
       )}
 
@@ -614,7 +620,7 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
   );
 }
 
-function SubtaskRow({ item, repository, scraps }: { item: TodoItem; repository: TodoRepository; scraps: ScrapRef[] }) {
+function SubtaskRow({ item, repository, scraps, onAddNext }: { item: TodoItem; repository: TodoRepository; scraps: ScrapRef[]; onAddNext: () => void }) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -654,7 +660,7 @@ function SubtaskRow({ item, repository, scraps }: { item: TodoItem; repository: 
           maxLength={500}
           onBlur={(event) => { const next = event.target.value.trim(); if (next && next !== item.title) rename.mutate(next); else setEditing(false); }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Enter") { event.currentTarget.blur(); onAddNext(); }
             if (event.key === "Escape") { event.currentTarget.value = item.title; setEditing(false); }
           }}
         />
@@ -669,12 +675,12 @@ function SubtaskRow({ item, repository, scraps }: { item: TodoItem; repository: 
   );
 }
 
-function SubtaskAdd({ parentId, repository, autoFocus }: { parentId: string; repository: TodoRepository; autoFocus: boolean }) {
+function SubtaskAdd({ parentId, repository, onDone }: { parentId: string; repository: TodoRepository; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (autoFocus) inputRef.current?.focus(); }, [autoFocus]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
   const add = useMutation({
     mutationFn: (title: string) => repository.create({ title, labelId: "", dueDate: null, dueTime: null, note: "", parentId }),
     onMutate: () => setError(null),
@@ -694,8 +700,12 @@ function SubtaskAdd({ parentId, repository, autoFocus }: { parentId: string; rep
       <input
         className="todo-subtask-add__input"
         maxLength={500}
+        onBlur={() => { if (!value.trim() && !add.isPending) onDone(); }}
         onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => { if (event.key === "Enter" && value.trim()) { event.preventDefault(); add.mutate(value.trim()); } }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") { event.preventDefault(); if (value.trim()) add.mutate(value.trim()); else onDone(); }
+          if (event.key === "Escape") { event.preventDefault(); onDone(); }
+        }}
         placeholder={translate("todo.subtask.addPlaceholder")}
         ref={inputRef}
         value={value}

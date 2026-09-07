@@ -343,6 +343,29 @@ describe("TodoPage", () => {
     await waitFor(() => expect(screen.queryByPlaceholderText("하위 항목 추가")).not.toBeInTheDocument());
   });
 
+  it("does not keep a standing add input once subtasks exist — reopen from the compact reveal or Enter", async () => {
+    renderTodo();
+    await screen.findByText("설거지 하기");
+
+    fireEvent.click(screen.getByRole("button", { name: "설거지 하기에 하위 항목 추가" }));
+    const input = await screen.findByPlaceholderText("하위 항목 추가");
+    fireEvent.change(input, { target: { value: "수세미 사기" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await screen.findByText("수세미 사기");
+
+    // Escape dismisses the input; nothing stands in the group's last slot.
+    fireEvent.keyDown(screen.getByPlaceholderText("하위 항목 추가"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByPlaceholderText("하위 항목 추가")).not.toBeInTheDocument());
+
+    // A compact reveal re-opens it, and Enter chains another add.
+    fireEvent.click(screen.getByRole("button", { name: "하위 항목" }));
+    const reopened = await screen.findByPlaceholderText("하위 항목 추가");
+    fireEvent.change(reopened, { target: { value: "행주 삶기" } });
+    fireEvent.keyDown(reopened, { key: "Enter" });
+    await screen.findByText("행주 삶기");
+    expect(screen.getByPlaceholderText("하위 항목 추가")).toBeInTheDocument();
+  });
+
   it("adds subtasks under a todo, rolls completion up, and warns before a cascade delete", async () => {
     renderTodo();
     await screen.findByRole("radio", { name: /전체 7/ });

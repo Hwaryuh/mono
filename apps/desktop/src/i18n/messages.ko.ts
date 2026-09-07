@@ -443,6 +443,7 @@ export const koMessages = {
   "todo.delete.warning": "삭제한 할 일은 복구할 수 없습니다.",
   "todo.delete.withSubtasks": "하위 항목 {count}개도 함께 삭제됩니다.",
   "todo.subtask.toggle": "{title} 하위 항목 펼치기/접기",
+  "todo.subtask.add": "하위 항목",
   "todo.subtask.addFirst": "{title}에 하위 항목 추가",
   "todo.subtask.addCancel": "{title} 하위 항목 추가 취소",
   "todo.subtask.addPlaceholder": "하위 항목 추가",
