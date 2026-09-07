@@ -30,6 +30,25 @@ describe("CalendarPage", () => {
     expect(screen.getByRole("tab", { name: "일정표" })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("advances one month per trackpad swipe and ignores the momentum tail", async () => {
+    const { container } = renderCalendar();
+    await screen.findByText("2026년 8월");
+    const page = container.querySelector(".calendar-page")!;
+
+    // One horizontal swipe: deltaX accumulates past the trigger threshold.
+    fireEvent.wheel(page, { deltaX: 90, deltaY: 1 });
+    fireEvent.wheel(page, { deltaX: 90, deltaY: 1 });
+    expect(await screen.findByText("2026년 9월")).toBeInTheDocument();
+
+    // The inertia tail keeps firing within the same gesture — it must not roll into more months.
+    for (let i = 0; i < 6; i += 1) fireEvent.wheel(page, { deltaX: 150, deltaY: 1 });
+    expect(screen.getByText("2026년 9월")).toBeInTheDocument();
+
+    // A mostly-vertical scroll is left alone.
+    fireEvent.wheel(page, { deltaX: 5, deltaY: 200 });
+    expect(screen.getByText("2026년 9월")).toBeInTheDocument();
+  });
+
   it("renders the 42-cell month grid boundaries, today marker, long titles, and schedule-table keyboard switching", async () => {
     const { container } = renderCalendar();
     expect(await screen.findByText("2026년 8월")).toBeInTheDocument();

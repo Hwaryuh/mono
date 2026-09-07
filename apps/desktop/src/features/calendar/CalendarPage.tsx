@@ -257,28 +257,32 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     wheelNavCleanup.current?.();
     wheelNavCleanup.current = undefined;
     if (!node) return;
+    // One navigation per gesture. A macOS swipe fires a long tail of decaying deltaX (inertia)
+    // after the fingers lift; disarm on trigger and only re-arm once the trackpad has been
+    // completely quiet for a beat, so the momentum tail can't roll into extra month jumps.
+    const TRIGGER_PX = 140;
+    const QUIET_MS = 260;
     let accum = 0;
-    let locked = false;
-    let resetTimer: number | undefined;
+    let armed = true;
+    let quietTimer: number | undefined;
     const onWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
       if (document.querySelector(".ui-overlay")) return;
       event.preventDefault();
-      if (locked) return;
+      window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(() => { accum = 0; armed = true; }, QUIET_MS);
+      if (!armed) return;
       accum += event.deltaX;
-      window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(() => { accum = 0; }, 140);
-      if (Math.abs(accum) < 64) return;
+      if (Math.abs(accum) < TRIGGER_PX) return;
       const dir = accum > 0 ? 1 : -1;
       accum = 0;
-      locked = true;
-      window.setTimeout(() => { locked = false; }, 420);
+      armed = false;
       moveMonth(dir);
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     wheelNavCleanup.current = () => {
       node.removeEventListener("wheel", onWheel);
-      window.clearTimeout(resetTimer);
+      window.clearTimeout(quietTimer);
     };
   }, [moveMonth]);
   const queryClient = useQueryClient();
