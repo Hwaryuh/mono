@@ -552,12 +552,16 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
             </button>
           ) : !item.routineId && (
             <button
-              aria-label={translate("todo.subtask.addFirst", { title: displayTitle })}
+              aria-expanded={expanded}
+              aria-label={translate(expanded ? "todo.subtask.addCancel" : "todo.subtask.addFirst", { title: displayTitle })}
               className="todo-item__add-sub"
-              onClick={() => { if (!expanded) onToggleExpanded(); setFocusAddOnExpand(true); }}
+              onClick={() => {
+                if (expanded) { onToggleExpanded(); setFocusAddOnExpand(false); }
+                else { setFocusAddOnExpand(true); onToggleExpanded(); }
+              }}
               type="button"
             >
-              <Icon name="plus" size={13} strokeWidth={1.8} />
+              <Icon name={expanded ? "minus" : "plus"} size={13} strokeWidth={1.8} />
             </button>
           )}
         </span>

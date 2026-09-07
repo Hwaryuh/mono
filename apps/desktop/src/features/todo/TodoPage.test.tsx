@@ -331,6 +331,18 @@ describe("TodoPage", () => {
     expect(titlesInOrder()[0]).not.toBe("렌즈 주문");
   });
 
+  it("toggles the empty subtask-add block open and shut from the gutter button", async () => {
+    renderTodo();
+    await screen.findByText("설거지 하기");
+
+    fireEvent.click(screen.getByRole("button", { name: "설거지 하기에 하위 항목 추가" }));
+    expect(await screen.findByPlaceholderText("하위 항목 추가")).toBeInTheDocument();
+
+    // The + has become a - that dismisses the block again (nothing was added).
+    fireEvent.click(screen.getByRole("button", { name: "설거지 하기 하위 항목 추가 취소" }));
+    await waitFor(() => expect(screen.queryByPlaceholderText("하위 항목 추가")).not.toBeInTheDocument());
+  });
+
   it("adds subtasks under a todo, rolls completion up, and warns before a cascade delete", async () => {
     renderTodo();
     await screen.findByRole("radio", { name: /전체 7/ });

@@ -175,7 +175,8 @@
 .todo-item__chevron--open { transform: rotate(90deg); }
 .todo-item__add-sub { opacity: 0; }
 .todo-item__main:hover .todo-item__add-sub,
-.todo-item__add-sub:focus-visible { opacity: 1; }
+.todo-item__add-sub:focus-visible,
+.todo-item__add-sub[aria-expanded="true"] { opacity: 1; }
 
 /* Parent checkbox showing a partial (some-but-not-all subtasks done) state. */
 .ui-checkbox.todo-item__cb--partial { border-color: var(--color-accent); background: var(--color-accent); }

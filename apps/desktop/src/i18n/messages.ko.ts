@@ -444,6 +444,7 @@ export const koMessages = {
   "todo.delete.withSubtasks": "하위 항목 {count}개도 함께 삭제됩니다.",
   "todo.subtask.toggle": "{title} 하위 항목 펼치기/접기",
   "todo.subtask.addFirst": "{title}에 하위 항목 추가",
+  "todo.subtask.addCancel": "{title} 하위 항목 추가 취소",
   "todo.subtask.addPlaceholder": "하위 항목 추가",
   "todo.subtask.deleteLabel": "{title} 하위 항목 삭제",
   "todo.status.completedAt": "완료: {time}",
