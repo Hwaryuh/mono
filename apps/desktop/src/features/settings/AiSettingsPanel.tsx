@@ -19,6 +19,13 @@ const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string
     dataNotice: translate("settings.ai.openaiDescription"),
     model: "gpt-5-nano",
   },
+  anthropic: {
+    label: "Claude",
+    keyPlaceholder: translate("settings.ai.anthropicTitle"),
+    keySource: "Anthropic Console",
+    dataNotice: translate("settings.ai.anthropicDescription"),
+    model: "claude-haiku-4-5",
+  },
 };
 
 export function AiSettingsPanel({ store }: { store: AiSettingsStore }) {

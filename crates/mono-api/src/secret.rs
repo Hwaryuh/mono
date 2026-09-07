@@ -110,12 +110,17 @@ fn provider_storage_key(provider: &str) -> ApiResult<&'static str> {
     match provider {
         "gemini" => Ok("gemini_api_key"),
         "openai" => Ok("openai_api_key"),
+        "anthropic" => Ok("anthropic_api_key"),
         _ => Err(ApiError::BadRequest("알 수 없는 AI provider입니다.".into())),
     }
 }
 
 fn provider_label(provider: &str) -> &'static str {
-    if provider == "openai" { "OpenAI" } else { "Gemini" }
+    match provider {
+        "openai" => "OpenAI",
+        "anthropic" => "Claude",
+        _ => "Gemini",
+    }
 }
 
 fn has_key(conn: &Connection, key: &str) -> ApiResult<bool> {
@@ -184,7 +189,11 @@ pub(super) fn get_active_provider(conn: &Connection) -> ApiResult<String> {
     let value: Option<String> = conn
         .query_row("SELECT value FROM secrets WHERE key = ?1", [ACTIVE_PROVIDER_KEY], |row| row.get(0))
         .optional()?;
-    Ok(if value.as_deref() == Some("openai") { "openai".into() } else { "gemini".into() })
+    // Any stored provider that still validates wins; anything else (unset, or a removed provider) falls back to gemini.
+    Ok(match value {
+        Some(p) if provider_storage_key(&p).is_ok() => p,
+        _ => "gemini".into(),
+    })
 }
 
 fn set_active_provider(conn: &Connection, provider: &str) -> ApiResult<()> {

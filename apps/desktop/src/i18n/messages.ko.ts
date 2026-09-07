@@ -140,6 +140,8 @@ export const koMessages = {
   "settings.ai.geminiDescription": "분류할 텍스트와 사진은 Google Gemini API로 전송됩니다. 무료 등급에서는 Google 정책에 따라 제출 데이터가 제품 개선에 사용될 수 있습니다.",
   "settings.ai.openaiTitle": "OpenAI API 키",
   "settings.ai.openaiDescription": "분류할 텍스트와 사진은 OpenAI API로 전송됩니다.",
+  "settings.ai.anthropicTitle": "Anthropic API 키",
+  "settings.ai.anthropicDescription": "분류할 텍스트와 사진은 Anthropic Claude API로 전송됩니다.",
   "settings.ai.description": "빠른 캡처에 사용할 AI를 설정합니다.",
   "settings.ai.providerLabel": "사용할 AI 모델",
   "settings.ai.keySectionLabel": "{provider} API 키 설정",

@@ -1,7 +1,5 @@
 import { translate } from "../../i18n/i18n";
-export type AiProviderId = "gemini" | "openai";
-
-export const AI_PROVIDER_IDS = ["gemini", "openai"] as const satisfies readonly AiProviderId[];
+export type AiProviderId = "gemini" | "openai" | "anthropic";
 
 export interface AiSettingsStore {
   hasApiKey(provider: AiProviderId): Promise<boolean>;
@@ -15,10 +13,11 @@ export interface AiSettingsStore {
 const PROVIDER_LABEL: Record<AiProviderId, string> = {
   gemini: "Gemini",
   openai: "OpenAI",
+  anthropic: "Claude",
 };
 
 export class InMemoryAiSettingsStore implements AiSettingsStore {
-  private keys: Record<AiProviderId, string | null> = { gemini: null, openai: null };
+  private keys: Record<AiProviderId, string | null> = { gemini: null, openai: null, anthropic: null };
   private activeProvider: AiProviderId = "gemini";
 
   async hasApiKey(provider: AiProviderId): Promise<boolean> {

@@ -17,6 +17,9 @@ const OPENAI_MODEL: &str = "gpt-5-nano";
 const OPENAI_ROOT: &str = "https://api.openai.com/v1";
 const GEMINI_MODEL: &str = "gemini-2.5-flash-lite";
 const GEMINI_ROOT: &str = "https://generativelanguage.googleapis.com/v1beta";
+const ANTHROPIC_MODEL: &str = "claude-haiku-4-5";
+const ANTHROPIC_ROOT: &str = "https://api.anthropic.com/v1";
+const ANTHROPIC_VERSION: &str = "2023-06-01";
 const MAX_INLINE_BASE64_BYTES: usize = 18 * 1024 * 1024;
 const CONNECT_TIMEOUT_SECS: u64 = 10;
 const REQUEST_TIMEOUT_SECS: u64 = 45;
@@ -77,10 +80,10 @@ pub(super) struct CaptureAnalysisResult {
 }
 
 pub(super) fn label(provider: &str) -> &'static str {
-    if provider == "openai" {
-        "OpenAI"
-    } else {
-        "Gemini"
+    match provider {
+        "openai" => "OpenAI",
+        "anthropic" => "Claude",
+        _ => "Gemini",
     }
 }
 
@@ -387,6 +390,95 @@ async fn gemini_test(api_key: &str, root: &str) -> AiResult<()> {
     Err(api_error_message("Gemini", status, &body))
 }
 
+// ---------- Anthropic (Claude Messages API) ----------
+
+// Forced tool use pins the reply to the JSON schema, so no prompt-fragile text parsing (same schema as Gemini).
+const ANTHROPIC_TOOL: &str = "record_analysis";
+
+fn parse_anthropic_response(body: &str) -> AiResult<CaptureAnalysisResult> {
+    let envelope: Value = serde_json::from_str(body)
+        .map_err(|e| format!("Claude 응답 JSON이 올바르지 않습니다: {e}"))?;
+    let input = envelope
+        .get("content")
+        .and_then(Value::as_array)
+        .and_then(|blocks| {
+            blocks.iter().find(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
+        })
+        .and_then(|block| block.get("input"))
+        .ok_or("Claude가 분석 결과를 반환하지 않았습니다.")?;
+    let result = schema_parse(input, "Claude")?;
+    validate_result(&result, "Claude")?;
+    Ok(result)
+}
+
+async fn anthropic_analyze(
+    api_key: &str,
+    raw: &str,
+    images: &[CaptureImage],
+    context: Option<&AnalysisContext>,
+    root: &str,
+) -> AiResult<CaptureAnalysisResult> {
+    let images = with_data_url(images);
+    inline_size_ok(&images, "Claude")?;
+
+    let mut content = vec![json!({ "type": "text", "text": user_text(raw) })];
+    for image in &images {
+        let data = image
+            .data_url
+            .as_deref()
+            .and_then(|d| d.split_once(','))
+            .map_or("", |(_, b)| b);
+        content.push(json!({
+            "type": "image",
+            "source": { "type": "base64", "media_type": image.mime_type, "data": data },
+        }));
+    }
+    let payload = json!({
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": 1024,
+        "system": build_analysis_instruction(context),
+        "tools": [{
+            "name": ANTHROPIC_TOOL,
+            "description": "분류 결과를 기록한다.",
+            "input_schema": gemini_result_schema(),
+        }],
+        "tool_choice": { "type": "tool", "name": ANTHROPIC_TOOL },
+        "messages": [{ "role": "user", "content": content }],
+    });
+
+    let response = http_client(REQUEST_TIMEOUT_SECS)
+        .post(format!("{root}/messages"))
+        .header("content-type", "application/json")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .body(payload.to_string())
+        .send()
+        .await
+        .map_err(|e| connect_error("Claude", &e))?;
+    let status = response.status().as_u16();
+    let body = response.text().await.map_err(|e| connect_error("Claude", &e))?;
+    if !(200..300).contains(&status) {
+        return Err(api_error_message("Claude", status, &body));
+    }
+    parse_anthropic_response(&body)
+}
+
+async fn anthropic_test(api_key: &str, root: &str) -> AiResult<()> {
+    let response = http_client(CONNECT_TIMEOUT_SECS)
+        .get(format!("{root}/models/{ANTHROPIC_MODEL}"))
+        .header("x-api-key", api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .send()
+        .await
+        .map_err(|e| connect_error("Claude", &e))?;
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let status = response.status().as_u16();
+    let body = response.text().await.unwrap_or_default();
+    Err(api_error_message("Claude", status, &body))
+}
+
 // ---------- dispatch (selectable-capture-analysis-provider.ts) ----------
 
 pub(super) async fn analyze(
@@ -398,6 +490,7 @@ pub(super) async fn analyze(
 ) -> AiResult<CaptureAnalysisResult> {
     match provider {
         "openai" => openai_analyze(api_key, raw, images, context, OPENAI_ROOT).await,
+        "anthropic" => anthropic_analyze(api_key, raw, images, context, ANTHROPIC_ROOT).await,
         _ => gemini_analyze(api_key, raw, images, context, GEMINI_ROOT).await,
     }
 }
@@ -405,6 +498,7 @@ pub(super) async fn analyze(
 async fn test_connection(provider: &str, api_key: &str) -> AiResult<()> {
     match provider {
         "openai" => openai_test(api_key, OPENAI_ROOT).await,
+        "anthropic" => anthropic_test(api_key, ANTHROPIC_ROOT).await,
         _ => gemini_test(api_key, GEMINI_ROOT).await,
     }
 }
@@ -445,6 +539,11 @@ mod tests {
 
     fn gemini_body(payload: Value) -> String {
         json!({ "candidates": [{ "content": { "parts": [{ "text": payload.to_string() }] } }] })
+            .to_string()
+    }
+
+    fn anthropic_body(payload: Value) -> String {
+        json!({ "content": [{ "type": "tool_use", "name": ANTHROPIC_TOOL, "input": payload }] })
             .to_string()
     }
 
@@ -494,6 +593,25 @@ mod tests {
         }));
         let result = parse_gemini_response(&body).unwrap();
         assert_eq!(result.target, "scrap");
+    }
+
+    #[test]
+    fn parses_valid_anthropic_tool_use() {
+        let body = anthropic_body(json!({
+            "target": "ledger",
+            "confidence": 0.8,
+            "fields": [{ "label": "금액", "value": "12000" }],
+        }));
+        let result = parse_anthropic_response(&body).unwrap();
+        assert_eq!(result.target, "ledger");
+        assert_eq!(result.fields[0].label, "금액");
+    }
+
+    #[test]
+    fn rejects_anthropic_without_tool_use() {
+        let body = json!({ "content": [{ "type": "text", "text": "거부합니다" }] }).to_string();
+        let err = parse_anthropic_response(&body).unwrap_err();
+        assert_eq!(err, "Claude가 분석 결과를 반환하지 않았습니다.");
     }
 
     #[test]
