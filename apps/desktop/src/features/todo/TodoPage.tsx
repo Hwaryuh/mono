@@ -641,7 +641,6 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
     <article
       aria-busy={toggleMutation.isPending}
       className={`todo-item ${hasSubtasks ? "todo-item--parent" : ""} ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""} ${drag.isDragging ? "todo-item--dragging" : ""} ${isDropTarget ? "todo-item--drop-target" : ""} ${draggingId && !drag.isDragging ? "todo-item--dnd-idle" : ""}`}
-      data-drop-hint={translate("todo.reparent.dropHint")}
       ref={setRowNode}
       style={dragStyle}
       {...drag.listeners}
@@ -710,16 +709,22 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
         </div>
       </div>
 
-      {expanded && (
+      {(expanded || isDropTarget) && (
         <div className="todo-subtasks">
-          {subtasks.map((sub) => <SubtaskRow item={sub} key={sub.id} onAddNext={() => setAddActive(true)} repository={repository} scraps={scraps} />)}
-          {addActive ? (
+          {expanded && subtasks.map((sub) => <SubtaskRow item={sub} key={sub.id} onAddNext={() => setAddActive(true)} repository={repository} scraps={scraps} />)}
+          {isDropTarget && draggedItem && (
+            <div aria-hidden="true" className="todo-subtask todo-subtask--ghost">
+              <span className="todo-subtask__check" />
+              <span className="todo-subtask__title">{resolveScrapMentions(draggedItem.title, scraps)}</span>
+            </div>
+          )}
+          {expanded && (addActive ? (
             <SubtaskAdd onDone={() => setAddActive(false)} parentId={item.id} repository={repository} />
           ) : (
             <button className="todo-subtasks__add" onClick={() => setAddActive(true)} type="button">
               <span><span className="todo-subtasks__add-label"><Icon name="plus" size={12} strokeWidth={1.8} />{translate("todo.subtask.add")}</span></span>
             </button>
-          )}
+          ))}
         </div>
       )}
 

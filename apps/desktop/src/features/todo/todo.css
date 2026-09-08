@@ -371,21 +371,22 @@
 .todo-item--dnd-idle:not(.todo-item--dragging) { cursor: grab; }
 .todo-item--dragging { cursor: grabbing; opacity: 0.9; box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--color-text) 30%, transparent); }
 .todo-item--dragging * { cursor: grabbing; }
-.todo-item--drop-target { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent), 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent); }
-.todo-item--drop-target::after {
-  content: attr(data-drop-hint);
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
-  color: var(--color-accent);
-  font-size: 11px;
-  font-weight: 600;
+/* The target shows the dragged todo as a ghost subtask — a live preview of where it will land. */
+.todo-item--drop-target { border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent); }
+.todo-item--drop-target .todo-subtasks { border-left-color: var(--color-accent); }
+.todo-subtask--ghost {
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
   pointer-events: none;
 }
+.todo-subtask--ghost .todo-subtask__check {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 1.5px dashed color-mix(in srgb, var(--color-accent) 60%, transparent);
+  border-radius: 4px;
+}
+.todo-subtask--ghost .todo-subtask__title { color: var(--color-accent); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .todo-subtask--dragging { cursor: grabbing; opacity: 0.9; background: var(--color-surface); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--color-text) 28%, transparent); }
 
 .todo-promote-strip {

@@ -452,7 +452,6 @@ export const koMessages = {
   "todo.reparent.warning": "이 할 일을 하위로 옮기면 기한·시간·메모·우선순위가 사라지고 라벨이 \"{label}\"로 바뀝니다.",
   "todo.reparent.confirm": "옮기기",
   "todo.reparent.promoteHint": "여기에 놓으면 최상위 할 일이 됩니다",
-  "todo.reparent.dropHint": "하위 항목으로 옮기기",
   "todo.reparent.error.hasSubtasks": "하위 항목이 있는 할 일은 다른 할 일의 하위로 옮길 수 없습니다.",
   "todo.status.completedAt": "완료: {time}",
   "todo.status.dueTodayAt": "오늘 {time}",
