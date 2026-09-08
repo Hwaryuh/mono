@@ -77,6 +77,13 @@ struct SetPriorityInput {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReparentInput {
+    // null promotes back to a top-level todo; a string makes it a subtask of that todo.
+    parent_id: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct TodoLabelWriteInput {
     name: String,
     color: String,
@@ -347,6 +354,57 @@ fn set_priority(conn: &Connection, id: &str, priority: i64) -> ApiResult<()> {
     Ok(())
 }
 
+// Moves an existing todo. `new_parent` = Some(id) makes it a subtask of that todo; None promotes
+// it back to top level. One level only: the new parent must itself be top level, and a todo that
+// has its own subtasks can't become a subtask. Becoming a subtask drops the moved todo's due
+// date/time/note/priority and adopts the parent's label — subtasks don't carry those.
+fn reparent(conn: &Connection, id: &str, new_parent: Option<&str>) -> ApiResult<()> {
+    require_item(conn, id)?;
+    let old_parent = item_parent(conn, id)?;
+    let new_parent = new_parent.filter(|value| !value.is_empty());
+
+    match new_parent {
+        None => {
+            if old_parent.is_none() {
+                return Ok(());
+            }
+            conn.execute(
+                "UPDATE todo_items SET parent_id = NULL, version = version + 1 WHERE id = ?1",
+                [id],
+            )?;
+        }
+        Some(parent_id) => {
+            if parent_id == id {
+                return Err(ApiError::BadRequest("할 일을 자기 자신의 하위로 옮길 수 없습니다.".into()));
+            }
+            if item_parent(conn, parent_id)?.is_some() {
+                return Err(ApiError::BadRequest("하위 항목 아래에는 다시 하위 항목을 만들 수 없습니다.".into()));
+            }
+            if !child_done_states(conn, id)?.is_empty() {
+                return Err(ApiError::BadRequest(
+                    "하위 항목이 있는 할 일은 다른 할 일의 하위로 옮길 수 없습니다.".into(),
+                ));
+            }
+            if old_parent.as_deref() == Some(parent_id) {
+                return Ok(());
+            }
+            let label_id: String = conn
+                .query_row("SELECT label_id FROM todo_items WHERE id = ?1", [parent_id], |row| row.get(0))?;
+            conn.execute(
+                "UPDATE todo_items SET parent_id = ?1, label_id = ?2, due_date = NULL, due_time = NULL, \
+                 note = '', priority = 0, version = version + 1 WHERE id = ?3",
+                params![parent_id, label_id, id],
+            )?;
+            resync_parent(conn, parent_id)?;
+        }
+    }
+
+    if let Some(old) = old_parent {
+        resync_parent(conn, &old)?;
+    }
+    Ok(())
+}
+
 fn delete_item(conn: &Connection, id: &str) -> ApiResult<()> {
     require_item(conn, id)?;
     let parent_id = item_parent(conn, id)?;
@@ -371,6 +429,7 @@ pub fn routes(db: Db) -> Router {
         )
         .route("/todo/items/{id}/toggle", post(toggle_handler))
         .route("/todo/items/{id}/priority", put(set_priority_handler))
+        .route("/todo/items/{id}/parent", put(reparent_handler))
         .route("/todo/labels", post(create_label_handler))
         .route("/todo/labels/order", put(reorder_handler))
         .route(
@@ -405,6 +464,15 @@ async fn update_item_handler(
 
 async fn toggle_handler(State(db): State<Db>, Path(id): Path<String>) -> ApiResult<Json<Value>> {
     toggle_complete(&db.conn(), &id)?;
+    Ok(ok())
+}
+
+async fn reparent_handler(
+    State(db): State<Db>,
+    Path(id): Path<String>,
+    Json(input): Json<ReparentInput>,
+) -> ApiResult<Json<Value>> {
+    reparent(&db.conn(), &id, input.parent_id.as_deref())?;
     Ok(ok())
 }
 
@@ -759,5 +827,87 @@ mod tests {
 
         delete_item(&conn, &open).unwrap();
         assert!(find_item(&get_snapshot(&conn).unwrap(), "배포").done);
+    }
+
+    #[test]
+    fn reparent_makes_a_top_level_todo_a_subtask_and_strips_its_own_fields() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let home = seed_label(&conn, "집안일");
+        let work = seed_label(&conn, "업무");
+        create_item(&conn, item_input("이사 준비", &home)).unwrap();
+        create_item(
+            &conn,
+            TodoWriteInput {
+                title: "관리비 정산".into(),
+                label_id: work.clone(),
+                due_date: Some("2026-09-20".into()),
+                due_time: Some("10:00".into()),
+                note: "고지서 확인".into(),
+                parent_id: None,
+            },
+        )
+        .unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "이사 준비").id.clone();
+        let moved = find_item(&get_snapshot(&conn).unwrap(), "관리비 정산").id.clone();
+        set_priority(&conn, &moved, 3).unwrap();
+
+        reparent(&conn, &moved, Some(&parent)).unwrap();
+
+        let snapshot = get_snapshot(&conn).unwrap();
+        let child = find_item(&snapshot, "관리비 정산");
+        assert_eq!(child.parent_id.as_deref(), Some(parent.as_str()));
+        assert_eq!(child.label_id, home);
+        assert!(child.due_date.is_none() && child.due_time.is_none());
+        assert_eq!(child.note, "");
+        assert_eq!(child.priority, 0);
+        // The parent had no subtasks before and was complete-by-default(false); adding an open child keeps it open.
+        assert!(!find_item(&snapshot, "이사 준비").done);
+    }
+
+    #[test]
+    fn reparent_promotes_a_subtask_back_to_top_level() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("분기 보고서", &label)).unwrap();
+        let parent = find_item(&get_snapshot(&conn).unwrap(), "분기 보고서").id.clone();
+        create_item(&conn, subtask_input("지표 취합", &parent)).unwrap();
+        create_item(&conn, subtask_input("초안 작성", &parent)).unwrap();
+        let a = find_item(&get_snapshot(&conn).unwrap(), "지표 취합").id.clone();
+        let b = find_item(&get_snapshot(&conn).unwrap(), "초안 작성").id.clone();
+        toggle_complete(&conn, &b).unwrap();
+
+        reparent(&conn, &a, None).unwrap();
+
+        let snapshot = get_snapshot(&conn).unwrap();
+        assert!(find_item(&snapshot, "지표 취합").parent_id.is_none());
+        // "초안 작성" is now the parent's only subtask and it's done → parent rolls up to done.
+        assert!(find_item(&snapshot, "분기 보고서").done);
+    }
+
+    #[test]
+    fn reparent_rejects_nesting_under_a_subtask_or_moving_a_parent() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, item_input("A", &label)).unwrap();
+        create_item(&conn, item_input("B", &label)).unwrap();
+        let a = find_item(&get_snapshot(&conn).unwrap(), "A").id.clone();
+        let b = find_item(&get_snapshot(&conn).unwrap(), "B").id.clone();
+        create_item(&conn, subtask_input("A-1", &a)).unwrap();
+        let a1 = find_item(&get_snapshot(&conn).unwrap(), "A-1").id.clone();
+
+        // Can't drop B under a subtask.
+        let under_subtask = reparent(&conn, &b, Some(&a1)).unwrap_err();
+        assert!(matches!(under_subtask, ApiError::BadRequest(m) if m.contains("다시 하위 항목")));
+
+        // Can't move A (which has a subtask) under B.
+        let has_children = reparent(&conn, &a, Some(&b)).unwrap_err();
+        assert!(matches!(has_children, ApiError::BadRequest(m) if m.contains("하위 항목이 있는")));
+
+        // Can't drop onto itself.
+        let onto_self = reparent(&conn, &b, Some(&b)).unwrap_err();
+        assert!(matches!(onto_self, ApiError::BadRequest(m) if m.contains("자기 자신")));
     }
 }

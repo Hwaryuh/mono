@@ -13,5 +13,8 @@ export interface TodoRepository extends TodoLabelRepository {
   update(itemId: string, input: TodoWriteInput, expectedVersion?: number): Promise<void>;
   toggleComplete(itemId: string): Promise<void>;
   setPriority(itemId: string, priority: number): Promise<void>;
+  // Move an existing todo: a parentId string makes it a subtask (dropping its due date/time/note/
+  // priority, adopting the parent's label); null promotes it back to a top-level todo.
+  reparent(itemId: string, parentId: string | null): Promise<void>;
   delete(itemId: string): Promise<void>;
 }

@@ -41,6 +41,18 @@ describe("createHttpTodoRepository", () => {
     expect(init).toMatchObject({ method: "POST", body: JSON.stringify(input) });
   });
 
+  it("reparents via PUT with the parentId body (string nests, null promotes)", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    const repository = createHttpTodoRepository();
+
+    await repository.reparent("child", "parent");
+    await repository.reparent("child", null);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("http://127.0.0.1:4174/todo/items/child/parent");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "PUT", body: JSON.stringify({ parentId: "parent" }) });
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "PUT", body: JSON.stringify({ parentId: null }) });
+  });
+
   it("throws the server error response's error message as an Error", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: "항목을 찾을 수 없습니다." }, 404));
 

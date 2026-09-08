@@ -36,6 +36,7 @@ function repositoryOf(base: TodoRepository, overrides: Partial<TodoRepository> =
     delete: overrides.delete ?? ((itemId) => base.delete(itemId)),
     toggleComplete: overrides.toggleComplete ?? ((itemId) => base.toggleComplete(itemId)),
     setPriority: overrides.setPriority ?? ((itemId, priority) => base.setPriority(itemId, priority)),
+    reparent: overrides.reparent ?? ((itemId, parentId) => base.reparent(itemId, parentId)),
   };
 }
 

@@ -9,6 +9,7 @@ export function createHttpTodoRepository(): TodoRepository {
     update: (itemId, input, expectedVersion) => httpPutVersioned(`/todo/items/${encodeURIComponent(itemId)}`, expectedVersion, input),
     toggleComplete: (itemId) => httpPost(`/todo/items/${encodeURIComponent(itemId)}/toggle`),
     setPriority: (itemId, priority) => httpPut(`/todo/items/${encodeURIComponent(itemId)}/priority`, { priority }),
+    reparent: (itemId, parentId) => httpPut(`/todo/items/${encodeURIComponent(itemId)}/parent`, { parentId }),
     delete: (itemId) => httpDelete(`/todo/items/${encodeURIComponent(itemId)}`),
     createLabel: (input) => httpPost("/todo/labels", input),
     updateLabel: (labelId, input, expectedVersion) => httpPutVersioned(`/todo/labels/${encodeURIComponent(labelId)}`, expectedVersion, input),

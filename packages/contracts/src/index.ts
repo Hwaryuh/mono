@@ -213,11 +213,19 @@ export const todoWriteInputSchema = z.object({
   parentId: z.string().nullable().optional(),
 });
 
+// PUT /todo/items/{id}/parent — move an existing todo. A string makes it a subtask of that todo
+// (dropping its own due date/time/note/priority, adopting the parent's label); null promotes it
+// back to a top-level todo.
+export const todoReparentInputSchema = z.object({
+  parentId: z.string().min(1).nullable(),
+});
+
 export type TodoLabel = z.infer<typeof todoLabelSchema>;
 export type TodoLabelWriteInput = z.infer<typeof todoLabelWriteInputSchema>;
 export type TodoItem = z.infer<typeof todoItemSchema>;
 export type TodoSnapshot = z.infer<typeof todoSnapshotSchema>;
 export type TodoWriteInput = z.infer<typeof todoWriteInputSchema>;
+export type TodoReparentInput = z.infer<typeof todoReparentInputSchema>;
 
 const routineDaysSchema = z.array(z.number().int().min(0).max(6)).min(1).max(7)
   .refine((days) => new Set(days).size === days.length, "반복 요일은 중복될 수 없습니다.");

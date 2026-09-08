@@ -3,7 +3,17 @@ import { errorMessage } from "../../i18n/error-message";
 import { type TodoItem, type TodoLabel, type TodoSnapshot, type TodoWriteInput } from "@mono/contracts";
 import { Button, Checkbox, DatePicker, Icon, Modal, Select, TimePicker, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
@@ -130,6 +140,16 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
     },
     onError: (error) => setFormError(errorMessage(error)),
   });
+  // Drag a todo onto another to nest it as a subtask; drag a subtask onto the promote strip to lift it back out.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [pendingReparent, setPendingReparent] = useState<{ item: TodoItem; parentId: string; parentLabelName: string } | null>(null);
+  const reparentMutation = useMutation({
+    mutationFn: ({ itemId, parentId }: { itemId: string; parentId: string | null }) => repository.reparent(itemId, parentId),
+    onMutate: () => setFormError(null),
+    onSuccess: invalidateSnapshots,
+    onError: (error) => setFormError(errorMessage(error)),
+  });
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   useEffect(() => {
     const loadedSnapshot = snapshotQuery.data;
@@ -182,6 +202,34 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
     return (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
   });
   const title = labelIds.length > 0 ? translate("todo.list.filteredLabel") : statusMeta[status].title;
+
+  const draggingItem = draggingId ? snapshot.items.find((candidate) => candidate.id === draggingId) ?? null : null;
+  function onDragEnd(event: DragEndEvent) {
+    setDraggingId(null);
+    const source = snapshot.items.find((candidate) => candidate.id === event.active.id);
+    const target = event.over?.data.current as { kind: "parent" | "promote"; item?: TodoItem } | undefined;
+    if (!source || !target) return;
+
+    if (target.kind === "promote") {
+      if (source.parentId === null) return;
+      reparentMutation.mutate({ itemId: source.id, parentId: null });
+      return;
+    }
+    const parent = target.item!;
+    if (parent.id === source.id || source.parentId === parent.id) return;
+    if (subtasksByParent.has(source.id)) {
+      setFormError(translate("todo.reparent.error.hasSubtasks"));
+      return;
+    }
+    const losesData = Boolean(source.dueDate || source.dueTime || source.note.trim() || source.priority > 0);
+    if (losesData) {
+      const parentLabel = snapshot.labels.find((candidate) => candidate.id === parent.labelId);
+      setPendingReparent({ item: source, parentId: parent.id, parentLabelName: parentLabel?.name ?? "" });
+    } else {
+      reparentMutation.mutate({ itemId: source.id, parentId: parent.id });
+    }
+  }
+
   const activeEditorItem = editorItem === "new" || editorItem === null ? null : editorItem;
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const savedDraft = editorItem === "new" ? blankDraft(snapshot.labels) : activeEditorItem ? draftOf(activeEditorItem) : null;
@@ -343,10 +391,13 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
             );
           })}
         </header>
+        <DndContext collisionDetection={pointerWithin} onDragCancel={() => setDraggingId(null)} onDragEnd={onDragEnd} onDragStart={(event) => setDraggingId(String(event.active.id))} sensors={dndSensors}>
         <div className="todo-list">
+          {draggingItem?.parentId != null && <ReparentPromoteStrip />}
           {visibleItems.map((item) => {
             const label = snapshot.labels.find((candidate) => candidate.id === item.labelId) ?? snapshot.labels[0];
             return <TodoRow
+              draggingId={draggingId}
               expanded={expandedIds.has(item.id)}
               item={item}
               key={item.id}
@@ -366,6 +417,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
             <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.title")}</strong><span>{translate("todo.empty.description")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newTodo")}</Button></div>
           )}
         </div>
+        </DndContext>
       </section>
 
       <Modal
@@ -456,17 +508,54 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       >
         <p>{translate("todo.mention.leaveWarning")}</p>
       </Modal>
+
+      <Modal
+        className="todo-delete-modal"
+        footer={<>
+          <Button autoFocus disabled={reparentMutation.isPending} onClick={() => setPendingReparent(null)}>{translate("common.action.cancel")}</Button>
+          <Button
+            loading={reparentMutation.isPending}
+            onClick={() => {
+              if (!pendingReparent) return;
+              reparentMutation.mutate(
+                { itemId: pendingReparent.item.id, parentId: pendingReparent.parentId },
+                { onSuccess: () => setPendingReparent(null) },
+              );
+            }}
+            variant="primary"
+          >
+            {translate("todo.reparent.confirm")}
+          </Button>
+        </>}
+        icon="alert"
+        onClose={() => { if (!reparentMutation.isPending) setPendingReparent(null); }}
+        open={pendingReparent !== null}
+        title={translate("todo.reparent.title")}
+      >
+        <p>{translate("todo.reparent.warning", { label: pendingReparent?.parentLabelName ?? "" })}</p>
+        <blockquote>{pendingReparent ? resolveScrapMentions(pendingReparent.item.title, scraps) : null}</blockquote>
+      </Modal>
     </div>
   );
 }
 
-function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded, onToggleExpanded, onOpen }: {
+function ReparentPromoteStrip() {
+  const { setNodeRef, isOver } = useDroppable({ id: "reparent-promote", data: { kind: "promote" } });
+  return (
+    <div className={isOver ? "todo-promote-strip todo-promote-strip--over" : "todo-promote-strip"} ref={setNodeRef}>
+      <Icon name="arrowUp" size={13} strokeWidth={2} />{translate("todo.reparent.promoteHint")}
+    </div>
+  );
+}
+
+function TodoRow({ item, label, snapshot, repository, scraps, subtasks, draggingId, expanded, onToggleExpanded, onOpen }: {
   item: TodoItem;
   label: TodoLabel;
   snapshot: TodoSnapshot;
   repository: TodoRepository;
   scraps: ScrapRef[];
   subtasks: TodoItem[];
+  draggingId: string | null;
   expanded: boolean;
   onToggleExpanded: () => void;
   onOpen: () => void;
@@ -481,6 +570,20 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
   const previousTopRef = useRef<number | null>(null);
   const previousDoneRef = useRef(item.done);
   const movementRef = useRef<Animation | null>(null);
+
+  const isRoutine = item.routineId != null;
+  const drag = useDraggable({ id: item.id, data: { item }, disabled: isRoutine || hasSubtasks });
+  const drop = useDroppable({ id: `parent:${item.id}`, data: { kind: "parent", item }, disabled: isRoutine });
+  const draggedItem = drop.active?.data.current?.item as TodoItem | undefined;
+  const isDropTarget = drop.isOver && draggedItem != null && draggedItem.id !== item.id && draggedItem.parentId !== item.id;
+  const setRowNode = (node: HTMLElement | null) => {
+    rowRef.current = node;
+    drag.setNodeRef(node);
+    drop.setNodeRef(node);
+  };
+  const dragStyle: CSSProperties | undefined = drag.transform
+    ? { transform: `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)`, zIndex: 20, position: "relative" }
+    : undefined;
   const queryClient = useQueryClient();
   const toggleMutation = useMutation({
     mutationFn: () => repository.toggleComplete(item.id),
@@ -515,6 +618,8 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
   useLayoutEffect(() => {
     const row = rowRef.current;
     if (!row) return;
+    // While this row follows the cursor its rect is transform-shifted — a re-sort FLIP here would fight the drag.
+    if (drag.isDragging) { previousDoneRef.current = item.done; return; }
     const nextTop = row.getBoundingClientRect().top;
     const previousTop = previousTopRef.current;
     previousTopRef.current = nextTop;
@@ -535,8 +640,11 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, expanded
   return (
     <article
       aria-busy={toggleMutation.isPending}
-      className={`todo-item ${hasSubtasks ? "todo-item--parent" : ""} ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""}`}
-      ref={rowRef}
+      className={`todo-item ${hasSubtasks ? "todo-item--parent" : ""} ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""} ${drag.isDragging ? "todo-item--dragging" : ""} ${isDropTarget ? "todo-item--drop-target" : ""} ${draggingId && !drag.isDragging ? "todo-item--dnd-idle" : ""}`}
+      data-drop-hint={translate("todo.reparent.dropHint")}
+      ref={setRowNode}
+      style={dragStyle}
+      {...drag.listeners}
     >
       <div className="todo-item__main">
         <span className="todo-item__gutter">
@@ -648,9 +756,19 @@ function SubtaskRow({ item, repository, scraps, onAddNext }: { item: TodoItem; r
     onError: (mutationErr) => setError(errorMessage(mutationErr)),
   });
   const busy = toggle.isPending || remove.isPending || rename.isPending;
+  const drag = useDraggable({ id: item.id, data: { item } });
+  const dragStyle: CSSProperties | undefined = drag.transform
+    ? { transform: `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)`, zIndex: 20, position: "relative" }
+    : undefined;
 
   return (
-    <div aria-busy={busy} className={`todo-subtask ${item.done ? "todo-subtask--done" : ""}`}>
+    <div
+      aria-busy={busy}
+      className={`todo-subtask ${item.done ? "todo-subtask--done" : ""} ${drag.isDragging ? "todo-subtask--dragging" : ""}`}
+      ref={drag.setNodeRef}
+      style={dragStyle}
+      {...drag.listeners}
+    >
       <Checkbox checked={item.done} className="todo-subtask__check" disabled={busy} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggle.mutate()} />
       {editing ? (
         <input

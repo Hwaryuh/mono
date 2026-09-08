@@ -323,7 +323,10 @@
 .todo-subtask-add__input::placeholder { color: var(--color-text-faint); }
 .todo-subtask-add__input:hover { background: var(--color-hover); }
 .todo-subtask-add__input:focus { border-color: var(--color-accent); background: var(--color-surface); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent); }
-.todo-item__stars { position: relative; z-index: 2; flex: none; display: inline-flex; align-items: center; }
+/* translateZ(0) pins the star cluster to its own compositor layer. Without it, the opacity
+   fade on .todo-item__add-sub during row hover re-layerizes this z-indexed context and the
+   sub-pixel x origin snaps to the device grid, nudging the stars a fraction each hover. */
+.todo-item__stars { position: relative; z-index: 2; flex: none; display: inline-flex; align-items: center; transform: translateZ(0); }
 .todo-item__star { appearance: none; width: 19px; height: 22px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 5px; box-shadow: none; background: transparent; color: var(--color-text-faint); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out; }
 .todo-item__star:hover { background: var(--color-hover); color: var(--color-text-muted); }
 .todo-item__star:active { scale: 0.85; }
@@ -363,6 +366,45 @@
 .todo-item__note { flex: none; color: var(--color-text-faint); }
 .todo-item--done { background: var(--color-surface-subtle); }
 .todo-item--completion-feedback { animation: todo-complete-feedback 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Drag a todo onto another to nest it as a subtask. */
+.todo-item--dnd-idle:not(.todo-item--dragging) { cursor: grab; }
+.todo-item--dragging { cursor: grabbing; opacity: 0.9; box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--color-text) 30%, transparent); }
+.todo-item--dragging * { cursor: grabbing; }
+.todo-item--drop-target { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent), 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent); }
+.todo-item--drop-target::after {
+  content: attr(data-drop-hint);
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.todo-subtask--dragging { cursor: grabbing; opacity: 0.9; background: var(--color-surface); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--color-text) 28%, transparent); }
+
+.todo-promote-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-faint);
+  font-size: 11px;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out, color 120ms ease-out;
+}
+.todo-promote-strip--over { border-color: var(--color-accent); border-style: solid; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-promote-strip { transition: none; }
+}
 .todo-item--done .todo-item__copy > strong { color: var(--color-text-faint); text-decoration: line-through; }
 .todo-item[aria-busy="true"] { opacity: 0.68; }
 .todo-item__error {

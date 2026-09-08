@@ -107,6 +107,32 @@ class MockTodoRepository implements TodoRepository {
     if (item.parentId) this.resyncParent(item.parentId);
   }
 
+  async reparent(itemId: string, parentId: string | null) {
+    const item = requireItem(this.state.todo.items, itemId);
+    const oldParentId = item.parentId;
+
+    if (parentId === null) {
+      if (oldParentId === null) return;
+      this.state.todo.items = this.state.todo.items.map((candidate) =>
+        candidate.id === itemId ? { ...candidate, parentId: null } : candidate);
+    } else {
+      if (parentId === itemId) throw new Error("할 일을 자기 자신의 하위로 옮길 수 없습니다.");
+      const parent = requireItem(this.state.todo.items, parentId);
+      if (parent.parentId) throw new Error("하위 항목 아래에는 다시 하위 항목을 만들 수 없습니다.");
+      if (this.state.todo.items.some((candidate) => candidate.parentId === itemId)) {
+        throw new Error("하위 항목이 있는 할 일은 다른 할 일의 하위로 옮길 수 없습니다.");
+      }
+      if (oldParentId === parentId) return;
+      this.state.todo.items = this.state.todo.items.map((candidate) =>
+        candidate.id === itemId
+          ? { ...candidate, parentId, labelId: parent.labelId, dueDate: null, dueTime: null, note: "", priority: 0 }
+          : candidate);
+      this.resyncParent(parentId);
+    }
+
+    if (oldParentId) this.resyncParent(oldParentId);
+  }
+
   async delete(itemId: string) {
     const item = requireItem(this.state.todo.items, itemId);
     const parentId = item.parentId;
