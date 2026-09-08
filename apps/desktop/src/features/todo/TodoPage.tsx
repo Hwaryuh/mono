@@ -5,6 +5,7 @@ import { Button, Checkbox, DatePicker, Icon, Modal, Select, TimePicker, type Ico
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   pointerWithin,
   useDraggable,
@@ -13,7 +14,8 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
@@ -417,6 +419,17 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
             <div className="todo-empty"><Icon name="todo" size={26} /><strong>{translate("todo.empty.title")}</strong><span>{translate("todo.empty.description")}</span><Button onClick={openCreate} variant="primary">{translate("app.action.newTodo")}</Button></div>
           )}
         </div>
+        {/* No drop animation: on drop the todo usually moves (becomes a subtask elsewhere), so animating
+            the chip back to its origin would be wrong — and it can leave the overlay mounted when the
+            source row re-renders in a new position. */}
+        <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
+          {draggingItem && (
+            <div className="todo-drag-chip">
+              <span className="todo-drag-chip__dot" style={{ backgroundColor: (snapshot.labels.find((l) => l.id === draggingItem.labelId) ?? snapshot.labels[0]).color }} />
+              <span className="todo-drag-chip__title">{resolveScrapMentions(draggingItem.title, scraps)}</span>
+            </div>
+          )}
+        </DragOverlay>
         </DndContext>
       </section>
 
@@ -581,9 +594,6 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
     drag.setNodeRef(node);
     drop.setNodeRef(node);
   };
-  const dragStyle: CSSProperties | undefined = drag.transform
-    ? { transform: `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)`, zIndex: 20, position: "relative" }
-    : undefined;
   const queryClient = useQueryClient();
   const toggleMutation = useMutation({
     mutationFn: () => repository.toggleComplete(item.id),
@@ -642,7 +652,6 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
       aria-busy={toggleMutation.isPending}
       className={`todo-item ${hasSubtasks ? "todo-item--parent" : ""} ${item.done ? "todo-item--done" : ""} ${justCompleted ? "todo-item--completion-feedback" : ""} ${drag.isDragging ? "todo-item--dragging" : ""} ${isDropTarget ? "todo-item--drop-target" : ""} ${draggingId && !drag.isDragging ? "todo-item--dnd-idle" : ""}`}
       ref={setRowNode}
-      style={dragStyle}
       {...drag.listeners}
     >
       <div className="todo-item__main">
@@ -762,16 +771,12 @@ function SubtaskRow({ item, repository, scraps, onAddNext }: { item: TodoItem; r
   });
   const busy = toggle.isPending || remove.isPending || rename.isPending;
   const drag = useDraggable({ id: item.id, data: { item } });
-  const dragStyle: CSSProperties | undefined = drag.transform
-    ? { transform: `translate3d(${drag.transform.x}px, ${drag.transform.y}px, 0)`, zIndex: 20, position: "relative" }
-    : undefined;
 
   return (
     <div
       aria-busy={busy}
       className={`todo-subtask ${item.done ? "todo-subtask--done" : ""} ${drag.isDragging ? "todo-subtask--dragging" : ""}`}
       ref={drag.setNodeRef}
-      style={dragStyle}
       {...drag.listeners}
     >
       <Checkbox checked={item.done} className="todo-subtask__check" disabled={busy} label={translate("routine.action.toggleCompletion", { title: displayTitle, state: item.done ? translate("routine.status.incomplete") : translate("todo.filter.completed") })} onCheckedChange={() => toggle.mutate()} />

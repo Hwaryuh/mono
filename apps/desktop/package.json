@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
     "@mono/contracts": "0.1.0",
     "@mono/domain": "0.1.0",
     "@mono/ui": "0.1.0",

@@ -367,10 +367,36 @@
 .todo-item--done { background: var(--color-surface-subtle); }
 .todo-item--completion-feedback { animation: todo-complete-feedback 220ms cubic-bezier(0.16, 1, 0.3, 1); }
 
-/* Drag a todo onto another to nest it as a subtask. */
+/* Drag a todo onto another to nest it as a subtask. The card the cursor carries is a small chip
+   (.todo-drag-chip, rendered in dnd-kit's DragOverlay) — the source row stays put as a dim gap. */
 .todo-item--dnd-idle:not(.todo-item--dragging) { cursor: grab; }
-.todo-item--dragging { cursor: grabbing; opacity: 0.9; box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--color-text) 30%, transparent); }
-.todo-item--dragging * { cursor: grabbing; }
+.todo-item--dragging { opacity: 0.4; }
+.todo-item--dragging .todo-item__hit { cursor: grabbing; }
+
+.todo-drag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  padding: 7px 13px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow:
+    0 14px 30px -10px color-mix(in srgb, var(--color-text) 42%, transparent),
+    0 3px 8px -3px color-mix(in srgb, var(--color-text) 30%, transparent);
+  cursor: grabbing;
+}
+.todo-drag-chip__dot { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.todo-drag-chip__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The target shows the dragged todo as a ghost subtask — a live preview of where it will land. */
 .todo-item--drop-target { border-color: var(--color-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent); }
 .todo-item--drop-target .todo-subtasks { border-left-color: var(--color-accent); }
@@ -387,7 +413,7 @@
   border-radius: 4px;
 }
 .todo-subtask--ghost .todo-subtask__title { color: var(--color-accent); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.todo-subtask--dragging { cursor: grabbing; opacity: 0.9; background: var(--color-surface); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--color-text) 28%, transparent); }
+.todo-subtask--dragging { opacity: 0.4; }
 
 .todo-promote-strip {
   display: flex;
