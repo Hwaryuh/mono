@@ -591,7 +591,24 @@ function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
     }
   });
 
-  return <button className="scrap-list-card" onClick={onOpen} ref={cardRef} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div className="scrap-list-card__footer"><span>{item.tag}</span><span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
+  const isText = item.kind === "text";
+  return (
+    <button className="scrap-list-card" onClick={onOpen} ref={cardRef} type="button">
+      <div className={isText ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}>
+        {isText
+          ? <div className={item.memo.trim() ? "scrap-list-card__excerpt" : "scrap-list-card__excerpt scrap-list-card__excerpt--title"}><span>{item.memo.trim() || item.title}</span></div>
+          : <ScrapMediaPreview iconSize={20} item={item} meta={meta} />}
+      </div>
+      <div className="scrap-list-card__body">
+        <strong title={item.title}>{item.title}</strong>
+        {!isText && <p>{item.memo}</p>}
+        <div className="scrap-list-card__footer">
+          <span>{item.tag}</span>
+          <span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span>
+        </div>
+      </div>
+    </button>
+  );
 }
 
 function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onManageTags }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void; onManageTags: () => void }) {
