@@ -127,6 +127,20 @@ describe("CalendarPage", () => {
     expect(screen.queryByRole("dialog", { name: "시작 날짜 선택" })).not.toBeInTheDocument();
   });
 
+  it("drags the untouched end to match the start (same day, +1h) until the end is edited", async () => {
+    renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "새 일정" });
+    const startTime = within(modal).getByRole("textbox", { name: "시작 시간" });
+    const endTime = within(modal).getByRole("textbox", { name: "종료 시간" });
+
+    fireEvent.change(startTime, { target: { value: "14:00" } });
+    expect(endTime).toHaveValue("15:00");
+
+    fireEvent.change(endTime, { target: { value: "18:00" } });
+    fireEvent.change(startTime, { target: { value: "08:00" } });
+    expect(endTime).toHaveValue("18:00");
+  });
+
   it("selects from the app-style label list using the keyboard", async () => {
     renderCalendar(createMockCalendarRepository(), "/calendar?modal=new");
     const modal = await screen.findByRole("dialog", { name: "새 일정" });

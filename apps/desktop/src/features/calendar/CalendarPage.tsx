@@ -71,6 +71,14 @@ function blankDraft(snapshot: CalendarSnapshot, selectedDate = snapshot.today): 
   };
 }
 
+// "HH:MM" + 1 hour, clamped to 23:59 so the end stays on the same day. Non-times pass through.
+function addOneHour(time: string): string {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return time;
+  const hour = Number(match[1]) + 1;
+  return hour >= 24 ? "23:59" : `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
 function draftOf(event: CalendarEvent): Draft {
   return {
     title: event.title,
@@ -232,6 +240,8 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
   const [editorItem, setEditorItem] = useState<EditorItem>(null);
   const [draft, setDraft] = useState<Draft>({ title: "", startDate: "", startTime: "", endDate: "", endTime: "", location: "", categoryId: "", note: "", recurrence: null });
   const [formError, setFormError] = useState<string | null>(null);
+  // When false, editing the start date/time drags the untouched end to match (same day, +1h).
+  const [endEdited, setEndEdited] = useState(false);
   // The dialog for choosing the scope when saving/deleting an occurrence of a recurring series.
   const [scopePrompt, setScopePrompt] = useState<{ mode: "save" | "delete"; event: CalendarEvent; input?: CalendarWriteInput } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -344,6 +354,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
       setDraft(blankDraft(snapshot));
       setEditorItem("new");
       setFormError(null);
+      setEndEdited(false);
     } else if (modal === "edit") {
       const item = snapshot.events.find((candidate) => candidate.id === id);
       if (item) openEditorState(item);
@@ -365,6 +376,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     setDraft(blankDraft(snapshot, selectedDate));
     setEditorItem("new");
     setFormError(null);
+    setEndEdited(false);
     setSearchParams({ modal: "new" }, { replace: true });
   }
 
@@ -373,6 +385,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     setDraft(draftOf(item));
     setEditorItem(item);
     setFormError(null);
+    setEndEdited(true);
   }
 
   function openEditor(item: CalendarEvent) {
@@ -390,6 +403,22 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
 
   function setDraftField<Key extends keyof Draft>(key: Key, value: Draft[Key]) {
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function setStartField<Key extends keyof Draft>(key: Key, value: Draft[Key]) {
+    setDraft((current) => {
+      const next = { ...current, [key]: value };
+      if (!endEdited && (key === "startDate" || key === "startTime")) {
+        next.endDate = next.startDate;
+        next.endTime = addOneHour(next.startTime);
+      }
+      return next;
+    });
+  }
+
+  function setEndField<Key extends keyof Draft>(key: Key, value: Draft[Key]) {
+    setEndEdited(true);
+    setDraftField(key, value);
   }
 
   function draftToInput(): CalendarWriteInput | null {
@@ -565,8 +594,8 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
       >
         <form aria-busy={editorBusy} className="calendar-event-form" id="calendar-event-form" onSubmit={submit}>
           <label className="calendar-event-form__title"><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
-          <DateTimeFields draft={draft} label={translate("calendar.field.start")} onChange={setDraftField} prefix="start" />
-          <DateTimeFields draft={draft} label={translate("calendar.field.end")} onChange={setDraftField} prefix="end" />
+          <DateTimeFields draft={draft} label={translate("calendar.field.start")} onChange={setStartField} prefix="start" />
+          <DateTimeFields draft={draft} label={translate("calendar.field.end")} onChange={setEndField} prefix="end" />
           <RecurrenceField
             disabled={editorBusy}
             onChange={(recurrence) => setDraftField("recurrence", recurrence)}
