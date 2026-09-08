@@ -20,8 +20,12 @@ function storageOf(initial: Record<string, string> = {}): Storage {
 
 describe("timer settings", () => {
   it("clamps an out-of-range value to the boundary", () => {
-    expect(normalizeTimerSettings({ focusMinutes: 999 }).focusMinutes).toBe(180);
-    expect(normalizeTimerSettings({ focusMinutes: 0 }).focusMinutes).toBe(1);
+    expect(normalizeTimerSettings({ focusSeconds: 999_999 }).focusSeconds).toBe(180 * 60);
+    expect(normalizeTimerSettings({ focusSeconds: 0 }).focusSeconds).toBe(1);
+  });
+
+  it("migrates a legacy focusMinutes value to seconds", () => {
+    expect(normalizeTimerSettings({ focusMinutes: 25 }).focusSeconds).toBe(1500);
   });
 
   it("discards the legacy rest setting", () => {
@@ -33,16 +37,16 @@ describe("timer settings", () => {
   });
 
   it("fills in missing or corrupted values with defaults", () => {
-    expect(normalizeTimerSettings({ focusMinutes: "몰라" })).toEqual(defaultTimerSettings);
+    expect(normalizeTimerSettings({ focusSeconds: "몰라" })).toEqual(defaultTimerSettings);
     expect(normalizeTimerSettings(null)).toEqual(defaultTimerSettings);
   });
 
   it("reads back a saved value", () => {
     const storage = storageOf();
     const store = LocalStorageTimerSettingsStore.of(storage);
-    store.write({ ...defaultTimerSettings, focusMinutes: 50, alarmEnabled: false });
+    store.write({ ...defaultTimerSettings, focusSeconds: 50 * 60 + 30, alarmEnabled: false });
 
-    expect(store.read()).toMatchObject({ focusMinutes: 50, alarmEnabled: false });
+    expect(store.read()).toMatchObject({ focusSeconds: 3030, alarmEnabled: false });
   });
 
   it("reads a corrupted stored value as the default", () => {

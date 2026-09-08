@@ -3,16 +3,16 @@ export const TIMER_SETTINGS_STORAGE_KEY = "mono:timer-settings";
 export const TIMER_SETTINGS_EVENT = "mono:timer-settings-changed";
 
 export type TimerSettings = {
-  focusMinutes: number;
+  focusSeconds: number;
   alarmEnabled: boolean;
 };
 
 export const defaultTimerSettings: TimerSettings = {
-  focusMinutes: 25,
+  focusSeconds: 25 * 60,
   alarmEnabled: true,
 };
 
-const timerMinuteBounds = { min: 1, max: 180 } as const;
+const timerSecondBounds = { min: 1, max: 180 * 60 } as const;
 
 function clamp(value: unknown, fallback: number, bounds: { min: number; max: number }): number {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -22,9 +22,11 @@ function clamp(value: unknown, fallback: number, bounds: { min: number; max: num
 
 export function normalizeTimerSettings(value: unknown): TimerSettings {
   if (!value || typeof value !== "object") return defaultTimerSettings;
-  const raw = value as Partial<TimerSettings>;
+  const raw = value as Partial<TimerSettings> & { focusMinutes?: number };
+  // Migration: settings stored before second-precision only had focusMinutes.
+  const seconds = raw.focusSeconds ?? (typeof raw.focusMinutes === "number" ? raw.focusMinutes * 60 : undefined);
   return {
-    focusMinutes: clamp(raw.focusMinutes, defaultTimerSettings.focusMinutes, timerMinuteBounds),
+    focusSeconds: clamp(seconds, defaultTimerSettings.focusSeconds, timerSecondBounds),
     alarmEnabled: typeof raw.alarmEnabled === "boolean" ? raw.alarmEnabled : defaultTimerSettings.alarmEnabled,
   };
 }

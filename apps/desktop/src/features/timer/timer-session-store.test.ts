@@ -21,7 +21,7 @@ describe("LocalStorageTimerSessionStore", () => {
     const storage = storageOf({
       [TIMER_SESSIONS_STORAGE_KEY]: JSON.stringify({
         date: "2026-09-01",
-        sessions: [{ startedAt: "09:20", minutes: 25 }],
+        sessions: [{ startedAt: "09:20", seconds: 1500 }],
       }),
     });
 
@@ -30,8 +30,8 @@ describe("LocalStorageTimerSessionStore", () => {
 
   it("accumulates sessions from the same day", () => {
     const store = LocalStorageTimerSessionStore.of(storageOf());
-    store.append("2026-09-02", { startedAt: "09:20", minutes: 25 });
-    const sessions = store.append("2026-09-02", { startedAt: "09:55", minutes: 25 });
+    store.append("2026-09-02", { startedAt: "09:20", seconds: 1500 });
+    const sessions = store.append("2026-09-02", { startedAt: "09:55", seconds: 1500 });
 
     expect(sessions).toHaveLength(2);
     expect(store.read("2026-09-02")).toHaveLength(2);

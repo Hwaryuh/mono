@@ -26,6 +26,15 @@ function formatClock(seconds: number) {
   return `${minutes}:${String(safe % 60).padStart(2, "0")}`;
 }
 
+/** "M:SS" → total seconds; a bare number is read as minutes (keeps the old muscle memory). */
+function parseDuration(raw: string): number | null {
+  const text = raw.trim();
+  const clock = /^(\d+):([0-5]?\d)$/.exec(text);
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]);
+  if (/^\d+$/.test(text)) return Number(text) * 60;
+  return null;
+}
+
 function startedAtOf(now: Date) {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
@@ -49,22 +58,22 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
   const today = currentIsoDate();
 
   const [settings, setSettings] = useState<TimerSettings>(() => preferences.read());
-  const [remaining, setRemaining] = useState(() => preferences.read().focusMinutes * 60);
+  const [remaining, setRemaining] = useState(() => preferences.read().focusSeconds);
   // The end time (epoch ms) while running. Remaining seconds must be recomputed on every tick, or setInterval drift accumulates.
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [sessions, setSessions] = useState<TimerSession[]>(() => store.read(today));
   // Whether focus just ended and the alarm is currently ringing. Won't move to the next session until it's turned off.
   const [ringing, setRinging] = useState(false);
-  // Whether the duration is being edited by tapping the large number. The input is only narrowed to a number on commit (blur/Enter).
-  const [editingMinutes, setEditingMinutes] = useState(false);
-  const [minutesDraft, setMinutesDraft] = useState<string | null>(null);
+  // Whether the duration is being edited by tapping the large number. The text is only parsed on commit (blur/Enter).
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [durationDraft, setDurationDraft] = useState<string | null>(null);
 
-  const total = settings.focusMinutes * 60;
+  const total = settings.focusSeconds;
   const running = endsAt !== null;
   // The duration can only be edited when neither counting down nor ringing (includes before start and while paused).
-  const canEditMinutes = !running && !ringing;
+  const canEditDuration = !running && !ringing;
 
-  const focusedMinutes = sessions.reduce((sum, session) => sum + session.minutes, 0);
+  const focusedSeconds = sessions.reduce((sum, session) => sum + session.seconds, 0);
 
   useEffect(() => {
     if (endsAt === null) return;
@@ -98,7 +107,7 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
       setSettings(next);
       // Doesn't touch a session that's currently running. Only applies the new duration while stopped.
       setEndsAt((current) => {
-        if (current === null) setRemaining(next.focusMinutes * 60);
+        if (current === null) setRemaining(next.focusSeconds);
         return current;
       });
     };
@@ -124,15 +133,15 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
   }, []);
 
   function resetToFocus() {
-    setRemaining(settings.focusMinutes * 60);
+    setRemaining(settings.focusSeconds);
     setEndsAt(null);
   }
 
   function finishFocus(record: boolean) {
     if (record) {
       setSessions(store.append(today, {
-        startedAt: startedAtOf(new Date(Date.now() - settings.focusMinutes * 60_000)),
-        minutes: settings.focusMinutes,
+        startedAt: startedAtOf(new Date(Date.now() - settings.focusSeconds * 1000)),
+        seconds: settings.focusSeconds,
       }));
       if (settings.alarmEnabled) {
         alarm.start();
@@ -150,15 +159,17 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
     resetToFocus();
   }
 
-  function commitMinutesDraft() {
-    const raw = minutesDraft;
-    setMinutesDraft(null);
-    setEditingMinutes(false);
+  function commitDurationDraft() {
+    const raw = durationDraft;
+    setDurationDraft(null);
+    setEditingDuration(false);
     if (raw === null || raw.trim() === "") return;
-    const next = normalizeTimerSettings({ ...settings, focusMinutes: Number(raw) });
+    const seconds = parseDuration(raw);
+    if (seconds === null) return;
+    const next = normalizeTimerSettings({ ...settings, focusSeconds: seconds });
     setSettings(next);
     preferences.write(next);
-    setRemaining(next.focusMinutes * 60);
+    setRemaining(next.focusSeconds);
   }
 
   function toggle() {
@@ -184,37 +195,33 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
   }
 
   const toggleLabel = running ? translate("timer.action.pause") : remaining === total ? translate("timer.action.start") : translate("timer.action.resume");
-  const currentMinutes = settings.focusMinutes;
 
   return (
     <div className="timer-page">
       <section className="timer-stage">
         <div className={`timer-digits ${ringing ? "timer-digits--ringing" : ""}`}>
-          {editingMinutes && canEditMinutes ? (
+          {editingDuration && canEditDuration ? (
             <input
               aria-label={translate("timer.adjust.label")}
               autoFocus
               className="timer-digits__input"
-              inputMode="numeric"
-              max={180}
-              min={1}
-              onBlur={commitMinutesDraft}
-              onChange={(event) => setMinutesDraft(event.target.value)}
+              onBlur={commitDurationDraft}
+              onChange={(event) => setDurationDraft(event.target.value)}
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
                 if (event.key === "Escape") {
-                  setMinutesDraft(null);
-                  setEditingMinutes(false);
+                  setDurationDraft(null);
+                  setEditingDuration(false);
                 }
               }}
-              type="number"
-              value={minutesDraft ?? String(currentMinutes)}
+              type="text"
+              value={durationDraft ?? formatClock(settings.focusSeconds)}
             />
-          ) : canEditMinutes ? (
+          ) : canEditDuration ? (
             <button
               className="timer-digits__edit"
-              onClick={() => setEditingMinutes(true)}
+              onClick={() => setEditingDuration(true)}
               title={translate("timer.adjust.edit")}
               type="button"
             >
@@ -224,7 +231,7 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
             formatClock(remaining)
           )}
         </div>
-        <div className="timer-bar" hidden={editingMinutes && canEditMinutes}>
+        <div className="timer-bar" hidden={editingDuration && canEditDuration}>
           <span style={{ width: `${Math.round(((total - remaining) / total) * 100)}%` }} />
         </div>
 
@@ -236,7 +243,7 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
             ))}
           </div>
           <span className="timer-tally__count">{sessions.length} / {DAILY_GOAL}</span>
-          {focusedMinutes > 0 && <span className="timer-tally__count">{translate("timer.duration.hoursMinutes", { hours: Math.floor(focusedMinutes / 60), minutes: focusedMinutes % 60 })}</span>}
+          {focusedSeconds > 0 && <span className="timer-tally__count">{translate("timer.duration.hoursMinutes", { hours: Math.floor(focusedSeconds / 3600), minutes: Math.round((focusedSeconds % 3600) / 60) })}</span>}
         </div>
 
         <div className="timer-controls">
@@ -269,7 +276,7 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
           {sessions.map((session, index) => (
             <div className="timer-log__row" key={`${session.startedAt}-${index}`}>
               <span className="timer-log__time">{session.startedAt}</span>
-              <span className="timer-log__minutes">{translate("timer.duration.minutes", { minutes: session.minutes })}</span>
+              <span className="timer-log__minutes">{formatClock(session.seconds)}</span>
             </div>
           ))}
         </div>

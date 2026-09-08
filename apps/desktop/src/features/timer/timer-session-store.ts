@@ -3,7 +3,7 @@ export const TIMER_SESSIONS_STORAGE_KEY = "mono:timer-sessions";
 export type TimerSession = {
   /** The time the session started. "HH:MM" */
   startedAt: string;
-  minutes: number;
+  seconds: number;
 };
 
 export interface TimerSessionStore {
@@ -17,7 +17,7 @@ function isSession(value: unknown): value is TimerSession {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<TimerSession>;
   return typeof session.startedAt === "string"
-    && typeof session.minutes === "number";
+    && typeof session.seconds === "number";
 }
 
 function parseLog(raw: string | null): StoredLog | null {
