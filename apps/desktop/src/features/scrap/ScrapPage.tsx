@@ -388,7 +388,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
             </div>
           )}
           <div className="scrap-comment-form__row">
-            <TextArea aria-label={translate("scrap.comment.new")} disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => { const file = firstFileFrom(event.clipboardData.files, event.clipboardData.items); if (file) { event.preventDefault(); chooseCommentFile(file); } }} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
+            <TextArea aria-label={translate("scrap.comment.new")} autoGrow disabled={commentBusyId === detail.id} maxLength={2_000} onChange={(event) => setCommentText(event.target.value)} onKeyDown={submitFormOnEnter} onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => { const file = firstFileFrom(event.clipboardData.files, event.clipboardData.items); if (file) { event.preventDefault(); chooseCommentFile(file); } }} placeholder={translate("scrap.comment.placeholder")} rows={1} value={commentText} />
             <IconButton aria-label={translate("scrap.comment.fileAttach")} disabled={commentBusyId === detail.id} onClick={() => commentFileInputRef.current?.click()} size="small" title={translate("scrap.comment.fileAttach")} type="button" variant="ghost"><Icon name="file" size={15} strokeWidth={1.5} /></IconButton>
             <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
           </div>
@@ -425,7 +425,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       >
         <form aria-busy={createMutation.isPending} className="scrap-create-form" id="scrap-create-form" onSubmit={submitCreate}>
           <label><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("scrap.editor.titlePlaceholder")} value={draft.title} /></label>
-          <label><span>{translate("common.field.note")}</span><TextArea maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder={translate("common.field.notePlaceholder")} rows={3} value={draft.memo} /></label>
+          <label><span>{translate("common.field.note")}</span><TextArea autoGrow maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder={translate("common.field.notePlaceholder")} rows={3} value={draft.memo} /></label>
           <label><span>{translate("scrap.field.optionalLink")}</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
           <div className="scrap-create-form__photo-field">
             <span className="scrap-create-form__photo-legend">{translate("scrap.field.optionalPhoto")}</span>
@@ -718,7 +718,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onMan
       : item.kind !== "text" && <div className="scrap-detail__media"><ScrapMediaPreview iconSize={22} item={item} meta={meta} /></div>}<div className="scrap-detail__copy">{editing ? (
     <form className="scrap-detail__editor" onSubmit={submitEdit}>
       <label><span>{translate("common.field.title")}</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
-      <label><span>{translate("common.field.note")}</span><TextArea disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
+      <label><span>{translate("common.field.note")}</span><TextArea autoGrow disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
       <label><span>{translate("scrap.field.optionalLink")}</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
       <div className="scrap-create-form__label-field">
         <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={editMutation.isPending} onClick={onManageTags} type="button">{translate("common.action.manage")}</button></div>
@@ -862,6 +862,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
             aria-invalid={editError ? "true" : undefined}
             aria-label={translate("scrap.comment.edit")}
             autoFocus
+            autoGrow
             disabled={updateMutation.isPending}
             maxLength={2_000}
             onChange={(event) => setDraft(event.target.value)}

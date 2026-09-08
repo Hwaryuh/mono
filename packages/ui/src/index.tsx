@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -71,8 +72,21 @@ export function Input({ className, invalid, ...props }: InputProps) {
   return <input aria-invalid={invalid || undefined} className={classes("ui-input", className)} {...props} />;
 }
 
-export function TextArea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={classes("ui-input", "ui-textarea", className)} {...props} />;
+export type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  /** Grow the field to fit its content, up to the CSS `max-height` (then scroll). */
+  autoGrow?: boolean;
+};
+
+export function TextArea({ className, autoGrow, ...props }: TextAreaProps) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  // WKWebView (macOS) has no `field-sizing`, so measure and set the height ourselves.
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element || !autoGrow) return;
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
+  }, [autoGrow, props.value]);
+  return <textarea className={classes("ui-input", "ui-textarea", autoGrow && "ui-textarea--grow", className)} ref={ref} {...props} />;
 }
 
 export type ChipProps = HTMLAttributes<HTMLSpanElement> & {

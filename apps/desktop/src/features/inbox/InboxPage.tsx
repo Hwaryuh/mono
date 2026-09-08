@@ -678,7 +678,7 @@ function InboxRow({
                 <label key={`${field.label}-${index}`}>
                   <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
                   {multiline
-                    ? <TextArea autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} rows={3} value={field.value} />
+                    ? <TextArea autoGrow autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} rows={3} value={field.value} />
                     : <Input autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} value={field.value} />}
                 </label>
               );

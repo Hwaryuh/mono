@@ -93,6 +93,7 @@
 .ui-input:focus { border-color: var(--color-accent); background: var(--color-surface); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .ui-input[aria-invalid="true"] { border-color: var(--color-danger); }
 .ui-textarea { min-height: 72px; padding-block: 8px; resize: vertical; line-height: 1.5; }
+.ui-textarea--grow { resize: none; overflow-y: auto; max-height: 40vh; }
 
 .ui-date-picker { position: relative; min-width: 0; }
 .ui-date-picker__trigger {

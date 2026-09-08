@@ -172,7 +172,7 @@
 .scrap-detail__editor > label > span,
 .scrap-detail__editor-photo-legend { color: var(--color-text-faint); font-size: 10.5px; }
 .scrap-detail__editor-photo { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.scrap-detail__editor .ui-textarea { height: auto; min-height: 66px; resize: none; }
+.scrap-detail__editor .ui-textarea { min-height: 66px; }
 .scrap-detail__editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .scrap-detail__copy > div { padding-top: 3px; display: flex; align-items: center; gap: 7px; min-width: 0; }
 .scrap-detail__url { min-width: 0; overflow: hidden; color: var(--color-accent); font-size: 10.5px; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-accent) 38%, transparent); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; }
@@ -210,7 +210,7 @@
 .scrap-comment__file strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .scrap-comment__file small { color: var(--color-text-faint); font-size: 10px; }
 .scrap-comment__editor { display: flex; flex-direction: column; gap: 7px; }
-.scrap-comment__editor .ui-textarea { min-height: 34px; max-height: 112px; height: auto; background: var(--color-surface); font-size: 12px; resize: none; field-sizing: content; }
+.scrap-comment__editor .ui-textarea { min-height: 34px; max-height: 112px; background: var(--color-surface); font-size: 12px; }
 .scrap-comment__editor-actions { display: flex; justify-content: flex-end; gap: 5px; }
 .scrap-comment__editor-actions .ui-button { min-height: 28px; }
 .scrap-comment__edit-error { color: var(--color-danger); font-size: 10px; line-height: 1.4; }
@@ -222,7 +222,7 @@
 .scrap-detail-drawer .ui-overlay__footer { padding-inline: 14px; }
 .scrap-comment-form { position: relative; min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .scrap-comment-form__row { display: flex; align-items: flex-end; gap: 8px; }
-.scrap-comment-form .ui-textarea { min-height: 34px; max-height: 112px; height: auto; background: var(--color-surface); resize: none; field-sizing: content; }
+.scrap-comment-form .ui-textarea { min-height: 34px; max-height: 112px; background: var(--color-surface); }
 .scrap-comment-form .ui-button { width: 34px; height: 34px; flex: 0 0 34px; padding: 0; }
 .scrap-comment-form__row > .ui-icon-button { width: 32px; height: 34px; flex: none; color: var(--color-text-faint); }
 .scrap-comment-form__file { min-width: 0; display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); font-size: 10.5px; }
@@ -237,7 +237,7 @@
 .scrap-create-form label > span,
 .scrap-create-form__photo-legend { color: var(--color-text-faint); font-size: 10.5px; }
 .scrap-create-form .ui-input { height: 34px; }
-.scrap-create-form .ui-textarea { height: auto; min-height: 72px; resize: none; }
+.scrap-create-form .ui-textarea { min-height: 72px; }
 .scrap-create-form__photo-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .scrap-photo-picker {
   width: 100%;

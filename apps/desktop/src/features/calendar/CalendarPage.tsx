@@ -581,7 +581,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
             </div>
             <Select align="end" label={translate("common.field.label")} onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
           </fieldset>
-          <label className="calendar-event-form__note"><span>{translate("common.field.note")}</span><TextArea maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
+          <label className="calendar-event-form__note"><span>{translate("common.field.note")}</span><TextArea autoGrow maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
           {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>

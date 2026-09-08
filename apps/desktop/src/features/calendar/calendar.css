@@ -286,7 +286,7 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event-form__location > svg { position: absolute; left: 9px; top: 50%; z-index: 1; transform: translateY(-50%); pointer-events: none; }
 .calendar-event-form__location > svg { color: var(--color-text-faint); }
 .calendar-event-form__location .ui-input { padding-left: 28px; }
-.calendar-event-form .ui-textarea { min-height: 72px; height: auto; resize: none; }
+.calendar-event-form .ui-textarea { min-height: 72px; }
 .calendar-event-form[aria-busy="true"] { opacity: 0.72; }
 .calendar-mutation-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
 
