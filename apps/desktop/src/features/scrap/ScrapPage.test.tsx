@@ -348,6 +348,12 @@ describe("ScrapPage", () => {
 
     expect(await within(drawer).findByText("합주실 후보 3곳")).toBeInTheDocument();
     expect((await repository.getSnapshot()).items.find((item) => item.id === "scrap-3")?.title).toBe("합주실 후보 3곳");
+
+    // Under the default "recently updated" sort the edited scrap re-sorts to the front of the list.
+    await waitFor(() => {
+      const cards = document.querySelectorAll(".scrap-list .scrap-list-card strong");
+      expect(cards[0]).toHaveTextContent("합주실 후보 3곳");
+    });
   });
 
   it("deletes a scrap after confirmation and removes it from the list and detail view", async () => {

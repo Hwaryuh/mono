@@ -4,7 +4,7 @@ import type { ScrapComment, ScrapCommentFile, ScrapItem, ScrapKind, ScrapSnapsho
 import { formatByteSize, formatTimestamp } from "@mono/domain";
 import { Button, Drawer, Icon, IconButton, Input, Modal, Select, TextArea, type IconName } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import { externalUrlOf, PlatformExternalUrlOpener, type ExternalUrlOpener } from "../../infrastructure/external-url-opener";
@@ -548,7 +548,50 @@ function CommentLinkPreview({ externalUrl, onOpen }: { externalUrl: string; onOp
 
 function ScrapCard({ item, onOpen }: { item: ScrapItem; onOpen: () => void }) {
   const meta = kindMeta[item.kind];
-  return <button className="scrap-list-card" onClick={onOpen} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div className="scrap-list-card__footer"><span>{item.tag}</span><span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
+  const cardRef = useRef<HTMLButtonElement>(null);
+  // offsetLeft/offsetTop are layout positions, unaffected by an in-flight FLIP transform — so a second
+  // render mid-animation (the realtime sync echo of the same edit) measures a zero delta and leaves it running.
+  const previousBox = useRef<{ left: number; top: number } | null>(null);
+  const previousUpdatedAt = useRef(item.updatedAt);
+  const moveRef = useRef<Animation | null>(null);
+
+  // When the list re-sorts (a scrap was edited, or a comment landed, under "recently updated"),
+  // FLIP each card from its old grid slot to the new one so the eye follows the change; the card
+  // that actually changed gets a brief accent pulse on arrival. Reduced motion keeps only the pulse.
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const box = { left: el.offsetLeft, top: el.offsetTop };
+    const before = previousBox.current;
+    previousBox.current = box;
+    const bumped = item.updatedAt !== previousUpdatedAt.current;
+    previousUpdatedAt.current = item.updatedAt;
+    if (!before || !el.animate) return;
+
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const dx = before.left - box.left;
+    const dy = before.top - box.top;
+
+    if (!reduced && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
+      moveRef.current?.cancel();
+      moveRef.current = el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)`, zIndex: 2 }, { transform: "translate(0, 0)", zIndex: 2 }],
+        { duration: 340, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+      );
+    }
+    if (bumped) {
+      // Resolve the tokens to concrete colors — custom properties inside animate() keyframes are unreliable in WKWebView.
+      const style = window.getComputedStyle(el);
+      const accent = style.getPropertyValue("--color-accent").trim() || "currentColor";
+      const resting = style.getPropertyValue("--color-border").trim() || "transparent";
+      el.animate(
+        [{ borderColor: accent }, { borderColor: resting }],
+        { duration: reduced ? 900 : 620, easing: "ease-out" },
+      );
+    }
+  });
+
+  return <button className="scrap-list-card" onClick={onOpen} ref={cardRef} type="button"><div className={item.kind === "text" ? "scrap-list-card__media scrap-list-card__media--text" : "scrap-list-card__media"}><ScrapMediaPreview iconSize={20} item={item} meta={meta} /></div><div className="scrap-list-card__body"><strong title={item.title}>{item.title}</strong><p>{item.memo}</p><div className="scrap-list-card__footer"><span>{item.tag}</span><span className="scrap-list-card__comment-count"><Icon name="message" size={11} />{item.comments.length}</span></div></div></button>;
 }
 
 function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onManageTags }: { item: ScrapItem; repository: ScrapRepository; tags: string[]; urlOpener: ExternalUrlOpener; onRequestDelete: () => void; onManageTags: () => void }) {

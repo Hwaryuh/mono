@@ -89,6 +89,7 @@
 }
 
 .scrap-list-card {
+  position: relative;
   width: 100%;
   min-width: 0;
   padding: 0;
