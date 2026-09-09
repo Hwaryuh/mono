@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   location TEXT NOT NULL DEFAULT '',
   category_id TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT '',
+  reminder_minutes INTEGER,
   version INTEGER NOT NULL DEFAULT 1
 );
 -- 반복 규칙. calendar_events의 마스터 행이 여기 항목을 가지면 반복 시리즈다.
@@ -255,6 +256,7 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
         "todo_items",
         &[("priority", "INTEGER NOT NULL DEFAULT 0"), ("parent_id", "TEXT")],
     )?;
+    migrate_add_columns(conn, "calendar_events", &[("reminder_minutes", "INTEGER")])?;
     conn.execute_batch(SEED)?;
     Ok(())
 }

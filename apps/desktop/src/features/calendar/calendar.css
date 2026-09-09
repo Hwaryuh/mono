@@ -205,9 +205,11 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-event-form__location-field,
 .calendar-event-form__category,
 .calendar-event-form__note,
+.calendar-event-form__reminder,
 .calendar-event-form__recurrence,
 .calendar-mutation-error { grid-column: 1 / -1; }
 
+.calendar-event-form__reminder > .ui-select,
 .calendar-event-form__recurrence > .ui-select { width: 100%; }
 .calendar-recurrence { margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--color-border); }
 .calendar-recurrence__interval > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; }

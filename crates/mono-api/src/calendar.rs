@@ -56,6 +56,7 @@ struct CalendarEvent {
     location: String,
     category_id: String,
     note: String,
+    reminder_minutes: Option<i64>,
     recurrence: Option<Recurrence>,
     series_id: Option<String>,
     occurrence_date: Option<String>,
@@ -81,6 +82,8 @@ struct CalendarWriteInput {
     category_id: String,
     #[serde(default)]
     note: String,
+    #[serde(default)]
+    reminder_minutes: Option<i64>,
     #[serde(default)]
     recurrence: Option<Recurrence>,
     // The scope when editing/deleting a recurring event. "this" | "future" | "all". Ignored for a single event.
@@ -159,6 +162,7 @@ struct MasterRow {
     location: String,
     category_id: String,
     note: String,
+    reminder_minutes: Option<i64>,
     recurrence: Option<Recurrence>,
     version: i64,
 }
@@ -182,7 +186,8 @@ fn load_masters(conn: &Connection) -> ApiResult<Vec<MasterRow>> {
         .prepare(
             "SELECT e.id, e.title, e.start_date, e.start_time, e.end_date, e.end_time, \
                     e.location, e.category_id, e.note, \
-                    r.freq, r.interval_n, r.weekdays_json, r.until_date, r.count_n, e.version \
+                    r.freq, r.interval_n, r.weekdays_json, r.until_date, r.count_n, e.version, \
+                    e.reminder_minutes \
              FROM calendar_events e LEFT JOIN calendar_recurrences r ON r.event_id = e.id \
              ORDER BY e.seq DESC",
         )?
@@ -209,6 +214,7 @@ fn load_masters(conn: &Connection) -> ApiResult<Vec<MasterRow>> {
                 location: row.get(6)?,
                 category_id: row.get(7)?,
                 note: row.get(8)?,
+                reminder_minutes: row.get(15)?,
                 recurrence,
                 version: row.get(14)?,
             })
@@ -350,6 +356,7 @@ fn to_event(master: &MasterRow, slot: Option<NaiveDate>, span_days: i64) -> Cale
             location: master.location.clone(),
             category_id: master.category_id.clone(),
             note: master.note.clone(),
+            reminder_minutes: master.reminder_minutes,
             recurrence: master.recurrence.clone(),
             series_id: None,
             occurrence_date: None,
@@ -368,6 +375,7 @@ fn to_event(master: &MasterRow, slot: Option<NaiveDate>, span_days: i64) -> Cale
                 location: master.location.clone(),
                 category_id: master.category_id.clone(),
                 note: master.note.clone(),
+                reminder_minutes: master.reminder_minutes,
                 recurrence: master.recurrence.clone(),
                 series_id: Some(master.id.clone()),
                 occurrence_date: Some(occ),
@@ -541,9 +549,15 @@ struct EventColumns {
     location: String,
     category_id: String,
     note: String,
+    reminder_minutes: Option<i64>,
 }
 
 fn validate_event(input: &CalendarWriteInput) -> ApiResult<EventColumns> {
+    if let Some(minutes) = input.reminder_minutes {
+        if !(0..=40_320).contains(&minutes) {
+            return Err(ApiError::validation("알림 시각이 올바르지 않습니다."));
+        }
+    }
     Ok(EventColumns {
         title: validated_title(&input.title)?,
         start_date: input.start_date.clone(),
@@ -553,6 +567,7 @@ fn validate_event(input: &CalendarWriteInput) -> ApiResult<EventColumns> {
         location: validated_len(&input.location, 500, "장소")?,
         category_id: input.category_id.clone(),
         note: validated_len(&input.note, 4_000, "메모")?,
+        reminder_minutes: input.reminder_minutes,
     })
 }
 
@@ -598,8 +613,8 @@ fn insert_event(
 ) -> ApiResult<()> {
     conn.execute(
         "INSERT INTO calendar_events \
-         (id, seq, title, start_date, start_time, end_date, end_time, location, category_id, note) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+         (id, seq, title, start_date, start_time, end_date, end_time, location, category_id, note, reminder_minutes) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             id,
             next_seq(conn)? + 1,
@@ -611,6 +626,7 @@ fn insert_event(
             event.location,
             event.category_id,
             event.note,
+            event.reminder_minutes,
         ],
     )?;
     if let Some(rule) = recurrence {
@@ -639,8 +655,8 @@ fn create_event(conn: &Connection, input: CalendarWriteInput) -> ApiResult<()> {
 fn set_master_columns(conn: &Connection, id: &str, event: &EventColumns, expected: Option<i64>) -> ApiResult<()> {
     let changed = conn.execute(
         "UPDATE calendar_events SET title = ?1, start_date = ?2, start_time = ?3, end_date = ?4, \
-         end_time = ?5, location = ?6, category_id = ?7, note = ?8, version = version + 1 \
-         WHERE id = ?9 AND (?10 IS NULL OR version = ?10)",
+         end_time = ?5, location = ?6, category_id = ?7, note = ?8, reminder_minutes = ?9, version = version + 1 \
+         WHERE id = ?10 AND (?11 IS NULL OR version = ?11)",
         params![
             event.title,
             event.start_date,
@@ -650,6 +666,7 @@ fn set_master_columns(conn: &Connection, id: &str, event: &EventColumns, expecte
             event.location,
             event.category_id,
             event.note,
+            event.reminder_minutes,
             id,
             expected,
         ],
@@ -923,6 +940,7 @@ mod tests {
             location: String::new(),
             category_id: category_id.into(),
             note: String::new(),
+            reminder_minutes: None,
             recurrence: None,
             scope: None,
         }
@@ -1172,5 +1190,27 @@ mod tests {
 
         let err = update_event(&conn, "nope", event_input("x", &category), None).unwrap_err();
         assert!(matches!(err, ApiError::NotFound(m) if m.contains("찾을 수 없습니다")));
+    }
+
+    #[test]
+    fn reminder_minutes_round_trips_and_is_range_checked() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let category = seed_category(&conn, "취미");
+
+        let mut with_reminder = event_input("알림 일정", &category);
+        with_reminder.reminder_minutes = Some(10);
+        create_event(&conn, with_reminder).unwrap();
+        assert_eq!(snapshot(&conn).events[0].reminder_minutes, Some(10));
+
+        let id = snapshot(&conn).events[0].id.clone();
+        let mut cleared = event_input("알림 일정", &category);
+        cleared.reminder_minutes = None;
+        update_event(&conn, &id, cleared, None).unwrap();
+        assert_eq!(snapshot(&conn).events[0].reminder_minutes, None);
+
+        let mut bad = event_input("범위 밖", &category);
+        bad.reminder_minutes = Some(-1);
+        assert!(matches!(create_event(&conn, bad).unwrap_err(), ApiError::Validation(_)));
     }
 }

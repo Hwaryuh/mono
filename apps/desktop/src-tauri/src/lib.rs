@@ -5,6 +5,8 @@ use tauri::Manager;
 
 mod alarm;
 mod runtime_server;
+#[cfg(desktop)]
+mod tray;
 
 use alarm::Alarm;
 use runtime_server::{RuntimeServer, ServerMode, StoredConnection};
@@ -160,7 +162,19 @@ pub fn run() {
             alarm::alarm_start,
             alarm::alarm_stop
         ])
+        .on_window_event(|window, event| {
+            // Closing the window hides it to the tray instead of quitting — reminders keep firing.
+            // "종료" in the tray menu is the real quit.
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
+            #[cfg(desktop)]
+            tray::init(app.handle())?;
+
             let data_directory = app
                 .path()
                 .app_data_dir()

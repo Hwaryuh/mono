@@ -306,6 +306,8 @@ export const calendarEventSchema = z.object({
   location: z.string(),
   categoryId: z.string(),
   note: z.string(),
+  // Minutes before the start to fire a reminder notification. null = no reminder. 0 = at start time.
+  reminderMinutes: z.number().int().min(0).max(40_320).nullable().default(null),
   // The recurring series' rule (carried on both the master and expanded occurrences). null for a single event.
   recurrence: calendarRecurrenceSchema.nullable().default(null),
   // For an expanded occurrence, the master event's id and that occurrence's original slot date. null for a single event.
@@ -325,6 +327,7 @@ export const calendarWriteInputSchema = calendarEventSchema
     title: z.string().trim().min(1).max(500),
     location: z.string().max(500),
     note: z.string().max(4_000),
+    reminderMinutes: z.number().int().min(0).max(40_320).nullable().optional(),
     recurrence: calendarRecurrenceSchema.nullable().optional(),
   });
 

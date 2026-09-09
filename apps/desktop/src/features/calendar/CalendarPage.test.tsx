@@ -237,6 +237,21 @@ describe("CalendarPage", () => {
     expect(await screen.findByRole("button", { name: /정기 치과 검진/ })).toHaveFocus();
   });
 
+  it("keeps the chosen reminder lead time through save and reopen", async () => {
+    const repository = createMockCalendarRepository();
+    renderCalendar(repository, "/calendar?modal=new");
+    let modal = await screen.findByRole("dialog", { name: "새 일정" });
+    fireEvent.change(within(modal).getByRole("textbox", { name: "제목" }), { target: { value: "약 먹기" } });
+    fireEvent.click(within(modal).getByRole("combobox", { name: "알림" }));
+    fireEvent.click(await screen.findByRole("option", { name: "10분 전" }));
+    fireEvent.click(within(modal).getByRole("button", { name: "생성" }));
+
+    fireEvent.click(await screen.findByRole("tab", { name: "일정표" }));
+    fireEvent.click(await screen.findByRole("button", { name: /약 먹기/ }));
+    modal = screen.getByRole("dialog", { name: "일정 수정" });
+    expect(within(modal).getByRole("combobox", { name: "알림" })).toHaveTextContent("10분 전");
+  });
+
   it("creating an event with a recurrence preset expands it into occurrences in month view", async () => {
     const repository = createMockCalendarRepository();
     renderCalendar(repository, "/calendar?modal=new");

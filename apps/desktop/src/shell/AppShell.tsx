@@ -8,6 +8,7 @@ import type { InboxRepository } from "../features/inbox/inbox-repository";
 import type { TodoRepository } from "../features/todo/todo-repository";
 import type { RoutineRepository } from "../features/routine/routine-repository";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
+import { useCalendarReminders } from "../features/calendar/calendar-reminders";
 import { currentIsoDate } from "@mono/domain";
 import { accentForegroundOf, LocalStorageAccentColorPreferenceStore } from "./accent-color-preference";
 import { InMemoryAiSettingsStore, type AiSettingsStore } from "../infrastructure/ai/ai-settings-store";
@@ -133,6 +134,7 @@ export function AppShell({
   const routineCount = routineQuery.data?.items.length ?? 0;
   const calendarQuery = useQuery({ queryKey: ["calendar"], queryFn: () => calendarRepository.getSnapshot() });
   const todayEventCount = calendarQuery.data?.events.filter((event) => event.startDate === calendarQuery.data?.today).length ?? 0;
+  useCalendarReminders(calendarQuery.data?.events);
   const dashboardQuery = useQuery({
     enabled: quickCaptureOpen,
     queryKey: dashboardQueryKey,

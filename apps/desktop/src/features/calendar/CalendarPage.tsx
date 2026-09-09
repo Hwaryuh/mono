@@ -1,4 +1,5 @@
 import { translate } from "../../i18n/i18n";
+import type { TranslationKey } from "../../i18n/messages.ko";
 import { errorMessage } from "../../i18n/error-message";
 import { type CalendarCategory, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
 import { Button, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
@@ -12,6 +13,18 @@ import { calendarViewStateStoreOf, type CalendarView, type CalendarViewStateStor
 import { addDays, weekdayOf } from "./recurrence";
 
 export const calendarQueryKey = ["calendar"] as const;
+
+// Reminder lead times offered in the event form. null = no reminder.
+const REMINDER_CHOICES: { value: number | null; key: TranslationKey }[] = [
+  { value: null, key: "calendar.reminder.none" },
+  { value: 0, key: "calendar.reminder.atStart" },
+  { value: 5, key: "calendar.reminder.min5" },
+  { value: 10, key: "calendar.reminder.min10" },
+  { value: 15, key: "calendar.reminder.min15" },
+  { value: 30, key: "calendar.reminder.min30" },
+  { value: 60, key: "calendar.reminder.hour1" },
+  { value: 1440, key: "calendar.reminder.day1" },
+];
 const dayNames = [translate("routine.weekday.sun"), translate("routine.weekday.mon"), translate("routine.weekday.tue"), translate("routine.weekday.wed"), translate("routine.weekday.thu"), translate("routine.weekday.fri"), translate("routine.weekday.sat")];
 const maxVisibleEventsPerDay = 3;
 // How many rows of continuing event bars to draw in a month cell. Overflow is viewed in the per-day schedule panel.
@@ -67,6 +80,7 @@ function blankDraft(snapshot: CalendarSnapshot, selectedDate = snapshot.today): 
     location: "",
     categoryId: snapshot.categories[0]?.id ?? "",
     note: "",
+    reminderMinutes: null,
     recurrence: null,
   };
 }
@@ -89,6 +103,7 @@ function draftOf(event: CalendarEvent): Draft {
     location: event.location,
     categoryId: event.categoryId,
     note: event.note,
+    reminderMinutes: event.reminderMinutes,
     recurrence: event.recurrence,
   };
 }
@@ -431,6 +446,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
       location: draft.location.trim(),
       categoryId: draft.categoryId,
       note: draft.note.trim(),
+      reminderMinutes: draft.reminderMinutes,
       recurrence: draft.recurrence,
     };
     if (!input.title) { setFormError(translate("common.validation.titleRequired")); return null; }
@@ -596,6 +612,16 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
           <label className="calendar-event-form__title"><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
           <DateTimeFields draft={draft} label={translate("calendar.field.start")} onChange={setStartField} prefix="start" />
           <DateTimeFields draft={draft} label={translate("calendar.field.end")} onChange={setEndField} prefix="end" />
+          <label className="calendar-event-form__reminder">
+            <span>{translate("calendar.field.reminder")}</span>
+            <Select
+              align="end"
+              label={translate("calendar.field.reminder")}
+              onChange={(value) => setDraftField("reminderMinutes", value === "" ? null : Number(value))}
+              options={REMINDER_CHOICES.map(({ value, key }) => ({ value: value === null ? "" : String(value), label: translate(key) }))}
+              value={draft.reminderMinutes == null ? "" : String(draft.reminderMinutes)}
+            />
+          </label>
           <RecurrenceField
             disabled={editorBusy}
             onChange={(recurrence) => setDraftField("recurrence", recurrence)}

@@ -79,7 +79,7 @@ class MockCalendarRepository implements CalendarRepository {
 
   async create(input: Parameters<CalendarRepository["create"]>[0]) {
     const parsed = calendarWriteInputSchema.parse(input);
-    const event: CalendarEvent = { id: `event-${this.state.nextCalendarId++}`, ...parsed, recurrence: parsed.recurrence ?? null, seriesId: null, occurrenceDate: null };
+    const event: CalendarEvent = { id: `event-${this.state.nextCalendarId++}`, ...parsed, reminderMinutes: parsed.reminderMinutes ?? null, recurrence: parsed.recurrence ?? null, seriesId: null, occurrenceDate: null };
     this.calendar.events = [event, ...this.calendar.events];
   }
 
@@ -88,7 +88,7 @@ class MockCalendarRepository implements CalendarRepository {
     const master = this.requireMaster(masterId);
     const parsed = calendarWriteInputSchema.parse(input);
     const nextRecurrence = parsed.recurrence === undefined ? master.recurrence : parsed.recurrence;
-    const fields = { ...parsed, recurrence: nextRecurrence };
+    const fields = { ...parsed, reminderMinutes: parsed.reminderMinutes ?? null, recurrence: nextRecurrence };
 
     if (master.recurrence == null && occurrenceDate == null) {
       this.calendar.events = this.calendar.events.map((event) => event.id === masterId ? { ...event, ...fields } : event);
