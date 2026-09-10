@@ -610,7 +610,10 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
   const priorityMutation = useMutation({
     mutationFn: (priority: number) => repository.setPriority(item.id, priority),
     onMutate: () => setMutationError(null),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+      queryClient.invalidateQueries({ queryKey: ["routine"] }),
+    ]),
     onError: (error) => setMutationError(errorMessage(error)),
   });
   const status = statusOf(item, snapshot.today);
@@ -695,7 +698,7 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
                   {doneSubtasks}/{subtasks.length}
                 </span>
               )}
-              {!item.routineId && (
+              {(!item.routineId || item.occurrenceDate != null) && (
                 <span className="todo-item__stars">
                   {[1, 2, 3].map((level) => (
                     <button

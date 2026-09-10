@@ -1,7 +1,7 @@
 import { todoLabelOrderSchema, todoLabelWriteInputSchema, todoSnapshotSchema, todoWriteInputSchema, type TodoItem, type TodoLabel } from "@mono/contracts";
 import type { TodoRepository } from "../../features/todo/todo-repository";
 import { createMockPlatformState, type MockPlatformState } from "./mock-platform-state";
-import { routineTodoItems, toggleRoutineOccurrence } from "./mock-routine-occurrences";
+import { routineTodoItems, setRoutineOccurrencePriority, toggleRoutineOccurrence } from "./mock-routine-occurrences";
 
 function requireItem(items: TodoItem[], itemId: string) {
   const item = items.find((candidate) => candidate.id === itemId);
@@ -149,10 +149,11 @@ class MockTodoRepository implements TodoRepository {
   }
 
   async setPriority(itemId: string, priority: number) {
-    requireItem(this.state.todo.items, itemId);
     if (!Number.isInteger(priority) || priority < 0 || priority > 3) {
       throw new Error("우선순위는 0~3 사이여야 합니다.");
     }
+    if (setRoutineOccurrencePriority(this.state, itemId, priority)) return;
+    requireItem(this.state.todo.items, itemId);
     this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, priority } : item);
   }
 

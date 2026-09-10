@@ -246,6 +246,8 @@ export const routineOccurrenceSchema = z.object({
   occurrenceDate: z.string(),
   done: z.boolean(),
   completedAt: z.string().nullable(),
+  // Star rating for this specific day's instance (0-3). Independent per occurrence.
+  priority: z.number().int().min(0).max(3).default(0),
 });
 
 export const routineSnapshotSchema = z.object({

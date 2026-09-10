@@ -51,6 +51,7 @@ function occurrence(routineId: string, occurrenceDate: string, done = true): Rou
     occurrenceDate,
     done,
     completedAt: done ? "완료" : null,
+    priority: 0,
   };
 }
 

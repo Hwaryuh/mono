@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS routine_occurrences (
   routine_id TEXT NOT NULL,
   occurrence_date TEXT NOT NULL,
   done INTEGER NOT NULL DEFAULT 0,
-  completed_at TEXT
+  completed_at TEXT,
+  priority INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS calendar_categories (
   id TEXT PRIMARY KEY,
@@ -257,6 +258,7 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
         &[("priority", "INTEGER NOT NULL DEFAULT 0"), ("parent_id", "TEXT")],
     )?;
     migrate_add_columns(conn, "calendar_events", &[("reminder_minutes", "INTEGER")])?;
+    migrate_add_columns(conn, "routine_occurrences", &[("priority", "INTEGER NOT NULL DEFAULT 0")])?;
     conn.execute_batch(SEED)?;
     Ok(())
 }

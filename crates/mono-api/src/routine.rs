@@ -41,6 +41,7 @@ struct RoutineOccurrenceDto {
     occurrence_date: String,
     done: bool,
     completed_at: Option<String>,
+    priority: i64,
 }
 
 #[derive(Serialize)]
@@ -113,6 +114,7 @@ struct OccurrenceRow {
     occurrence_date: String,
     done: bool,
     completed_at: Option<String>,
+    priority: i64,
 }
 
 fn parse_days(raw: &str) -> Vec<i64> {
@@ -171,7 +173,7 @@ fn is_scheduled(routine: &RoutineRow, date: &str) -> bool {
 fn fetch_occurrence(conn: &Connection, id: &str) -> ApiResult<Option<OccurrenceRow>> {
     let row = conn
         .query_row(
-            "SELECT id, routine_id, occurrence_date, done, completed_at FROM routine_occurrences WHERE id = ?1",
+            "SELECT id, routine_id, occurrence_date, done, completed_at, priority FROM routine_occurrences WHERE id = ?1",
             [id],
             |row| {
                 Ok(OccurrenceRow {
@@ -180,6 +182,7 @@ fn fetch_occurrence(conn: &Connection, id: &str) -> ApiResult<Option<OccurrenceR
                     occurrence_date: row.get(2)?,
                     done: row.get::<_, i64>(3)? != 0,
                     completed_at: row.get(4)?,
+                    priority: row.get(5)?,
                 })
             },
         )
@@ -211,6 +214,7 @@ fn ensure_occurrence(
         occurrence_date: date.to_string(),
         done: false,
         completed_at: None,
+        priority: 0,
     }))
 }
 
@@ -259,7 +263,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<RoutineSnapshot> {
         .collect();
 
     let occurrences = conn
-        .prepare("SELECT id, routine_id, occurrence_date, done, completed_at FROM routine_occurrences")?
+        .prepare("SELECT id, routine_id, occurrence_date, done, completed_at, priority FROM routine_occurrences")?
         .query_map([], |row| {
             Ok(RoutineOccurrenceDto {
                 id: row.get(0)?,
@@ -267,6 +271,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<RoutineSnapshot> {
                 occurrence_date: row.get(2)?,
                 done: row.get::<_, i64>(3)? != 0,
                 completed_at: row.get(4)?,
+                priority: row.get(5)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -336,6 +341,7 @@ pub(super) struct RoutineTodoRow {
     pub done: bool,
     pub completed_at: Option<String>,
     pub routine_id: String,
+    pub priority: i64,
 }
 
 // Today's scheduled routine occurrences, shaped as todo items. Prepended to the front of the todo snapshot.
@@ -352,6 +358,7 @@ pub(super) fn today_todo_rows(conn: &Connection) -> ApiResult<Vec<RoutineTodoRow
                 done: occurrence.done,
                 completed_at: occurrence.completed_at,
                 routine_id: routine.id,
+                priority: occurrence.priority,
             });
         }
     }
@@ -364,6 +371,26 @@ pub(super) fn toggle_occurrence_by_id(conn: &Connection, id: &str) -> ApiResult<
         return Ok(false);
     }
     toggle(conn, id)?;
+    Ok(true)
+}
+
+// Sets the star rating on a routine occurrence via its synthetic todo id
+// ("routine-occurrence:<routine_id>:<YYYY-MM-DD>"), materializing the row on first use.
+// Returns false if `id` isn't a routine-occurrence id or the routine/day isn't valid — the
+// caller then falls back to a plain todo update. Priority range is checked by the caller.
+pub(super) fn set_occurrence_priority_by_id(
+    conn: &Connection,
+    id: &str,
+    priority: i64,
+) -> ApiResult<bool> {
+    let Some(rest) = id.strip_prefix("routine-occurrence:") else { return Ok(false) };
+    let Some((routine_id, date)) = rest.split_once(':') else { return Ok(false) };
+    let Ok(routine) = require_routine(conn, routine_id) else { return Ok(false) };
+    let Some(occurrence) = ensure_occurrence(conn, &routine, date)? else { return Ok(false) };
+    conn.execute(
+        "UPDATE routine_occurrences SET priority = ?1 WHERE id = ?2",
+        params![priority, occurrence.id],
+    )?;
     Ok(true)
 }
 

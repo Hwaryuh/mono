@@ -332,6 +332,18 @@ describe("TodoPage", () => {
     expect(titlesInOrder()[0]).not.toBe("렌즈 주문");
   });
 
+  it("lets a routine todo be starred like any other item", async () => {
+    renderTodo();
+    await screen.findByText("비타민 먹기");
+
+    fireEvent.click(screen.getByRole("button", { name: "비타민 먹기 우선순위 3단계로 설정" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "비타민 먹기 우선순위 1단계로 설정" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "비타민 먹기 우선순위 3단계로 설정" })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "비타민 먹기 우선순위 3단계로 설정" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "비타민 먹기 우선순위 1단계로 설정" })).toHaveAttribute("aria-pressed", "false"));
+  });
+
   it("toggles the empty subtask-add block open and shut from the gutter button", async () => {
     renderTodo();
     await screen.findByText("설거지 하기");

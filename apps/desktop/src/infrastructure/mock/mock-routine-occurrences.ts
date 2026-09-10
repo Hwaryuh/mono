@@ -22,6 +22,7 @@ function ensureRoutineOccurrence(state: MockPlatformState, routine: RoutineDefin
     occurrenceDate: date,
     done: false,
     completedAt: null,
+    priority: 0,
   };
   state.routine.occurrences.push(occurrence);
   return occurrence;
@@ -55,6 +56,21 @@ export function toggleRoutineOccurrence(state: MockPlatformState, itemId: string
   return true;
 }
 
+// Sets a per-day star rating on a routine occurrence via its synthetic todo id, materializing it
+// on first use. Returns false if the id isn't a routine-occurrence id or the day isn't scheduled.
+export function setRoutineOccurrencePriority(state: MockPlatformState, itemId: string, priority: number) {
+  const match = /^routine-occurrence:(.+):(\d{4}-\d{2}-\d{2})$/.exec(itemId);
+  if (!match) return false;
+  const [, routineId, date] = match;
+  const routine = state.routine.items.find((candidate) => candidate.id === routineId);
+  if (!routine) return false;
+  const occurrence = ensureRoutineOccurrence(state, routine, date);
+  if (!occurrence) return false;
+  state.routine.occurrences = state.routine.occurrences.map((candidate) =>
+    candidate.id === occurrence.id ? { ...candidate, priority } : candidate);
+  return true;
+}
+
 export function routineTodoItems(state: MockPlatformState): TodoItem[] {
   return todayRoutineOccurrences(state).map(({ routine, occurrence }) => ({
     id: occurrence.id,
@@ -67,7 +83,7 @@ export function routineTodoItems(state: MockPlatformState): TodoItem[] {
     completedAt: occurrence.completedAt,
     routineId: routine.id,
     occurrenceDate: occurrence.occurrenceDate,
-    priority: 0,
+    priority: occurrence.priority,
     parentId: null,
   }));
 }

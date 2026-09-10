@@ -171,7 +171,7 @@ fn get_snapshot(conn: &Connection) -> ApiResult<TodoSnapshot> {
             completed_at: r.completed_at,
             routine_id: Some(r.routine_id),
             occurrence_date: Some(r.occurrence_date),
-            priority: 0,
+            priority: r.priority,
             parent_id: None,
         })
         .collect();
@@ -348,6 +348,10 @@ pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
 fn set_priority(conn: &Connection, id: &str, priority: i64) -> ApiResult<()> {
     if !(0..=3).contains(&priority) {
         return Err(ApiError::validation("우선순위는 0~3 사이여야 합니다."));
+    }
+    // A routine occurrence mixed into the todo snapshot stores its own per-day priority.
+    if super::routine::set_occurrence_priority_by_id(conn, id, priority)? {
+        return Ok(());
     }
     require_item(conn, id)?;
     conn.execute("UPDATE todo_items SET priority = ?1 WHERE id = ?2", params![priority, id])?;
@@ -745,6 +749,53 @@ mod tests {
         toggle_complete(&conn, &routine_item.id.clone()).unwrap();
         let after = get_snapshot(&conn).unwrap();
         assert!(after.items.iter().find(|i| i.routine_id.is_some()).unwrap().done);
+    }
+
+    #[test]
+    fn routine_occurrence_priority_is_per_day_and_set_via_todo_id() {
+        use chrono::Datelike;
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let today_weekday = kst_now().date_naive().weekday().num_days_from_sunday();
+        conn.execute(
+            "INSERT INTO routine_items (id, seq, title, label_id, days_json, start_date, end_date) \
+             VALUES ('r1', 1, '스트레칭', 'health', ?1, '2000-01-01', NULL)",
+            params![format!("[{today_weekday}]")],
+        )
+        .unwrap();
+
+        let id = get_snapshot(&conn).unwrap().items[0].id.clone();
+        assert!(id.starts_with("routine-occurrence:r1:"));
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 0);
+
+        // Setting priority materializes today's occurrence and sticks.
+        set_priority(&conn, &id, 3).unwrap();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 3);
+
+        // A different day's occurrence keeps its own rating.
+        let other_day = "2000-01-02";
+        conn.execute(
+            "INSERT INTO routine_occurrences (id, routine_id, occurrence_date, done, priority) \
+             VALUES (?1, 'r1', ?2, 0, 1)",
+            params![format!("routine-occurrence:r1:{other_day}"), other_day],
+        )
+        .unwrap();
+        set_priority(&conn, &id, 2).unwrap();
+        let other: i64 = conn
+            .query_row(
+                "SELECT priority FROM routine_occurrences WHERE occurrence_date = ?1",
+                [other_day],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(other, 1);
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 2);
+
+        set_priority(&conn, &id, 0).unwrap();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 0);
+
+        let err = set_priority(&conn, &id, 4).unwrap_err();
+        assert!(matches!(err, ApiError::Validation(_)));
     }
 
     #[test]
