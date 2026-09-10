@@ -40,6 +40,7 @@ type Draft = {
   dueDate: string;
   dueTime: string;
   note: string;
+  priority: number;
 };
 
 const statusMeta: Record<TodoStatus, { name: string; title: string; icon: IconName }> = {
@@ -65,7 +66,7 @@ function isAgedDone(item: TodoItem, now: number): boolean {
 }
 
 function blankDraft(labels: TodoLabel[]): Draft {
-  return { title: "", labelId: labels[0]?.id ?? "", dueDate: "", dueTime: "", note: "" };
+  return { title: "", labelId: labels[0]?.id ?? "", dueDate: "", dueTime: "", note: "", priority: 0 };
 }
 
 function draftOf(item: TodoItem): Draft {
@@ -75,6 +76,7 @@ function draftOf(item: TodoItem): Draft {
     dueDate: item.dueDate ?? "",
     dueTime: item.dueTime ?? "",
     note: item.note,
+    priority: item.priority,
   };
 }
 
@@ -83,7 +85,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
   const [viewState, setViewState] = useState(() => store.read());
   const { status, labelIds } = viewState;
   const [editorItem, setEditorItem] = useState<TodoItem | "new" | null>(null);
-  const [draft, setDraft] = useState<Draft>({ title: "", labelId: "", dueDate: "", dueTime: "", note: "" });
+  const [draft, setDraft] = useState<Draft>({ title: "", labelId: "", dueDate: "", dueTime: "", note: "", priority: 0 });
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pendingMention, setPendingMention] = useState<string | null>(null);
@@ -325,6 +327,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       dueDate: draft.dueDate || null,
       dueTime: draft.dueDate && draft.dueTime ? draft.dueTime : null,
       note: draft.note.trim(),
+      priority: draft.priority,
     };
     if (!input.title) { setFormError(translate("common.validation.titleRequired")); return; }
     if (!input.labelId) { setFormError(translate("common.validation.labelRequired")); return; }
@@ -459,6 +462,23 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
           <div className="todo-editor__due">
             <fieldset><legend>{translate("todo.field.dueDate")}</legend><DatePicker label={translate("todo.field.dueDate")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
             <label><span>{translate("todo.field.time")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.field.dueTime")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
+          </div>
+          <div className="todo-editor__field">
+            <span className="todo-editor__stars-legend">{translate("todo.field.priority")}</span>
+            <div aria-label={translate("todo.field.priority")} className="todo-editor__stars" role="group">
+              {[1, 2, 3].map((level) => (
+                <button
+                  aria-label={translate("todo.priority.set", { level })}
+                  aria-pressed={draft.priority >= level}
+                  className={draft.priority >= level ? "todo-editor__star todo-editor__star--active" : "todo-editor__star"}
+                  key={level}
+                  onClick={() => setDraft((current) => ({ ...current, priority: current.priority === level ? 0 : level }))}
+                  type="button"
+                >
+                  <Icon fill={draft.priority >= level ? "currentColor" : "none"} name="star" size={15} />
+                </button>
+              ))}
+            </div>
           </div>
           <label><span>{translate("common.field.note")}</span><ScrapMentionInput ariaLabel={translate("common.field.note")} maxLength={4000} multiline onChange={(note) => setDraft((current) => ({ ...current, note }))} onNavigateMention={navigateToScrap} placeholder={translate("common.field.notePlaceholder")} scraps={scraps} value={draft.note} /></label>
           {formError && !deleteOpen && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
@@ -767,7 +787,7 @@ function SubtaskRow({ item, repository, scraps, onAddNext }: { item: TodoItem; r
     onError: (mutationErr) => setError(errorMessage(mutationErr)),
   });
   const rename = useMutation({
-    mutationFn: (title: string) => repository.update(item.id, { title, labelId: item.labelId, dueDate: null, dueTime: null, note: "" }, item.version),
+    mutationFn: (title: string) => repository.update(item.id, { title, labelId: item.labelId, dueDate: null, dueTime: null, note: "", priority: item.priority }, item.version),
     onMutate: () => setError(null),
     onSuccess: async () => { setEditing(false); await invalidate(); },
     onError: (mutationErr) => setError(errorMessage(mutationErr)),
@@ -813,7 +833,7 @@ function SubtaskAdd({ parentId, repository, onDone }: { parentId: string; reposi
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
   const add = useMutation({
-    mutationFn: (title: string) => repository.create({ title, labelId: "", dueDate: null, dueTime: null, note: "", parentId }),
+    mutationFn: (title: string) => repository.create({ title, labelId: "", dueDate: null, dueTime: null, note: "", priority: 0, parentId }),
     onMutate: () => setError(null),
     onSuccess: async () => {
       setValue("");

@@ -499,6 +499,13 @@
 .todo-editor__label-legend > button:active { scale: 0.96; }
 .todo-editor__field > .ui-select { width: 100%; }
 .todo-editor__due { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }
+.todo-editor__stars-legend { display: block; margin-bottom: 4px; color: var(--color-text-faint); font-size: 10.5px; }
+.todo-editor__stars { display: inline-flex; align-items: center; gap: 2px; margin-left: -6px; }
+.todo-editor__star { appearance: none; width: 26px; height: 26px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 6px; box-shadow: none; background: transparent; color: var(--color-text-faint); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out; }
+.todo-editor__star:hover { background: var(--color-hover); color: var(--color-text-muted); }
+.todo-editor__star:active { scale: 0.85; }
+.todo-editor__star--active { color: var(--color-accent); }
+.todo-editor__star--active:hover { background: var(--color-accent-soft); color: var(--color-accent); }
 .todo-editor__delete { margin-right: auto; color: var(--color-danger); }
 .todo-mutation-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
 .todo-delete-modal { width: min(420px, 100%); }

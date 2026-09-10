@@ -439,6 +439,8 @@ export const koMessages = {
   "todo.field.required": "필수",
   "todo.field.time": "시간",
   "todo.field.dueTime": "마감 시간",
+  "todo.field.priority": "별점",
+  "todo.priority.set": "별점 {level}점으로 설정",
   "todo.delete.question": "이 할 일을 삭제할까요?",
   "todo.delete.warning": "삭제한 할 일은 복구할 수 없습니다.",
   "todo.delete.withSubtasks": "하위 항목 {count}개도 함께 삭제됩니다.",

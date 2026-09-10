@@ -74,6 +74,19 @@ describe("TodoPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "할 일 수정" })).not.toBeInTheDocument());
   });
 
+  it("sets a star rating on a manually created todo", async () => {
+    renderTodo(createMockTodoRepository(), "/todo?modal=new");
+    const modal = await screen.findByRole("dialog", { name: "새 할 일" });
+    typeInto(within(modal).getByRole("textbox", { name: "제목" }), "세금 신고");
+    fireEvent.click(within(modal).getByRole("combobox", { name: "라벨" }));
+    fireEvent.click(screen.getByRole("option", { name: "업무" }));
+    fireEvent.click(within(modal).getByRole("button", { name: "별점 2점으로 설정" }));
+    fireEvent.click(within(modal).getByRole("button", { name: "생성" }));
+
+    const starTwo = await screen.findByRole("button", { name: "세금 신고 우선순위 2단계로 설정" });
+    expect(starTwo).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("renders a scrap token in the title as a link with its current name in the list", async () => {
     const base = createMockTodoRepository();
     const snapshot = await base.getSnapshot();

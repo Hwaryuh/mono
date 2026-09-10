@@ -68,6 +68,8 @@ struct TodoWriteInput {
     #[serde(default)]
     note: String,
     #[serde(default)]
+    priority: i64,
+    #[serde(default)]
     parent_id: Option<String>,
 }
 
@@ -119,6 +121,13 @@ fn validated_note(raw: &str) -> ApiResult<String> {
         return Err(ApiError::validation("메모는 4000자 이하여야 합니다."));
     }
     Ok(raw.to_string())
+}
+
+fn validated_priority(priority: i64) -> ApiResult<i64> {
+    if !(0..=3).contains(&priority) {
+        return Err(ApiError::validation("우선순위는 0~3 사이여야 합니다."));
+    }
+    Ok(priority)
 }
 
 // ---------- Repository logic (1:1 with apps/api/src/repositories/todo-repository.ts) ----------
@@ -281,10 +290,11 @@ fn create_item(conn: &Connection, input: TodoWriteInput) -> ApiResult<()> {
     }
 
     let note = validated_note(&input.note)?;
+    let priority = validated_priority(input.priority)?;
     conn.execute(
         "INSERT INTO todo_items \
-         (id, seq, title, label_id, due_date, due_time, note, done, completed_at, routine_id, occurrence_date) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, NULL, NULL, NULL)",
+         (id, seq, title, label_id, due_date, due_time, note, done, completed_at, routine_id, occurrence_date, priority) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, NULL, NULL, NULL, ?8)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -293,6 +303,7 @@ fn create_item(conn: &Connection, input: TodoWriteInput) -> ApiResult<()> {
             input.due_date,
             input.due_time,
             note,
+            priority,
         ],
     )?;
     Ok(())
@@ -302,10 +313,11 @@ fn update_item(conn: &Connection, id: &str, input: TodoWriteInput, expected: Opt
     require_item(conn, id)?;
     let title = validated_title(&input.title)?;
     let note = validated_note(&input.note)?;
+    let priority = validated_priority(input.priority)?;
     let changed = conn.execute(
         "UPDATE todo_items SET title = ?1, label_id = ?2, due_date = ?3, due_time = ?4, \
-         note = ?5, version = version + 1 WHERE id = ?6 AND (?7 IS NULL OR version = ?7)",
-        params![title, input.label_id, input.due_date, input.due_time, note, id, expected],
+         note = ?5, priority = ?6, version = version + 1 WHERE id = ?7 AND (?8 IS NULL OR version = ?8)",
+        params![title, input.label_id, input.due_date, input.due_time, note, priority, id, expected],
     )?;
     ensure_versioned_update(changed, expected)
 }
@@ -346,9 +358,7 @@ pub(super) fn toggle_complete(conn: &Connection, id: &str) -> ApiResult<()> {
 }
 
 fn set_priority(conn: &Connection, id: &str, priority: i64) -> ApiResult<()> {
-    if !(0..=3).contains(&priority) {
-        return Err(ApiError::validation("우선순위는 0~3 사이여야 합니다."));
-    }
+    let priority = validated_priority(priority)?;
     // A routine occurrence mixed into the todo snapshot stores its own per-day priority.
     if super::routine::set_occurrence_priority_by_id(conn, id, priority)? {
         return Ok(());
@@ -547,6 +557,7 @@ mod tests {
             due_date: None,
             due_time: None,
             note: String::new(),
+            priority: 0,
             parent_id: None,
         }
     }
@@ -558,6 +569,7 @@ mod tests {
             due_date: None,
             due_time: None,
             note: String::new(),
+            priority: 0,
             parent_id: Some(parent_id.into()),
         }
     }
@@ -618,6 +630,7 @@ mod tests {
                 due_date: Some("2026-08-26".into()),
                 due_time: None,
                 note: "메모".into(),
+                priority: 0,
                 parent_id: None,
             },
         )
@@ -689,6 +702,18 @@ mod tests {
         let names: Vec<String> =
             get_snapshot(&conn).unwrap().labels.into_iter().map(|l| l.name).collect();
         assert_eq!(names, ["기타", "B", "A"]);
+    }
+
+    #[test]
+    fn create_item_stores_and_validates_priority() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        let label = seed_label(&conn, "업무");
+        create_item(&conn, TodoWriteInput { priority: 2, ..item_input("별점 할 일", &label) }).unwrap();
+        assert_eq!(get_snapshot(&conn).unwrap().items[0].priority, 2);
+
+        let err = create_item(&conn, TodoWriteInput { priority: 9, ..item_input("범위 밖", &label) }).unwrap_err();
+        assert!(matches!(err, ApiError::Validation(_)));
     }
 
     #[test]
@@ -895,6 +920,7 @@ mod tests {
                 due_date: Some("2026-09-20".into()),
                 due_time: Some("10:00".into()),
                 note: "고지서 확인".into(),
+                priority: 0,
                 parent_id: None,
             },
         )

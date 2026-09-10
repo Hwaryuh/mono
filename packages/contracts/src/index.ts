@@ -209,7 +209,8 @@ export const todoWriteInputSchema = z.object({
   dueDate: z.string().nullable(),
   dueTime: z.string().nullable(),
   note: z.string().max(4_000),
-  // Set only when creating a subtask. The server ignores due/time/note/label for subtasks and inherits the parent's label.
+  priority: z.number().int().min(0).max(3).default(0),
+  // Set only when creating a subtask. The server ignores due/time/note/label/priority for subtasks and inherits the parent's label.
   parentId: z.string().nullable().optional(),
 });
 

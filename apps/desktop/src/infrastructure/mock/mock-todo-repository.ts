@@ -79,7 +79,7 @@ class MockTodoRepository implements TodoRepository {
     }
     this.state.todo.items = [
       { id, title: parsed.title, labelId: parsed.labelId, dueDate: parsed.dueDate, dueTime: parsed.dueTime,
-        note: parsed.note, done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: 0, parentId: null },
+        note: parsed.note, done: false, completedAt: null, routineId: null, occurrenceDate: null, priority: parsed.priority, parentId: null },
       ...this.state.todo.items,
     ];
   }
@@ -87,7 +87,7 @@ class MockTodoRepository implements TodoRepository {
   async update(itemId: string, input: Parameters<TodoRepository["update"]>[1]) {
     requireItem(this.state.todo.items, itemId);
     const parsed = todoWriteInputSchema.parse(input);
-    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, title: parsed.title, labelId: parsed.labelId, dueDate: parsed.dueDate, dueTime: parsed.dueTime, note: parsed.note } : item);
+    this.state.todo.items = this.state.todo.items.map((item) => item.id === itemId ? { ...item, title: parsed.title, labelId: parsed.labelId, dueDate: parsed.dueDate, dueTime: parsed.dueTime, note: parsed.note, priority: parsed.priority } : item);
   }
 
   async toggleComplete(itemId: string) {

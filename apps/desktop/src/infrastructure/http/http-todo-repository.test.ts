@@ -33,7 +33,7 @@ describe("createHttpTodoRepository", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }, 201));
 
     const repository = createHttpTodoRepository();
-    const input = { title: "장보기", labelId: "personal", dueDate: null, dueTime: null, note: "" };
+    const input = { title: "장보기", labelId: "personal", dueDate: null, dueTime: null, note: "", priority: 0 };
     await repository.create(input);
 
     const [url, init] = fetchMock.mock.calls[0];
@@ -65,7 +65,7 @@ describe("createHttpTodoRepository", () => {
 
     const repository = createHttpTodoRepository();
     await expect(
-      repository.create({ title: "", labelId: "personal", dueDate: null, dueTime: null, note: "" }),
+      repository.create({ title: "", labelId: "personal", dueDate: null, dueTime: null, note: "", priority: 0 }),
     ).rejects.toThrow("제목을 입력해야 합니다.");
   });
 
