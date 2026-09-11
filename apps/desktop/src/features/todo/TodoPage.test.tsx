@@ -80,7 +80,7 @@ describe("TodoPage", () => {
     typeInto(within(modal).getByRole("textbox", { name: "제목" }), "세금 신고");
     fireEvent.click(within(modal).getByRole("combobox", { name: "라벨" }));
     fireEvent.click(screen.getByRole("option", { name: "업무" }));
-    fireEvent.click(within(modal).getByRole("button", { name: "별점 2점으로 설정" }));
+    fireEvent.click(within(modal).getByRole("button", { name: "우선순위 2단계로 설정" }));
     fireEvent.click(within(modal).getByRole("button", { name: "생성" }));
 
     const starTwo = await screen.findByRole("button", { name: "세금 신고 우선순위 2단계로 설정" });
