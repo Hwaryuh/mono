@@ -154,6 +154,13 @@ fn all_times(s: &str) -> Vec<String> {
     out
 }
 
+// The first run of digits in the field, if it fits calendarEventSchema.reminderMinutes' 0..=40_320 range.
+// Anything unparseable or out of range is treated as "no reminder" rather than blocking approval.
+fn leading_minutes(s: &str) -> Option<i64> {
+    let digits: String = s.chars().skip_while(|c| !c.is_ascii_digit()).take_while(char::is_ascii_digit).collect();
+    digits.parse::<i64>().ok().filter(|&n| (0..=40_320).contains(&n))
+}
+
 // ---------- Repository logic (1:1 with apps/api/src/repositories/inbox-repository.ts) ----------
 
 struct InboxRow {
@@ -284,6 +291,7 @@ fn approve_to_calendar(conn: &Connection, row: &InboxRow, fields: &[InboxField])
         .or_else(|| dates.first().cloned())
         .unwrap_or_else(|| today.clone());
     let end_time = times.get(1).cloned().or_else(|| times.first().cloned());
+    let reminder_minutes = leading_minutes(&field_value(fields, "알림"));
     let next_seq: i64 =
         conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM calendar_events", [], |r| r.get(0))?;
     let title = {
@@ -292,8 +300,8 @@ fn approve_to_calendar(conn: &Connection, row: &InboxRow, fields: &[InboxField])
     };
     conn.execute(
         "INSERT INTO calendar_events \
-         (id, seq, title, start_date, start_time, end_date, end_time, location, category_id, note) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+         (id, seq, title, start_date, start_time, end_date, end_time, location, category_id, note, reminder_minutes) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             uuid::Uuid::new_v4().to_string(),
             next_seq + 1,
@@ -305,6 +313,7 @@ fn approve_to_calendar(conn: &Connection, row: &InboxRow, fields: &[InboxField])
             field_value(fields, "장소"),
             category_id,
             field_value(fields, "메모"),
+            reminder_minutes,
         ],
     )?;
     Ok(())
@@ -664,6 +673,48 @@ mod tests {
         assert_eq!(st.as_deref(), Some("12:00"));
         assert_eq!(ed, "2026-08-09");
         assert_eq!(et.as_deref(), Some("14:00"));
+    }
+
+    #[test]
+    fn approve_calendar_parses_reminder_and_ignores_unparseable_or_out_of_range() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_inbox(
+            &conn,
+            "inbox-1",
+            "text",
+            Some("calendar"),
+            0.8,
+            r#"[{"label":"제목","value":"합주"},{"label":"일시","value":"2026-08-09 12:00"},{"label":"알림","value":"10분 전"}]"#,
+        );
+        seed_inbox(
+            &conn,
+            "inbox-2",
+            "text",
+            Some("calendar"),
+            0.8,
+            r#"[{"label":"제목","value":"산책"},{"label":"일시","value":"2026-08-10 09:00"},{"label":"알림","value":"미지정"}]"#,
+        );
+        seed_inbox(
+            &conn,
+            "inbox-3",
+            "text",
+            Some("calendar"),
+            0.8,
+            r#"[{"label":"제목","value":"장기 알림"},{"label":"일시","value":"2026-08-11 09:00"},{"label":"알림","value":"999999"}]"#,
+        );
+
+        approve_item(&conn, "inbox-1").unwrap();
+        approve_item(&conn, "inbox-2").unwrap();
+        approve_item(&conn, "inbox-3").unwrap();
+        let reminders: Vec<Option<i64>> = conn
+            .prepare("SELECT reminder_minutes FROM calendar_events ORDER BY seq ASC")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(reminders, [Some(10), None, None]);
     }
 
     #[test]

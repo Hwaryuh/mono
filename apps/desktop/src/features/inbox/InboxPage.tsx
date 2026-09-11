@@ -53,7 +53,7 @@ const sourceMeta: Record<InboxItem["source"], { name: string; icon: IconName }> 
 
 const fieldLabels: Record<InboxTargetModuleId, string[]> = {
   todo: [translate("common.field.title"), translate("common.field.label"), translate("inbox.field.due"), translate("common.field.note")],
-  calendar: [translate("common.field.title"), translate("inbox.field.schedule"), translate("common.field.location"), translate("common.field.label")],
+  calendar: [translate("common.field.title"), translate("inbox.field.schedule"), translate("common.field.location"), translate("common.field.label"), translate("inbox.field.reminder")],
   scrap: [translate("common.field.title"), translate("common.field.note"), translate("inbox.field.original"), translate("common.field.label")],
   ledger: [translate("ledger.field.item"), translate("ledger.field.amount"), translate("common.field.date"), translate("common.field.label")],
 };

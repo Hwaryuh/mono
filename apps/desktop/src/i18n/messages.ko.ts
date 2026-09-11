@@ -355,6 +355,7 @@ export const koMessages = {
   "inbox.source.video": "영상 입력",
   "inbox.field.due": "마감",
   "inbox.field.schedule": "일시",
+  "inbox.field.reminder": "알림",
   "common.field.location": "장소",
   "inbox.field.original": "원문",
   "ledger.field.item": "항목",
