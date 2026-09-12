@@ -40,14 +40,20 @@ impl McpServer {
 
 #[tool_router]
 impl McpServer {
-    #[tool(description = "할 일 목록 스냅샷(JSON). 라벨, 완료 여부, 마감일·마감시간, 우선순위를 포함한다.")]
+    #[tool(
+        description = "할 일 목록 스냅샷(JSON). 라벨, 완료 여부, 마감일·마감시간, 우선순위를 포함한다. \
+                        parentId가 있는 항목은 서브태스크이며, parentTitle에 그 상위 할 일의 제목이 \
+                        들어있다(parentId 없음 = 일반 최상위 할 일)."
+    )]
     async fn list_todos(&self) -> String {
-        self.snapshot("/todo/snapshot").await
+        annotate_parent_titles(self.snapshot("/todo/snapshot").await)
     }
 
-    #[tool(description = "오늘이 마감(dueDate)인 할 일만 필터링한 스냅샷(JSON). 나머지 필드는 list_todos와 동일하다.")]
+    #[tool(
+        description = "오늘이 마감(dueDate)인 할 일만 필터링한 스냅샷(JSON). 나머지 필드·서브태스크 표시(parentId/parentTitle)는 list_todos와 동일하다."
+    )]
     async fn list_todos_today(&self) -> String {
-        filter_todos_due_today(self.snapshot("/todo/snapshot").await)
+        filter_todos_due_today(annotate_parent_titles(self.snapshot("/todo/snapshot").await))
     }
 
     #[tool(description = "일정/루틴 목록 스냅샷(JSON). 오늘 체크 여부를 포함한다.")]
@@ -75,6 +81,29 @@ impl ServerHandler for McpServer {
         );
         info
     }
+}
+
+/// 서브태스크(parentId 있음) 항목에 `parentTitle`을 붙인다 — id는 LLM이 다른 항목과
+/// 교차 대조해야만 무슨 할 일인지 알 수 있어서, 상위 할 일 제목을 미리 붙여 바로 읽히게 한다.
+fn annotate_parent_titles(snapshot: String) -> String {
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&snapshot) else {
+        return snapshot;
+    };
+    let titles: std::collections::HashMap<String, String> = value["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| Some((item.get("id")?.as_str()?.to_owned(), item.get("title")?.as_str()?.to_owned())))
+        .collect();
+    if let Some(items) = value.get_mut("items").and_then(|v| v.as_array_mut()) {
+        for item in items {
+            let parent_title = item.get("parentId").and_then(|v| v.as_str()).and_then(|id| titles.get(id)).cloned();
+            if let Some(title) = parent_title {
+                item["parentTitle"] = serde_json::Value::String(title);
+            }
+        }
+    }
+    value.to_string()
 }
 
 /// `/todo/snapshot` JSON에서 `dueDate`가 `today` 필드와 같은 항목만 남긴다. 파싱에 실패하면
@@ -109,7 +138,21 @@ pub(crate) fn service(
 
 #[cfg(test)]
 mod tests {
-    use super::filter_todos_due_today;
+    use super::{annotate_parent_titles, filter_todos_due_today};
+
+    #[test]
+    fn subtasks_get_parent_title_and_top_level_items_dont() {
+        let snapshot = r#"{"today":"2026-09-12","labels":[],"items":[
+            {"id":"p","title":"발표 준비","parentId":null},
+            {"id":"c1","title":"슬라이드 초안","parentId":"p"},
+            {"id":"c2","title":"연습","parentId":"p"}
+        ]}"#;
+        let annotated: serde_json::Value = serde_json::from_str(&annotate_parent_titles(snapshot.into())).unwrap();
+        let items = annotated["items"].as_array().unwrap();
+        assert_eq!(items[0].get("parentTitle"), None, "최상위 할 일엔 parentTitle이 없어야 함");
+        assert_eq!(items[1]["parentTitle"], "발표 준비");
+        assert_eq!(items[2]["parentTitle"], "발표 준비");
+    }
 
     #[test]
     fn keeps_only_items_due_today_and_drops_the_rest() {
