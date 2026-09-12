@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors"] }
 rusqlite = { version = "0.37", features = ["backup", "bundled"] }
 serde = { version = "1", features = ["derive"] }
@@ -27,7 +28,8 @@ aes-gcm = "0.10"
 getrandom = "0.2"
 hmac = "0.12"
 sha2 = "0.10"
+# 리모트 MCP 서버(/mcp) — todo/routine/scrap snapshot을 MCP 툴로 노출.
+rmcp = { version = "3.3", features = ["transport-streamable-http-server"] }
 
 [dev-dependencies]
-tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

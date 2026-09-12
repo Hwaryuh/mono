@@ -17,6 +17,7 @@ mod error;
 mod inbox;
 mod ledger;
 mod link_preview;
+mod mcp;
 mod media;
 mod routine;
 mod scrap;
@@ -202,6 +203,13 @@ fn build_router(
     let secret_state = SecretState { db: database.clone(), crypto };
     let change_hub = change::ChangeHub::new();
 
+    // MCP 툴이 내부적으로 oneshot 호출하는 전용 라우터 — 인증/CORS/변경-이벤트 레이어가 없는,
+    // 외부에 직접 노출되지 않는 read 전용 서브셋.
+    let mcp_snapshot_router = Router::new()
+        .merge(todo::routes(database.clone()))
+        .merge(routine::routes(database.clone()))
+        .merge(scrap::routes(database.clone()));
+
     let router = Router::new()
         .route("/health", get(|| async { "ok" }))
         // Used by the client to detect app↔server version drift (when only the server falls behind in remote mode).
@@ -223,6 +231,7 @@ fn build_router(
         .merge(ai::routes(secret_state))
         .merge(link_preview::routes(link_preview::state()))
         .merge(change::routes(change_hub.clone()))
+        .route_service("/mcp", mcp::service(mcp_snapshot_router))
         // Detects a successful mutation response and publishes a module-change event (an invalidation signal to SSE subscribers).
         .layer(middleware::from_fn_with_state(
             change_hub,
@@ -342,6 +351,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn mcp_initialize_is_token_gated_and_advertises_tools() {
+        let router = build_router(db::open_memory(), SecretCrypto::test_arc(), &[], Some("s3cr3t"));
+        const INITIALIZE_BODY: &str = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}"#;
+        let request = |token: Option<&str>| {
+            let mut builder = Request::post("/mcp")
+                .header("host", "127.0.0.1")
+                .header("content-type", "application/json")
+                .header("accept", "application/json, text/event-stream");
+            if let Some(token) = token {
+                builder = builder.header("authorization", format!("Bearer {token}"));
+            }
+            builder.body(Body::from(INITIALIZE_BODY)).unwrap()
+        };
+
+        let unauthorized = router.clone().oneshot(request(None)).await.unwrap();
+        assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+        let response = router.oneshot(request(Some("s3cr3t"))).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let payload = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(payload.contains(r#""tools":{}"#), "capabilities should advertise tools: {payload}");
     }
 
     #[tokio::test]
