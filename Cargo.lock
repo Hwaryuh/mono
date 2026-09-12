@@ -2566,7 +2566,7 @@ dependencies = [
 
 [[package]]
 name = "mono-api"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "aes-gcm",
  "axum",
@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "mono-desktop"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "mono-api",
  "rodio",
