@@ -3,13 +3,15 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { createMockCalendarRepository } from "../../infrastructure/mock/mock-calendar-repository";
+import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
 import type { CalendarRepository } from "./calendar-repository";
 import { CalendarPage } from "./CalendarPage";
 import { calendarViewStateStoreOf, type CalendarViewStateStore } from "./calendar-view-state-store";
+import type { TodoRepository } from "../todo/todo-repository";
 
-function renderCalendar(repository: CalendarRepository = createMockCalendarRepository(), initialEntry = "/calendar", viewStateStore: CalendarViewStateStore = calendarViewStateStoreOf("2026-08")) {
+function renderCalendar(repository: CalendarRepository = createMockCalendarRepository(), initialEntry = "/calendar", viewStateStore: CalendarViewStateStore = calendarViewStateStoreOf("2026-08"), todoRepository: TodoRepository = createMockTodoRepository()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const result = render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[initialEntry]}><CalendarPage repository={repository} viewStateStore={viewStateStore} /></MemoryRouter></QueryClientProvider>);
+  const result = render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[initialEntry]}><CalendarPage repository={repository} todoRepository={todoRepository} viewStateStore={viewStateStore} /></MemoryRouter></QueryClientProvider>);
   return { ...result, repository };
 }
 
@@ -73,6 +75,21 @@ describe("CalendarPage", () => {
     const todayCell = container.querySelector(".calendar-cell__day--today")?.parentElement;
     expect(todayCell?.querySelectorAll(".calendar-event")).toHaveLength(3);
     expect(todayCell?.querySelector(".calendar-cell__more")).not.toBeInTheDocument();
+  });
+
+  it("shows due todos as chips and hides them via the toggle", async () => {
+    const { container } = renderCalendar();
+    await screen.findByText("2026년 8월");
+
+    // task-1 (설거지 하기) is due 2026-08-05 and not done; task-2 is due the same day but done, so it's excluded.
+    expect(screen.getByRole("button", { name: "설거지 하기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "빨래 정리하기" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 표시" }));
+    expect(container.querySelector(".calendar-todo-chip")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "할 일 표시" }));
+    expect(await screen.findByRole("button", { name: "설거지 하기" })).toBeInTheDocument();
   });
 
   it("opens the full day-schedule panel by clicking the date number of a day with events", async () => {
@@ -304,7 +321,9 @@ describe("CalendarPage", () => {
       create: (input) => base.create(input),
       update: (id, input) => base.update(id, input),
     };
-    renderCalendar(repository);
+    const todoBase = createMockTodoRepository();
+    const todoRepository: TodoRepository = { ...todoBase, getSnapshot: async () => ({ today: "2026-08-05", labels: [], items: [] }) };
+    renderCalendar(repository, "/calendar", calendarViewStateStoreOf("2026-08"), todoRepository);
     expect(await screen.findByText("이 달에는 일정이 없습니다")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "새 일정" }));
     expect(await screen.findByRole("dialog", { name: "새 일정" })).toBeInTheDocument();

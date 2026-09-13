@@ -551,6 +551,7 @@ export const koMessages = {
   "calendar.recurrence.count": "횟수",
   "calendar.recurrence.endDate": "반복 종료 날짜",
   "calendar.recurrence.countLabel": "반복 횟수",
+  "calendar.todo.toggle": "할 일 표시",
   "calendar.empty.title": "이 달에는 일정이 없습니다",
   "calendar.empty.description": "새 일정을 만들어 날짜와 시간을 정리하세요.",
   "calendar.loading": "일정 불러오는 중",

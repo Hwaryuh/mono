@@ -106,6 +106,18 @@ button.calendar-cell__day--today:hover { background: var(--color-accent-hover); 
 .calendar-agenda-event strong > svg { margin-left: 4px; color: var(--color-text-faint); vertical-align: -1px; }
 .calendar-cell__more { align-self: flex-start; padding: 1px 3px; color: var(--color-text-faint); font-size: 9.5px; }
 
+/* Due todos shown alongside events. Dashed border keeps them visually distinct from real calendar events. */
+.calendar-todo-chip { min-width: 0; padding: 2px 5px; display: flex; align-items: center; gap: 5px; overflow: hidden; border: 1px dashed var(--color-border-strong); border-radius: 3px; background: transparent; color: var(--color-text-muted); text-align: left; }
+.calendar-todo-chip:hover { background: var(--color-hover); color: var(--color-text); }
+.calendar-todo-chip > svg { flex: none; }
+.calendar-todo-chip span { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-day-list .calendar-todo-chip { padding: 8px 10px; font-size: 12.5px; }
+.calendar-day-list .calendar-todo-chip span { font-size: inherit; }
+
+.calendar-toolbar__todo-toggle { padding: 4px 10px; display: flex; align-items: center; gap: 5px; border: 1px solid var(--color-border); border-radius: 6px; background: transparent; color: var(--color-text-muted); font-size: 11px; }
+.calendar-toolbar__todo-toggle[aria-pressed="true"] { background: var(--color-hover); color: var(--color-text); }
+.calendar-toolbar__todo-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
 /* Multi-day events: a bar drawn overlapping the cells. Each cell reserves top space equal to --span-reserve. */
 .calendar-grid { --cal-span-lane: 17px; --cal-span-top: 23px; }
 .calendar-cell__span-reserve { flex: none; pointer-events: none; }

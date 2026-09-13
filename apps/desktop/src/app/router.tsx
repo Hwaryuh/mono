@@ -52,7 +52,7 @@ export function createAppRouter(
         { path: "todo", element: <TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} /> },
         { path: "routine", element: <RoutinePage repository={routineRepository} todoRepository={todoRepository} /> },
         { path: "timer", element: <TimerPage /> },
-        { path: "calendar", element: <CalendarPage repository={calendarRepository} viewStateStore={calendarViewStateStore} /> },
+        { path: "calendar", element: <CalendarPage repository={calendarRepository} todoRepository={todoRepository} viewStateStore={calendarViewStateStore} /> },
         { path: "scrap", element: <ScrapPage repository={scrapRepository} viewStateStore={scrapViewStateStore} /> },
         { path: "ledger", element: <LedgerPage repository={ledgerRepository} viewStateStore={ledgerViewStateStore} /> },
       ],

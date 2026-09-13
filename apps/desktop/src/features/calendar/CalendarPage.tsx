@@ -1,16 +1,21 @@
 import { translate } from "../../i18n/i18n";
 import type { TranslationKey } from "../../i18n/messages.ko";
 import { errorMessage } from "../../i18n/error-message";
-import { type CalendarCategory, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq } from "@mono/contracts";
+import { type CalendarCategory, type CalendarEditScope, type CalendarEvent, type CalendarRecurrence, type CalendarSnapshot, type CalendarWriteInput, type RecurrenceFreq, type TodoItem } from "@mono/contracts";
 import { Button, DatePicker, Icon, IconButton, Input, Modal, Select, TextArea, TimePicker } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import type { CalendarRepository } from "./calendar-repository";
 import { CalendarCategoryManager } from "./CalendarCategoryManager";
 import { calendarViewStateStoreOf, type CalendarView, type CalendarViewStateStore } from "./calendar-view-state-store";
 import { addDays, weekdayOf } from "./recurrence";
+import type { TodoRepository } from "../todo/todo-repository";
+
+const todoQueryKey = ["todo"] as const;
+// Only the top few due todos render per day cell before collapsing into "+N more" (same cap as events).
+const maxVisibleTodosPerDay = 3;
 
 export const calendarQueryKey = ["calendar"] as const;
 
@@ -168,6 +173,16 @@ function coversDate(event: CalendarEvent, date: string) {
   return event.startDate <= date && event.endDate >= date;
 }
 
+// Groups not-done top-level todos by dueDate. Subtasks and done todos are left off the calendar — they'd just be noise here.
+function todosByDate(items: TodoItem[]): Map<string, TodoItem[]> {
+  const groups = new Map<string, TodoItem[]>();
+  for (const item of items) {
+    if (!item.dueDate || item.done || item.parentId) continue;
+    groups.set(item.dueDate, [...(groups.get(item.dueDate) ?? []), item]);
+  }
+  return groups;
+}
+
 type SpanSegment = {
   event: CalendarEvent;
   category?: CalendarCategory;
@@ -245,10 +260,11 @@ function gridRange(visibleMonth: string): { from: string; to: string } {
   return { from: addDays(start, -7), to: addDays(start, 48) };
 }
 
-export function CalendarPage({ repository, viewStateStore }: { repository: CalendarRepository; viewStateStore?: CalendarViewStateStore }) {
+export function CalendarPage({ repository, todoRepository, viewStateStore }: { repository: CalendarRepository; todoRepository: TodoRepository; viewStateStore?: CalendarViewStateStore }) {
+  const navigate = useNavigate();
   const [store] = useState(() => viewStateStore ?? calendarViewStateStoreOf());
   const [viewState, setViewState] = useState(() => store.read());
-  const { view, visibleMonth } = viewState;
+  const { view, visibleMonth, showTodos } = viewState;
   // Month-transition animation direction: 1 = next month (slides left), -1 = previous month, 0 = no animation.
   const [slideDir, setSlideDir] = useState<-1 | 0 | 1>(0);
   const [dayDialogDate, setDayDialogDate] = useState<string | null>(null);
@@ -316,6 +332,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
     queryKey: [...calendarQueryKey, range.from, range.to],
     queryFn: () => repository.getSnapshot(range),
   });
+  const todoQuery = useQuery({ queryKey: todoQueryKey, queryFn: () => todoRepository.getSnapshot(), enabled: showTodos });
 
   const invalidateSnapshots = async () => {
     await Promise.all([
@@ -383,9 +400,20 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
   const monthEvents = sortEvents(snapshot.events.filter((event) => event.startDate.startsWith(visibleMonth)));
   const editorBusy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const editingEvent = editorItem && editorItem !== "new" ? editorItem : null;
+  const todoGroups = showTodos && todoQuery.data ? todosByDate(todoQuery.data.items) : new Map<string, TodoItem[]>();
+  const monthTodoGroups = new Map([...todoGroups].filter(([date]) => date.startsWith(visibleMonth)));
   const cells = monthCells(visibleMonth, snapshot.today, snapshot.events);
   const monthSpans = computeMonthSpans(cells, snapshot);
   const dayEvents = dayDialogDate ? sortEvents(snapshot.events.filter((event) => coversDate(event, dayDialogDate))) : [];
+  const dayTodos = dayDialogDate ? todoGroups.get(dayDialogDate) ?? [] : [];
+
+  function toggleShowTodos() {
+    setViewState((current) => {
+      const next = { ...current, showTodos: !current.showTodos };
+      store.write(next);
+      return next;
+    });
+  }
 
   function openCreate(selectedDate = snapshot.today) {
     setDraft(blankDraft(snapshot, selectedDate));
@@ -531,6 +559,7 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
         <div aria-label={translate("calendar.view.label")} className="calendar-view-tabs" role="tablist">
           {(["month", "agenda"] as const).map((candidate, index) => <button aria-selected={view === candidate} key={candidate} onClick={() => selectView(candidate)} onKeyDown={(event) => onViewKeyDown(event, index)} ref={(element) => { viewRefs.current[index] = element; }} role="tab" tabIndex={view === candidate ? 0 : -1} type="button">{candidate === "month" ? translate("calendar.view.month") : translate("calendar.view.agenda")}</button>)}
         </div>
+        <button aria-pressed={showTodos} className="calendar-toolbar__todo-toggle" onClick={toggleShowTodos} type="button"><Icon name="todo" size={13} />{translate("calendar.todo.toggle")}</button>
       </div>
 
       {view === "month" ? (
@@ -542,14 +571,16 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
               const dayNumber = Number(cell.date.slice(-2));
               const spanLanes = monthSpans.laneByDate.get(cell.date) ?? 0;
               const coveringCount = snapshot.events.filter((event) => coversDate(event, cell.date)).length;
+              const dayTodoCount = todoGroups.get(cell.date)?.length ?? 0;
               return (
                 <div className={cell.inMonth ? "calendar-cell" : "calendar-cell calendar-cell--outside"} key={cell.date}>
-                  {coveringCount > 0
+                  {coveringCount + dayTodoCount > 0
                     ? <button aria-label={translate("calendar.day.openEvents", { date: formatDay(cell.date), count: coveringCount })} className={dayClassName} onClick={() => setDayDialogDate(cell.date)} type="button">{dayNumber}</button>
                     : <span className={dayClassName}>{dayNumber}</span>}
                   {spanLanes > 0 && <div className="calendar-cell__span-reserve" style={{ height: `calc(${spanLanes} * var(--cal-span-lane))` }} />}
                   {cell.events.slice(0, maxVisibleEventsPerDay).map((item) => <CalendarEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}
                   {cell.events.length > maxVisibleEventsPerDay && <span className="calendar-cell__more">{translate("calendar.day.moreEvents", { count: cell.events.length - maxVisibleEventsPerDay })}</span>}
+                  {(todoGroups.get(cell.date) ?? []).slice(0, maxVisibleTodosPerDay).map((todo) => <CalendarTodoChip key={todo.id} onClick={() => navigate("/todo")} todo={todo} />)}
                 </div>
               );
             })}
@@ -582,18 +613,21 @@ export function CalendarPage({ repository, viewStateStore }: { repository: Calen
                 ))}
               </div>
             )}
-            {monthEvents.length === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
+            {monthEvents.length === 0 && monthTodoGroups.size === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
           </div>
         </div>
       ) : (
         <div className="calendar-agenda" key={visibleMonth} role="tabpanel">
-          {agendaGroups(monthEvents).map((group) => <div className="calendar-agenda__group" key={group.date}><div className="calendar-agenda__date"><strong>{formatDay(group.date)}</strong><span className={group.date === snapshot.today ? "calendar-agenda__today" : ""}>{dayLabel(group.date, snapshot.today)}</span></div><div className="calendar-agenda__events">{group.events.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}</div></div>)}
-          {monthEvents.length === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
+          {agendaGroups(monthEvents, monthTodoGroups).map((group) => <div className="calendar-agenda__group" key={group.date}><div className="calendar-agenda__date"><strong>{formatDay(group.date)}</strong><span className={group.date === snapshot.today ? "calendar-agenda__today" : ""}>{dayLabel(group.date, snapshot.today)}</span></div><div className="calendar-agenda__events">{group.events.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}{group.todos.map((todo) => <CalendarTodoChip key={todo.id} onClick={() => navigate("/todo")} todo={todo} />)}</div></div>)}
+          {monthEvents.length === 0 && monthTodoGroups.size === 0 && <CalendarEmpty onCreate={() => openCreate(`${visibleMonth}-01`)} />}
         </div>
       )}
 
       <Modal className="calendar-day-modal" icon="calendar" onClose={() => setDayDialogDate(null)} open={dayDialogDate !== null} title={<>{dayDialogDate ? formatDay(dayDialogDate) : ""}<small>{translate("calendar.day.eventCount", { count: dayEvents.length })}</small></>}>
-        <div className="calendar-day-list">{dayEvents.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}</div>
+        <div className="calendar-day-list">
+          {dayEvents.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}
+          {dayTodos.map((todo) => <CalendarTodoChip key={todo.id} onClick={() => navigate("/todo")} todo={todo} />)}
+        </div>
       </Modal>
 
       <Modal
@@ -704,10 +738,19 @@ function monthCells(visibleMonth: string, today: string, events: CalendarEvent[]
   });
 }
 
-function agendaGroups(events: CalendarEvent[]) {
-  const groups = new Map<string, CalendarEvent[]>();
-  events.forEach((event) => groups.set(event.startDate, [...(groups.get(event.startDate) ?? []), event]));
-  return Array.from(groups, ([date, groupedEvents]) => ({ date, events: groupedEvents }));
+function agendaGroups(events: CalendarEvent[], todoGroups: Map<string, TodoItem[]>) {
+  const groups = new Map<string, { events: CalendarEvent[]; todos: TodoItem[] }>();
+  events.forEach((event) => {
+    const group = groups.get(event.startDate) ?? { events: [], todos: [] };
+    group.events.push(event);
+    groups.set(event.startDate, group);
+  });
+  todoGroups.forEach((todos, date) => {
+    const group = groups.get(date) ?? { events: [], todos: [] };
+    group.todos = todos;
+    groups.set(date, group);
+  });
+  return Array.from(groups, ([date, group]) => ({ date, ...group })).sort((left, right) => left.date.localeCompare(right.date));
 }
 
 function dayLabel(date: string, today: string) {
@@ -722,6 +765,11 @@ function CalendarEventButton({ event, category, onClick }: { event: CalendarEven
 
 function AgendaEventButton({ event, category, onClick }: { event: CalendarEvent; category?: CalendarCategory; onClick: () => void }) {
   return <button className="calendar-agenda-event" onClick={onClick} type="button"><i style={{ backgroundColor: category?.color ?? "oklch(0.645 0.009 106.643)" }} /><time>{formatRange(event)}</time><strong title={event.title}>{event.title}{event.seriesId && <Icon name="routine" size={10} strokeWidth={1.8} />}</strong><span title={event.location}>{event.location}</span></button>;
+}
+
+// Read-only — a due todo links out to the todo list rather than opening an editor here, since the calendar doesn't own todo state.
+function CalendarTodoChip({ todo, onClick }: { todo: TodoItem; onClick: () => void }) {
+  return <button className="calendar-todo-chip" onClick={onClick} title={todo.title} type="button"><Icon name="todo" size={10} strokeWidth={1.8} /><span>{todo.title}</span></button>;
 }
 
 function DateTimeFields({ draft, label, prefix, onChange }: { draft: Draft; label: string; prefix: "start" | "end"; onChange: <Key extends keyof Draft>(key: Key, value: Draft[Key]) => void }) {
