@@ -2,6 +2,7 @@ import { Button, Input } from "@mono/ui";
 import { useEffect, useState } from "react";
 import { type AiProviderId, type AiSettingsStore } from "../../infrastructure/ai/ai-settings-store";
 import { translate } from "../../i18n/i18n";
+import { DiscordSettingsSection } from "./DiscordSettingsSection";
 import { messageOf, SettingsHeading, useAsyncAction } from "./settings-shared";
 
 const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string; keySource: string; dataNotice: string; model: string }> = {
@@ -71,6 +72,7 @@ export function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
           />
         ))}
       </div>
+      <DiscordSettingsSection />
     </>
   );
 }

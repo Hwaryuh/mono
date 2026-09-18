@@ -320,13 +320,13 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
 // ---------- capture (dashboard-repository.ts capture 1:1) ----------
 
 #[derive(Deserialize)]
-struct CaptureInput {
+pub(super) struct CaptureInput {
     #[serde(default)]
-    raw: String,
+    pub(super) raw: String,
     #[serde(default)]
-    images: Vec<CaptureImage>,
+    pub(super) images: Vec<CaptureImage>,
     #[serde(default)]
-    videos: Vec<CaptureVideo>,
+    pub(super) videos: Vec<CaptureVideo>,
 }
 
 fn names(conn: &Connection, sql: &str) -> ApiResult<Vec<String>> {
@@ -350,7 +350,7 @@ fn field(label: &str, value: &str) -> ai::AnalysisField {
     ai::AnalysisField { label: label.to_string(), value: value.to_string(), confidence: None }
 }
 
-async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
+pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
     let raw_trimmed = input.raw.trim().to_string();
     if raw_trimmed.chars().count() > 2_000 {
         return Err(ApiError::validation("캡처 텍스트는 2000자 이하여야 합니다."));

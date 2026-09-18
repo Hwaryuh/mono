@@ -123,11 +123,11 @@ fn provider_label(provider: &str) -> &'static str {
     }
 }
 
-fn has_key(conn: &Connection, key: &str) -> ApiResult<bool> {
+pub(super) fn has_key(conn: &Connection, key: &str) -> ApiResult<bool> {
     Ok(conn.query_row("SELECT 1 FROM secrets WHERE key = ?1", [key], |_| Ok(())).optional()?.is_some())
 }
 
-fn set_key(conn: &Connection, crypto: &SecretCrypto, key: &str, value: &str) -> ApiResult<()> {
+pub(super) fn set_key(conn: &Connection, crypto: &SecretCrypto, key: &str, value: &str) -> ApiResult<()> {
     conn.execute(
         "INSERT INTO secrets (key, value) VALUES (?1, ?2) \
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -136,18 +136,26 @@ fn set_key(conn: &Connection, crypto: &SecretCrypto, key: &str, value: &str) -> 
     Ok(())
 }
 
-fn delete_key(conn: &Connection, key: &str) -> ApiResult<()> {
+pub(super) fn delete_key(conn: &Connection, key: &str) -> ApiResult<()> {
     conn.execute("DELETE FROM secrets WHERE key = ?1", [key])?;
     Ok(())
 }
 
-fn set_plain(conn: &Connection, key: &str, value: &str) -> ApiResult<()> {
+pub(super) fn set_plain(conn: &Connection, key: &str, value: &str) -> ApiResult<()> {
     conn.execute(
         "INSERT INTO secrets (key, value) VALUES (?1, ?2) \
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![key, value],
     )?;
     Ok(())
+}
+
+pub(super) fn get_plain(conn: &Connection, key: &str) -> ApiResult<Option<String>> {
+    Ok(conn.query_row("SELECT value FROM secrets WHERE key = ?1", [key], |r| r.get(0)).optional()?)
+}
+
+pub(super) fn get_secret(conn: &Connection, crypto: &SecretCrypto, key: &str) -> ApiResult<Option<String>> {
+    get_plain(conn, key)?.map(|enc| crypto.decrypt(&enc)).transpose()
 }
 
 fn has_api_key(conn: &Connection, provider: &str) -> ApiResult<bool> {

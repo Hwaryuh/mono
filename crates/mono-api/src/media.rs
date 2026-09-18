@@ -191,7 +191,7 @@ impl R2Client {
         format!("/{}/{}", uri_encode(&self.bucket, true), uri_encode(key, true))
     }
 
-    async fn put(&self, key: &str, body: Vec<u8>, content_type: &str) -> ApiResult<()> {
+    pub(super) async fn put(&self, key: &str, body: Vec<u8>, content_type: &str) -> ApiResult<()> {
         let hash = sha256_hex(&body);
         let res = self
             .signed(reqwest::Method::PUT, &self.object_uri(key), "", &hash)
@@ -622,7 +622,7 @@ pub(super) fn routes(state: SecretState) -> Router {
         .with_state(state)
 }
 
-fn client_from(state: &SecretState) -> ApiResult<R2Client> {
+pub(super) fn client_from(state: &SecretState) -> ApiResult<R2Client> {
     let config = {
         let conn = state.db.conn();
         get_r2_config(&conn, &state.crypto)?

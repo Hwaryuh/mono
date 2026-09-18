@@ -2570,6 +2570,7 @@ version = "0.13.1"
 dependencies = [
  "aes-gcm",
  "axum",
+ "base64 0.22.1",
  "chrono",
  "futures-util",
  "getrandom 0.2.17",

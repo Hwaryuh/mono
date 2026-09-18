@@ -38,7 +38,7 @@ impl ChangeHub {
         }
     }
 
-    fn publish(&self, modules: &[&str]) {
+    pub(super) fn publish(&self, modules: &[&str]) {
         if modules.is_empty() {
             return;
         }
