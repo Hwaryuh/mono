@@ -51,6 +51,14 @@ const sourceMeta: Record<InboxItem["source"], { name: string; icon: IconName }> 
   video: { name: translate("inbox.source.video"), icon: "video" },
 };
 
+// Fields the user (or the AI) may leave empty. An empty one is dropped on save instead of blocking it.
+const optionalFieldLabels = new Set([
+  translate("common.field.note"),
+  translate("inbox.field.due"),
+  translate("common.field.location"),
+  translate("inbox.field.reminder"),
+]);
+
 const fieldLabels: Record<InboxTargetModuleId, string[]> = {
   todo: [translate("common.field.title"), translate("common.field.label"), translate("inbox.field.due"), translate("common.field.note")],
   calendar: [translate("common.field.title"), translate("inbox.field.schedule"), translate("common.field.location"), translate("common.field.label"), translate("inbox.field.reminder")],
@@ -559,7 +567,9 @@ function InboxRow({
 
   function submitUpdate(event: FormEvent) {
     event.preventDefault();
-    const normalizedFields = fields.map((field) => ({ ...field, value: field.value.trim() }));
+    const normalizedFields = fields
+      .map((field) => ({ ...field, value: field.value.trim() }))
+      .filter((field) => field.value || !optionalFieldLabels.has(field.label));
     const label = normalizedFields.find((field) => field.label === translate("common.field.label"))?.value;
     if (label !== undefined && !labelCatalog[target].options.some((option) => option.value === label)) {
       setActionError(translate("inbox.validation.labelRequired", { target: moduleMeta[target].name }));
