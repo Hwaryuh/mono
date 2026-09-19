@@ -293,6 +293,22 @@
 .settings-version { margin-bottom: 14px; display: flex; align-items: baseline; gap: 10px; }
 .settings-version span { color: var(--color-text-faint); font-size: 10.5px; }
 .settings-version strong { color: var(--color-text); font: 12px var(--font-code); font-variant-numeric: tabular-nums; }
+/* Discord source: flat rows between hairlines, deliberately unlike the filled provider cards below it. */
+.settings-source { margin-bottom: 28px; padding: 4px 0 20px; border-bottom: 1px solid var(--color-border, color-mix(in srgb, var(--color-text) 12%, transparent)); }
+.settings-source__header { margin-bottom: 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.settings-source__header > div { display: flex; flex-direction: column; gap: 4px; }
+.settings-source__header strong { color: var(--color-text); font-size: 13px; }
+.settings-source__header div > span { color: var(--color-text-faint); font-size: 10.5px; }
+.settings-source__state { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
+.settings-source__state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-faint); }
+.settings-source__state[data-connected="true"] { color: var(--color-text); }
+.settings-source__state[data-connected="true"]::before { background: var(--color-accent); }
+.settings-source__form { display: flex; flex-direction: column; }
+.settings-source__form > label { min-height: 44px; display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 12px; }
+.settings-source__form > label + label { border-top: 1px solid color-mix(in srgb, var(--color-text) 7%, transparent); }
+.settings-source__form > label > span { color: var(--color-text-muted); font-size: 11px; }
+.settings-source__form .ui-input { min-width: 0; }
+.settings-source__actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
 .settings-ai-providers { display: flex; flex-direction: column; gap: 14px; }
 .settings-ai-providers > .settings-group + .settings-group { margin-top: 0; }
 .settings-ai--provider { transition-property: background-color, box-shadow; transition-duration: 160ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }

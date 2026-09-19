@@ -58,6 +58,7 @@ export function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
   return (
     <>
       <SettingsHeading description={translate("settings.ai.description")} title="AI" />
+      <DiscordSettingsSection />
       {providerError?.provider === null && <p className="settings-ai__error settings-ai__provider-error" role="alert">{providerError.message}</p>}
       <div aria-label={translate("settings.ai.providerLabel")} className="settings-ai-providers" role="radiogroup">
         {(Object.keys(providerMeta) as AiProviderId[]).map((provider) => (
@@ -72,7 +73,6 @@ export function AiSettingsPanel({ store }: { store: AiSettingsStore }) {
           />
         ))}
       </div>
-      <DiscordSettingsSection />
     </>
   );
 }
