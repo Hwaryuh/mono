@@ -11,7 +11,7 @@ const providerMeta: Record<AiProviderId, { label: string; keyPlaceholder: string
     keyPlaceholder: translate("settings.ai.geminiTitle"),
     keySource: "Google AI Studio",
     dataNotice: translate("settings.ai.geminiDescription"),
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.5-flash-lite",
   },
   openai: {
     label: "OpenAI",

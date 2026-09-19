@@ -15,7 +15,7 @@ use super::secret::{self, SecretState};
 
 const OPENAI_MODEL: &str = "gpt-5-nano";
 const OPENAI_ROOT: &str = "https://api.openai.com/v1";
-const GEMINI_MODEL: &str = "gemini-2.5-flash-lite";
+const GEMINI_MODEL: &str = "gemini-3.5-flash-lite";
 const GEMINI_ROOT: &str = "https://generativelanguage.googleapis.com/v1beta";
 const ANTHROPIC_MODEL: &str = "claude-haiku-4-5";
 const ANTHROPIC_ROOT: &str = "https://api.anthropic.com/v1";
