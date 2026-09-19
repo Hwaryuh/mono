@@ -155,7 +155,7 @@ fn schema_parse(value: &Value, provider_label: &str) -> AiResult<CaptureAnalysis
     let fields = raw_fields
         .iter()
         .filter(|f| {
-            f.get("label").and_then(Value::as_str).is_none_or(|l| l.trim().is_empty())
+            f.get("label").and_then(Value::as_str).map_or(true, |l| l.trim().is_empty())
                 || f.get("value").and_then(Value::as_str).is_some_and(|v| !v.trim().is_empty())
         })
         .map(|f| AnalysisField {
