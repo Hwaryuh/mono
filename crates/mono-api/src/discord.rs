@@ -75,6 +75,27 @@ fn parse_messages(body: &Value) -> Vec<Message> {
     messages.into_iter().map(|(_, m)| m).collect()
 }
 
+const WAITING: &str = "%E2%8F%B3"; // ⏳
+const DONE: &str = "%E2%9C%85"; // ✅
+const FAILED: &str = "%E2%9D%8C"; // ❌
+
+// Needs the bot's "Add Reactions" permission; without it this just logs and the capture is unaffected.
+// Discord wants ~250ms between reaction calls, hence the sleep.
+async fn react(client: &reqwest::Client, token: &str, channel: &str, message: &str, emoji: &str, add: bool) {
+    let method = if add { reqwest::Method::PUT } else { reqwest::Method::DELETE };
+    let result = client
+        .request(method, format!("{API}/channels/{channel}/messages/{message}/reactions/{emoji}/@me"))
+        .header("Authorization", format!("Bot {token}"))
+        .header("Content-Length", "0")
+        .send()
+        .await
+        .and_then(|r| r.error_for_status());
+    if let Err(error) = result {
+        eprintln!("discord: 리액션 실패({message}): {error}");
+    }
+    tokio::time::sleep(Duration::from_millis(300)).await;
+}
+
 async fn discord_get(client: &reqwest::Client, token: &str, path: &str) -> ApiResult<Value> {
     let fail = |message: String| ApiError::BadRequest(format!("Discord 요청 실패: {message}"));
     let response = client
@@ -167,11 +188,18 @@ async fn poll_once(state: &SecretState, hub: &ChangeHub, client: &reqwest::Clien
             if message.text.is_empty() && images.is_empty() {
                 continue;
             }
+            react(client, &token, &channel, &message.id, WAITING, true).await;
             let input = CaptureInput { raw: message.text, images, videos: vec![] };
             // A message that fails validation is logged and skipped — retrying it every poll would never succeed.
-            if let Err(error) = dashboard::capture(state, input).await {
-                eprintln!("discord: 메시지 {} 수집 실패: {error:?}", message.id);
-            }
+            let analyzed = match dashboard::capture(state, input).await {
+                Ok(analyzed) => analyzed,
+                Err(error) => {
+                    eprintln!("discord: 메시지 {} 수집 실패: {error:?}", message.id);
+                    false
+                }
+            };
+            react(client, &token, &channel, &message.id, WAITING, false).await;
+            react(client, &token, &channel, &message.id, if analyzed { DONE } else { FAILED }, true).await;
             secret::set_plain(&state.db.conn(), CURSOR_KEY, &message.id)?;
             hub.publish(&["dashboard", "inbox", "todo", "routine"]);
         }

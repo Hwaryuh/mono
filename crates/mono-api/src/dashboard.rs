@@ -350,7 +350,8 @@ fn field(label: &str, value: &str) -> ai::AnalysisField {
     ai::AnalysisField { label: label.to_string(), value: value.to_string(), confidence: None }
 }
 
-pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<()> {
+// Ok(true) if the analysis succeeded; Ok(false) if it failed and a status:"failed" inbox item was created instead.
+pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResult<bool> {
     let raw_trimmed = input.raw.trim().to_string();
     if raw_trimmed.chars().count() > 2_000 {
         return Err(ApiError::validation("캡처 텍스트는 2000자 이하여야 합니다."));
@@ -478,7 +479,7 @@ pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResu
             videos_json,
         ],
     )?;
-    Ok(())
+    Ok(analysis.is_ok())
 }
 
 // ---------- Routes (apps/api/src/routes/dashboard.ts) ----------
