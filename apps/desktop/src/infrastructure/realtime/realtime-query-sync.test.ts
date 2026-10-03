@@ -1,3 +1,4 @@
+import { realtimeModuleIds } from "@mono/contracts";
 import type { RealtimeChangeListener, RealtimeChangeSource } from "./realtime-change-source";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
@@ -33,10 +34,10 @@ describe("RealtimeQuerySync", () => {
     RealtimeQuerySync.of(queryClient, source).start();
 
     source.listener?.onOpen();
-    expect(invalidate).toHaveBeenCalledTimes(7);
+    expect(invalidate).toHaveBeenCalledTimes(realtimeModuleIds.length);
 
     invalidate.mockClear();
     source.listener?.onResync();
-    expect(invalidate).toHaveBeenCalledTimes(7);
+    expect(invalidate).toHaveBeenCalledTimes(realtimeModuleIds.length);
   });
 });

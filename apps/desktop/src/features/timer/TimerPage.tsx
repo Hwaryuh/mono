@@ -16,6 +16,7 @@ import {
 } from "./timer-settings-store";
 import { createAlarm, type Alarm } from "./timer-alarm";
 import { focusAppWindow, notifySessionEnd, onNotificationClick } from "./timer-notify";
+import type { DayRepository } from "../day/day-repository";
 
 const DAILY_GOAL = 8;
 const TICK_MS = 250;
@@ -43,9 +44,11 @@ interface TimerPageProps {
   sessionStore?: TimerSessionStore;
   settingsStore?: TimerSettingsStore;
   alarm?: Alarm;
+  /** When given, every finished focus session is also logged to 하루 as an untitled timer entry. */
+  dayRepository?: DayRepository;
 }
 
-export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: TimerPageProps) {
+export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp, dayRepository }: TimerPageProps) {
   const store = useMemo(
     () => sessionStore ?? LocalStorageTimerSessionStore.of(window.localStorage),
     [sessionStore],
@@ -122,7 +125,11 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
   useEffect(() => {
     let disposed = false;
     let dispose = () => {};
-    void onNotificationClick(() => void focusAppWindow()).then((off) => {
+    void onNotificationClick(() => {
+      void focusAppWindow();
+      // Opens the untitled entry the session just left in 하루. Hash routing, so no router hook is needed here.
+      if (dayRepository) window.location.hash = "#/day?focus=untitled";
+    }).then((off) => {
       if (disposed) off();
       else dispose = off;
     });
@@ -130,7 +137,7 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
       disposed = true;
       dispose();
     };
-  }, []);
+  }, [dayRepository]);
 
   function resetToFocus() {
     setRemaining(settings.focusSeconds);
@@ -139,13 +146,17 @@ export function TimerPage({ sessionStore, settingsStore, alarm: alarmProp }: Tim
 
   function finishFocus(record: boolean) {
     if (record) {
-      setSessions(store.append(today, {
-        startedAt: startedAtOf(new Date(Date.now() - settings.focusSeconds * 1000)),
-        seconds: settings.focusSeconds,
-      }));
+      const endedAt = new Date();
+      const startedAt = new Date(endedAt.getTime() - settings.focusSeconds * 1000);
+      setSessions(store.append(today, { startedAt: startedAtOf(startedAt), seconds: settings.focusSeconds }));
+      // ponytail: fire-and-forget; a session under a minute (same start/end clock) is rejected and simply not logged.
+      void dayRepository?.create({
+        date: currentIsoDate(startedAt), startTime: startedAtOf(startedAt), endTime: startedAtOf(endedAt),
+        title: "", todoId: null, note: "", source: "timer",
+      }).catch(() => {});
       if (settings.alarmEnabled) {
         alarm.start();
-        void notifySessionEnd(translate("timer.notify.focusTitle"), translate("timer.notify.body"));
+        void notifySessionEnd(translate("timer.notify.focusTitle"), translate(dayRepository ? "timer.notify.dayBody" : "timer.notify.body"));
         setRinging(true);
         return;
       }

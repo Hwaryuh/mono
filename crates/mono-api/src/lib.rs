@@ -12,6 +12,7 @@ mod change;
 mod color;
 mod common;
 mod dashboard;
+mod day;
 mod db;
 mod discord;
 mod error;
@@ -224,6 +225,7 @@ fn build_router(
         )
         .merge(todo::routes(database.clone()))
         .merge(ledger::routes(database.clone()))
+        .merge(day::routes(database.clone()))
         .merge(calendar::routes(database.clone()))
         .merge(routine::routes(database.clone()))
         .merge(scrap::routes(database.clone()))

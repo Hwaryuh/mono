@@ -125,6 +125,8 @@ fn modules_for_path(path: &str) -> &'static [&'static str] {
         &["scrap", "dashboard"]
     } else if path.starts_with("/ledger") {
         &["ledger", "dashboard"]
+    } else if path.starts_with("/day") {
+        &["day"]
     } else if path.starts_with("/inbox") {
         &["inbox", "todo", "calendar", "scrap", "ledger", "dashboard"]
     } else if path.starts_with("/dashboard") {
@@ -161,8 +163,8 @@ mod tests {
     // The canonical module set that must exactly match the client's realtimeChangeEventSchema
     // (packages/contracts's realtimeModuleIds). If Rust publishes a name outside this set, the SSE event
     // is silently dropped at the client's Zod parse and the screen goes stale. This is the one contract point between the two languages, so this test guards against drift.
-    const REALTIME_MODULE_IDS: [&str; 7] =
-        ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger"];
+    const REALTIME_MODULE_IDS: [&str; 8] =
+        ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger", "day"];
 
     #[test]
     fn published_modules_match_client_realtime_set() {
@@ -173,6 +175,7 @@ mod tests {
             "/calendar/events",
             "/scrap/items",
             "/ledger/expenses",
+            "/day/entries",
             "/inbox/items/1/approve",
             "/dashboard/capture",
         ];

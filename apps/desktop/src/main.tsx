@@ -66,9 +66,10 @@ async function start() {
     calendarRepository,
     scrapRepository,
     ledgerRepository,
+    dayRepository,
   } = createHttpRepositories();
   const router = createAppRouter(
-    dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository,
+    dashboardRepository, inboxRepository, todoRepository, routineRepository, calendarRepository, scrapRepository, ledgerRepository, dayRepository,
     new HttpAiSettingsStore(), new HttpMediaMaintenance(), new HttpR2SettingsStore(), new TauriServerSettingsStore(),
   );
 

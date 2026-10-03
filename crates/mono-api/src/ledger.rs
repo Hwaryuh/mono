@@ -131,7 +131,7 @@ fn validated_amount(value: &Value) -> ApiResult<i64> {
 }
 
 // packages/contracts/src/index.ts isoDateSchema: YYYY-MM-DD format + must be a real calendar date.
-fn validated_date(raw: &str) -> ApiResult<String> {
+pub(super) fn validated_date(raw: &str) -> ApiResult<String> {
     let parts: Vec<&str> = raw.split('-').collect();
     let looks_iso = parts.len() == 3
         && parts[0].len() == 4

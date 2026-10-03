@@ -13,6 +13,7 @@ const paths = {
   image: "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4",
   video: "M4 6h11v12H4zM15 10l5-3v10l-5-3z",
   clock: "M12 4a8 8 0 100 16 8 8 0 000-16zM12 8v4l3 2",
+  timeline: "M4 6h2M4 12h2M4 18h2M10 6h10M10 12h10M10 18h7",
   play: "M8 5.5l11 6.5-11 6.5z",
   pause: "M9.5 5.5v13M14.5 5.5v13",
   skip: "M6 6l8 6-8 6zM18 5.5v13",

@@ -173,6 +173,19 @@ CREATE TABLE IF NOT EXISTS secrets (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+-- 하루: 실제로 한 일의 기록. end_time < start_time 이면 자정을 넘긴 기록이고, 날짜는 시작한 날이다.
+CREATE TABLE IF NOT EXISTS time_entries (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  todo_id TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual',
+  version INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS time_entries_date ON time_entries (date);
 CREATE TABLE IF NOT EXISTS dashboard_captures (
   id TEXT PRIMARY KEY,
   seq INTEGER NOT NULL,

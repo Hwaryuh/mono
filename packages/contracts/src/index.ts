@@ -1,7 +1,7 @@
 import { inboxTargetModuleIds, normalizeColorToOklch, platformModuleIds } from "@mono/domain";
 import { z } from "zod";
 
-export const realtimeModuleIds = ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger"] as const;
+export const realtimeModuleIds = ["dashboard", "inbox", "todo", "routine", "calendar", "scrap", "ledger", "day"] as const;
 
 export const realtimeChangeEventSchema = z.object({
   revision: z.number().int().positive(),
@@ -470,3 +470,44 @@ export type LedgerExpense = z.infer<typeof ledgerExpenseSchema>;
 export type LedgerComparison = z.infer<typeof ledgerComparisonSchema>;
 export type LedgerSnapshot = z.infer<typeof ledgerSnapshotSchema>;
 export type LedgerWriteInput = z.infer<typeof ledgerWriteInputSchema>;
+
+export const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "시각은 HH:MM 형식이어야 합니다.");
+
+export const dayEntrySourceSchema = z.enum(["manual", "timer"]);
+
+// An endTime earlier than startTime means the entry ran past midnight; it belongs to the date it started.
+export const dayEntrySchema = z.object({
+  id: z.string().min(1),
+  version: recordVersionSchema,
+  date: isoDateSchema,
+  startTime: clockTimeSchema,
+  endTime: clockTimeSchema,
+  // Empty for a finished timer session that hasn't been named yet.
+  title: z.string().max(500),
+  todoId: z.string().nullable(),
+  note: z.string().max(4_000),
+  source: dayEntrySourceSchema,
+});
+
+export const daySnapshotSchema = z.object({
+  today: isoDateSchema,
+  date: isoDateSchema,
+  entries: z.array(dayEntrySchema),
+  // Logged minutes per linked todo, across every date.
+  todoMinutes: z.array(z.object({ todoId: z.string(), minutes: z.number().int().nonnegative() })),
+});
+
+export const dayEntryWriteInputSchema = z.object({
+  date: isoDateSchema,
+  startTime: clockTimeSchema,
+  endTime: clockTimeSchema,
+  title: z.string().trim().max(500),
+  todoId: z.string().min(1).nullable(),
+  note: z.string().max(4_000),
+  // Read on create only; an entry keeps the source it was created with.
+  source: dayEntrySourceSchema.optional(),
+}).refine((input) => input.startTime !== input.endTime, "시작과 끝 시각이 같습니다.");
+
+export type DayEntry = z.infer<typeof dayEntrySchema>;
+export type DaySnapshot = z.infer<typeof daySnapshotSchema>;
+export type DayEntryWriteInput = z.infer<typeof dayEntryWriteInputSchema>;

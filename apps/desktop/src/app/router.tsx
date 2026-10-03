@@ -3,6 +3,8 @@ import type { DashboardRepository } from "../features/dashboard/dashboard-reposi
 import { CalendarPage } from "../features/calendar/CalendarPage";
 import type { CalendarRepository } from "../features/calendar/calendar-repository";
 import { calendarViewStateStoreOf } from "../features/calendar/calendar-view-state-store";
+import { DayPage } from "../features/day/DayPage";
+import type { DayRepository } from "../features/day/day-repository";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { InboxPage } from "../features/inbox/InboxPage";
 import type { InboxRepository } from "../features/inbox/inbox-repository";
@@ -29,7 +31,7 @@ import { TauriServerSettingsStore } from "../infrastructure/server/tauri-server-
 
 export function createAppRouter(
   dashboardRepository: DashboardRepository, inboxRepository: InboxRepository, todoRepository: TodoRepository, routineRepository: RoutineRepository,
-  calendarRepository: CalendarRepository, scrapRepository: ScrapRepository, ledgerRepository: LedgerRepository,
+  calendarRepository: CalendarRepository, scrapRepository: ScrapRepository, ledgerRepository: LedgerRepository, dayRepository: DayRepository,
   aiSettingsStore: AiSettingsStore = new InMemoryAiSettingsStore(),
   mediaMaintenance: MediaMaintenance = new InMemoryMediaMaintenance(),
   r2SettingsStore: R2SettingsStore = new InMemoryR2SettingsStore(),
@@ -51,7 +53,8 @@ export function createAppRouter(
         { path: "inbox", element: <InboxPage calendarRepository={calendarRepository} ledgerRepository={ledgerRepository} repository={inboxRepository} scrapRepository={scrapRepository} todoRepository={todoRepository} viewStateStore={inboxViewStateStore} /> },
         { path: "todo", element: <TodoPage repository={todoRepository} scrapRepository={scrapRepository} viewStateStore={todoViewStateStore} /> },
         { path: "routine", element: <RoutinePage repository={routineRepository} todoRepository={todoRepository} /> },
-        { path: "timer", element: <TimerPage /> },
+        { path: "day", element: <DayPage repository={dayRepository} todoRepository={todoRepository} /> },
+        { path: "timer", element: <TimerPage dayRepository={dayRepository} /> },
         { path: "calendar", element: <CalendarPage repository={calendarRepository} todoRepository={todoRepository} viewStateStore={calendarViewStateStore} /> },
         { path: "scrap", element: <ScrapPage repository={scrapRepository} viewStateStore={scrapViewStateStore} /> },
         { path: "ledger", element: <LedgerPage repository={ledgerRepository} viewStateStore={ledgerViewStateStore} /> },
