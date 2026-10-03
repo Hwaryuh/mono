@@ -90,8 +90,9 @@ pub(super) fn label(provider: &str) -> &'static str {
 // ---------- Prompt (capture-analysis-prompt.ts) ----------
 
 const BASE: &str = "다음 개인 캡처를 정확히 한 모듈로 분류하고 핵심 필드를 한국어로 추출하라.\n\
-todo: 실행해야 할 작업. calendar: 날짜나 시간이 있는 일정. ledger: 지출이나 구매 기록. \
-scrap: 보관할 메모, 링크, 이미지, 참고자료 또는 나머지.\n";
+todo: 내가 해야 할 행동. calendar: 약속·예약·회의·행사처럼 사람이나 장소와 정해 둔 일정. ledger: 지출이나 구매 기록. \
+scrap: 보관할 메모, 링크, 이미지, 참고자료 또는 나머지.\n\
+날짜나 시각이 있다는 것만으로 calendar로 보내지 마라. 혼자 하는 행동(산책, 운동, 공부, 청소 등)은 시각이 있어도 todo이고 그 시각은 \"마감\"에 쓴다.\n";
 
 const RULES: &str = "명시되지 않은 날짜, 금액, 이름은 만들지 마라.\n";
 
@@ -108,6 +109,7 @@ const FIELD_CONTRACT: &str = "각 모듈은 아래 필드명을 정확히 그대
 const EXAMPLES: &str = "예시(라벨은 아래 목록에서 고른다):\n\
 - \"우유 사기\" → todo. 제목: 우유 사기\n\
 - \"금요일까지 세금 신고서 제출, 홈택스에서\" → todo. 제목: 세금 신고서 제출 / 마감: 이번 주 금요일의 YYYY-MM-DD / 메모: 홈택스에서 제출\n\
+- \"오늘 저녁 8시에 산책하기\" → todo. 제목: 산책하기 / 마감: 오늘의 YYYY-MM-DD 20:00\n\
 - \"9월 30일 오후 3시 치과 예약, 30분 전에 알려줘\" → calendar. 제목: 치과 예약 / 일시: 올해 9월 30일의 YYYY-MM-DD 15:00 / 알림: 30\n\
 - \"스타벅스 5,800원\" → ledger. 항목: 스타벅스 / 금액: 5800\n\
 - \"https://example.com/post 나중에 읽을 글\" → scrap. 제목: 나중에 읽을 글 / 메모: https://example.com/post\n";
