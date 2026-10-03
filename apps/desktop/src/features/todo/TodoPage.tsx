@@ -636,6 +636,15 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
     ]),
     onError: (error) => setMutationError(errorMessage(error)),
   });
+  const rescheduleMutation = useMutation({
+    mutationFn: () => repository.update(item.id, { title: item.title, labelId: item.labelId, dueDate: snapshot.today, dueTime: item.dueTime, note: item.note, priority: item.priority }, item.version),
+    onMutate: () => setMutationError(null),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: todoQueryKey }),
+      queryClient.invalidateQueries({ queryKey: dashboardQueryKey }),
+    ]),
+    onError: (error) => setMutationError(errorMessage(error)),
+  });
   const status = statusOf(item, snapshot.today);
   const justCompleted = item.done && !previousDoneRef.current;
   const dueText = item.done
@@ -710,6 +719,11 @@ function TodoRow({ item, label, snapshot, repository, scraps, subtasks, dragging
             <strong><ScrapText scraps={scraps} text={item.title} /></strong>
             <span>
               <time className={status === "overdue" ? "todo-item__due todo-item__due--overdue" : "todo-item__due"}>{dueText}</time>
+              {status === "overdue" && !item.routineId && (
+                <button aria-label={translate("todo.action.rescheduleTodayLabel", { title: displayTitle })} className="todo-item__reschedule" disabled={rescheduleMutation.isPending} onClick={() => rescheduleMutation.mutate()} type="button">
+                  {translate("todo.action.rescheduleToday")}
+                </button>
+              )}
               <span className="todo-item__label"><i style={{ backgroundColor: label.color }} />{label.name}</span>
               {item.note.trim() && <Icon aria-label={translate("todo.note.present")} className="todo-item__note" name="note" role="img" size={12} />}
               {hasSubtasks && (

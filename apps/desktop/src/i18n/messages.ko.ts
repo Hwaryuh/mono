@@ -473,6 +473,8 @@ export const koMessages = {
   "todo.status.overdueByDays": "기한: {days}일 지남",
   "todo.status.dueAt": "기한: {date}{time}",
   "todo.action.editLabel": "{title} 수정",
+  "todo.action.rescheduleToday": "오늘로",
+  "todo.action.rescheduleTodayLabel": "{title} 마감일을 오늘로 설정",
   "todo.action.setPriority": "{title} 우선순위 {level}단계로 설정",
   "todo.note.present": "메모 있음",
   "todo.mention.missing": "(삭제된 스크랩)",

@@ -41,6 +41,12 @@ function repositoryOf(base: TodoRepository, overrides: Partial<TodoRepository> =
 }
 
 describe("TodoPage", () => {
+  it("moves an overdue todo to today with one click", async () => {
+    renderTodo();
+    fireEvent.click(await screen.findByRole("button", { name: "전기세 이체 확인 마감일을 오늘로 설정" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "전기세 이체 확인 마감일을 오늘로 설정" })).not.toBeInTheDocument());
+  });
+
   it("switches status filters with the keyboard and layers a label filter on top", async () => {
     renderTodo();
     const all = await screen.findByRole("radio", { name: /전체 7/ });
