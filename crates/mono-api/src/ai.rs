@@ -403,7 +403,7 @@ async fn gemini_analyze(
             "responseMimeType": "application/json",
             "responseJsonSchema": gemini_result_schema(),
             "maxOutputTokens": 1024,
-            "thinkingConfig": { "thinkingBudget": 0 },
+            "thinkingConfig": { "thinkingLevel": "minimal" },
         },
     });
 
@@ -424,18 +424,8 @@ async fn gemini_analyze(
 }
 
 async fn gemini_test(api_key: &str, root: &str) -> AiResult<()> {
-    let response = http_client(CONNECT_TIMEOUT_SECS)
-        .get(format!("{root}/models/{GEMINI_MODEL}"))
-        .header("x-goog-api-key", api_key)
-        .send()
-        .await
-        .map_err(|e| connect_error("Gemini", &e))?;
-    if response.status().is_success() {
-        return Ok(());
-    }
-    let status = response.status().as_u16();
-    let body = response.text().await.unwrap_or_default();
-    Err(api_error_message("Gemini", status, &body))
+    // Model lookup alone doesn't validate generation settings or structured output support.
+    gemini_analyze(api_key, "우유 사기", &[], None, root).await.map(|_| ())
 }
 
 // ---------- Anthropic (Claude Messages API) ----------
@@ -593,6 +583,50 @@ mod tests {
     fn anthropic_body(payload: Value) -> String {
         json!({ "content": [{ "type": "tool_use", "name": ANTHROPIC_TOOL, "input": payload }] })
             .to_string()
+    }
+
+    async fn mock_gemini_generation(response: Value) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let root = format!("http://{}", listener.local_addr().unwrap());
+        let router = Router::new().route(
+            &format!("/models/{GEMINI_MODEL}:generateContent"),
+            post(move |Json(request): Json<Value>| async move {
+                let config = &request["generationConfig"];
+                if config["thinkingConfig"] != json!({ "thinkingLevel": "minimal" })
+                    || config["responseJsonSchema"] != gemini_result_schema()
+                    || config["responseMimeType"] != "application/json"
+                {
+                    return (
+                        axum::http::StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": { "message": "Invalid generation settings" } })),
+                    );
+                }
+                (axum::http::StatusCode::OK, Json(response))
+            }),
+        );
+        let task = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        (root, task)
+    }
+
+    #[tokio::test]
+    async fn gemini_connection_test_validates_generation_settings() {
+        // Only POST generateContent exists: a model-lookup-only test cannot pass this server.
+        let response = serde_json::from_str(&gemini_body(json!({
+            "target": "todo", "confidence": 0.9,
+            "fields": [{ "label": "제목", "value": "우유 사기" }],
+        }))).unwrap();
+        let (root, server) = mock_gemini_generation(response).await;
+        let result = gemini_test("test-key", &root).await;
+        server.abort();
+        result.unwrap();
+    }
+
+    #[tokio::test]
+    async fn gemini_connection_test_rejects_invalid_analysis() {
+        let (root, server) = mock_gemini_generation(json!({ "candidates": [] })).await;
+        let result = gemini_test("test-key", &root).await;
+        server.abort();
+        assert_eq!(result.unwrap_err(), "Gemini가 분석 결과를 반환하지 않았습니다.");
     }
 
     // Structured Outputs' strict mode rejects the whole request at call time if any object node breaks
