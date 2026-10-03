@@ -83,6 +83,13 @@ export function DayPage({ repository, todoRepository }: { repository: DayReposit
     onError: (cause) => setError(errorMessage(cause, "day.error.save")),
   });
 
+  // Prefetch the neighbouring days so stepping with the arrows never flashes the loading skeleton.
+  useEffect(() => {
+    for (const neighbour of [shiftDate(date, -1), shiftDate(date, 1)]) {
+      void queryClient.prefetchQuery({ queryKey: [...dayQueryKey, neighbour], queryFn: () => repository.getSnapshot(neighbour) });
+    }
+  }, [date, queryClient, repository]);
+
   // A draft belongs to the day it was typed on — switching days (buttons or URL) starts fresh.
   useEffect(() => {
     setDraft("");
