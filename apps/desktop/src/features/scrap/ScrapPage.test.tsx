@@ -17,7 +17,11 @@ vi.mock("../../infrastructure/http/http-client", async (importOriginal) => ({
   httpGetBlob: httpClient.httpGetBlob,
 }));
 
+const saveFile = vi.hoisted(() => ({ saveObjectUrlToDisk: vi.fn() }));
+vi.mock("../../infrastructure/media/save-file", () => saveFile);
+
 beforeEach(() => {
+  saveFile.saveObjectUrlToDisk.mockReset().mockResolvedValue(undefined);
   httpClient.httpGetBlob.mockReset().mockResolvedValue(new Blob(["img"], { type: "image/png" }));
 });
 
@@ -448,7 +452,7 @@ describe("ScrapPage", () => {
     expect((await repository.getSnapshot()).items[0]).toMatchObject({ kind: "image", mediaId, title: "여름 바다" });
   });
 
-  it("saves a non-image file upload as a file type and shows a download chip in the detail view", async () => {
+  it("saves a non-image file upload as a file type and downloads it through the save dialog from the detail view", async () => {
     const repository = createMockScrapRepository();
     const mediaStore: MediaStore = { save: vi.fn(async () => {}), load: vi.fn(async () => "blob:doc"), delete: vi.fn(async () => {}) };
     const mediaId = "00000000-0000-4000-8000-0000000000ab";
@@ -468,7 +472,9 @@ describe("ScrapPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: /1분기 보고서/ }));
     const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
     const chip = within(drawer).getByRole("link", { name: /1분기 보고서\.pdf/ });
-    expect(chip).toHaveAttribute("download", "1분기 보고서.pdf");
+    await waitFor(() => expect(chip).toHaveAttribute("href", "blob:doc"));
+    expect(fireEvent.click(chip)).toBe(false);
+    await waitFor(() => expect(saveFile.saveObjectUrlToDisk).toHaveBeenCalledWith("blob:doc", "1분기 보고서.pdf"));
   });
 
   it("returns focus to the photo-select button that appears after removing a photo", async () => {

@@ -115,19 +115,31 @@ fn restart_app(app: tauri::AppHandle) {
 
 /// Saves media (photos/files) to a path the user chooses. Returns false if canceled.
 /// The webview's <a download> lands only in the Downloads folder without a path picker on macOS, so this handles it instead.
+/// The bytes arrive as a raw IPC body (not a JSON number array) so large attachments don't balloon in transit;
+/// the suggested file name rides in the percent-encoded `x-file-name` header.
 #[tauri::command]
 async fn save_media_file(
     app: tauri::AppHandle,
-    name: String,
-    bytes: Vec<u8>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("파일 저장 실패: 잘못된 요청 본문".into());
+    };
+    let name = request
+        .headers()
+        .get("x-file-name")
+        .and_then(|value| value.to_str().ok())
+        // encodeURIComponent escapes '=', '&' and '+', so the whole header decodes as a single key.
+        .and_then(|encoded| url::form_urlencoded::parse(encoded.as_bytes()).next())
+        .map(|(name, _)| name.into_owned())
+        .unwrap_or_default();
     // An async command doesn't run on the main thread, so it's fine to use a blocking dialog.
     let Some(target) = app.dialog().file().set_file_name(&name).blocking_save_file() else {
         return Ok(false);
     };
     let path = target.into_path().map_err(|error| error.to_string())?;
-    std::fs::write(&path, &bytes).map_err(|error| format!("파일 저장 실패: {error}"))?;
+    std::fs::write(&path, bytes).map_err(|error| format!("파일 저장 실패: {error}"))?;
     Ok(true)
 }
 

@@ -6,7 +6,8 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 async function saveBlobToDisk(blob: Blob, name: string): Promise<void> {
   if (isTauri()) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    await invoke("save_media_file", { name, bytes });
+    // Raw body instead of { bytes }: a JSON number array balloons large attachments several times over.
+    await invoke("save_media_file", bytes, { headers: { "x-file-name": encodeURIComponent(name) } });
     return;
   }
   const url = URL.createObjectURL(blob);

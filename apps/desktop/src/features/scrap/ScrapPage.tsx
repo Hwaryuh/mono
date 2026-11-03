@@ -521,14 +521,31 @@ function CommentContent({ text, urlOpener }: { text: string; urlOpener: External
   return <><p className="scrap-comment__text">{segments.map((segment, index) => segment.externalUrl ? <a href={segment.externalUrl} key={`${index}-${segment.text}`} onClick={(event) => openExternalUrl(event, segment.externalUrl as string)} rel="noreferrer" target="_blank">{segment.text}</a> : segment.strike ? <s key={`${index}-${segment.text}`}>{segment.text}</s> : segment.text)}</p>{previewUrl && <CommentLinkPreview externalUrl={previewUrl} onOpen={openExternalUrl} />}</>;
 }
 
-// ponytail: <a download> shows a save dialog on desktop WebView2/webkitgtk, but
-// on macOS WKWebView it can fall back to opening a new tab. Doing this properly needs the tauri dialog+fs plugins.
+// <a download> drops the file straight into Downloads (or opens a tab on macOS WKWebView) with no path picker,
+// so the click is routed through saveObjectUrlToDisk, which opens the native "Save As" dialog on desktop.
 function MediaFileChip({ mediaId, name, size, className = "scrap-comment__file", iconSize = 14 }: { mediaId: string; name: string; size: number; className?: string; iconSize?: number }) {
   const { data: href } = useMedia(mediaId);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
+  async function download(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (!href || saving) return;
+    setSaving(true);
+    setSaveError(false);
+    try {
+      await saveObjectUrlToDisk(href, name);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <a className={className} download={name} href={href ?? undefined} rel="noreferrer" target="_blank">
+    <a aria-busy={saving} className={className} download={name} href={href ?? undefined} onClick={download} rel="noreferrer">
       <Icon name="file" size={iconSize} strokeWidth={1.5} />
-      <span><strong title={name}>{name}</strong><small>{formatByteSize(size)}</small></span>
+      <span><strong title={name}>{name}</strong><small>{saveError ? translate("common.error.actionFailed") : formatByteSize(size)}</small></span>
     </a>
   );
 }
