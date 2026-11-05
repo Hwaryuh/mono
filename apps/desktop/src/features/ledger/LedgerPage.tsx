@@ -1,18 +1,17 @@
 import { translate } from "../../i18n/i18n";
 import { errorMessage } from "../../i18n/error-message";
-import { ledgerCategoryWriteInputSchema, ledgerWriteInputSchema, type LedgerCategory, type LedgerCategoryWriteInput, type LedgerExpense, type LedgerSnapshot, type LedgerWriteInput } from "@mono/contracts";
-import { Button, ColorPicker, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
+import { ledgerWriteInputSchema, type LedgerCategory, type LedgerExpense, type LedgerWriteInput } from "@mono/contracts";
+import { Button, DatePicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import { isConflictError } from "../../infrastructure/http/http-client";
-import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import type { LedgerRepository } from "./ledger-repository";
 import { LedgerAmountInput } from "./LedgerAmountInput";
+import { LedgerCategoryManager } from "./LedgerCategoryManager";
 import { summarizeLedgerMonth } from "./ledger-summary";
 import { ledgerViewStateStoreOf, type LedgerViewStateStore } from "./ledger-view-state-store";
 
-const ledgerQueryKey = ["ledger"] as const;
+export const ledgerQueryKey = ["ledger"] as const;
 const dashboardQueryKey = ["dashboard"] as const;
 
 type Draft = {
@@ -22,14 +21,6 @@ type Draft = {
   categoryId: string;
   note: string;
 };
-
-type CategoryCommand =
-  | { type: "create"; input: LedgerCategoryWriteInput }
-  | { type: "update"; categoryId: string; input: LedgerCategoryWriteInput; expectedVersion: number }
-  | { type: "reorder"; categoryIds: string[] }
-  | { type: "delete"; categoryId: string };
-
-const blankCategoryDraft: LedgerCategoryWriteInput = { name: "", color: "oklch(0.539 0.082 160.129)" };
 
 function blankDraft(today: string, categories: LedgerCategory[]): Draft {
   return { title: "", amountWon: "", date: today, categoryId: categories[0]?.id ?? "", note: "" };
@@ -45,11 +36,6 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   const [formError, setFormError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [editingCategoryVersion, setEditingCategoryVersion] = useState(1);
-  const [categoryDraft, setCategoryDraft] = useState<LedgerCategoryWriteInput>(blankCategoryDraft);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const handledNewParamRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -90,43 +76,6 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
     },
     onError: (error) => setFormError(errorMessage(error, "ledger.error.save")),
   });
-  const categoryMutation = useMutation({
-    mutationFn: async (command: CategoryCommand) => {
-      if (command.type === "create") await repository.createCategory(command.input);
-      else if (command.type === "update") await repository.updateCategory(command.categoryId, command.input, command.expectedVersion);
-      else if (command.type === "reorder") await repository.reorderCategories(command.categoryIds);
-      else await repository.deleteCategory(command.categoryId);
-    },
-    onMutate: () => setCategoryError(null),
-    onSuccess: async (_, command) => {
-      if (command.type === "create") setCategoryDraft(blankCategoryDraft);
-      if (command.type === "update") {
-        setEditingCategoryId(null);
-        setCategoryDraft(blankCategoryDraft);
-      }
-      if (command.type === "delete") {
-        setDeleteCategoryId(null);
-        setEditingCategoryId((current) => current === command.categoryId ? null : current);
-        setDraft((current) => current.categoryId === command.categoryId ? { ...current, categoryId: "other" } : current);
-      }
-      await invalidateSnapshots();
-      if (command.type === "create") {
-        // ponytail: createCategory returns void; name is unique (dupes rejected), so match by name after the refetch above.
-        const created = queryClient.getQueryData<LedgerSnapshot>(ledgerQueryKey)?.categories.find((category) => category.name === command.input.name);
-        if (created) setDraft((current) => ({ ...current, categoryId: created.id }));
-      }
-    },
-    onError: async (error) => {
-      setCategoryError(errorMessage(error, "ledger.error.save"));
-      if (isConflictError(error) && editingCategoryId) {
-        const version = await resyncConflictVersion<LedgerSnapshot>(
-          queryClient, ledgerQueryKey, invalidateSnapshots,
-          (snapshot) => snapshot.categories.find((candidate) => candidate.id === editingCategoryId),
-        );
-        if (version !== null) setEditingCategoryVersion(version);
-      }
-    },
-  });
 
   useEffect(() => {
     const snapshot = snapshotQuery.data;
@@ -154,7 +103,6 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   const summary = summarizeLedgerMonth(snapshot, activeMonth);
   const listExpenses = summary.expenses;
   const [year, month] = activeMonth.split("-").map(Number);
-  const fallbackCategoryName = snapshot.categories.find((category) => category.id === "other")?.name ?? translate("common.label.other");
   // The server precomputes "comparison" based on the current month, so it isn't shown when viewing another month.
   const comparison = snapshot.comparison.direction === "same"
     ? translate("ledger.comparison.same")
@@ -179,7 +127,6 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
     setEditingExpenseId(null);
     setDeleteExpenseId(null);
     setCategoryManagerOpen(false);
-    setDeleteCategoryId(null);
     setFormError(null);
     if (searchParams.has("modal")) setSearchParams({}, { replace: true });
   }
@@ -193,44 +140,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
   }
 
   function openCategoryManager() {
-    setEditingCategoryId(null);
-    setCategoryDraft(blankCategoryDraft);
-    setCategoryError(null);
     setCategoryManagerOpen(true);
-  }
-
-  function closeCategoryManager() {
-    if (categoryMutation.isPending) return;
-    setCategoryManagerOpen(false);
-    setEditingCategoryId(null);
-    setDeleteCategoryId(null);
-    setCategoryError(null);
-  }
-
-  function editCategory(category: LedgerCategory) {
-    setEditingCategoryId(category.id);
-    setEditingCategoryVersion(category.version ?? 1);
-    setCategoryDraft({ name: category.name, color: category.color });
-    setCategoryError(null);
-  }
-
-  function submitCategory(event: FormEvent) {
-    event.preventDefault();
-    const parsed = ledgerCategoryWriteInputSchema.safeParse(categoryDraft);
-    if (!parsed.success) {
-      setCategoryError(parsed.error.issues[0]?.message ?? translate("common.validation.labelInvalid"));
-      return;
-    }
-    if (editingCategoryId) categoryMutation.mutate({ type: "update", categoryId: editingCategoryId, input: parsed.data, expectedVersion: editingCategoryVersion });
-    else categoryMutation.mutate({ type: "create", input: parsed.data });
-  }
-
-  function moveCategory(index: number, offset: -1 | 1) {
-    const targetIndex = index + offset;
-    if (targetIndex < 0 || targetIndex >= snapshot.categories.length) return;
-    const categoryIds = snapshot.categories.map((category) => category.id);
-    [categoryIds[index], categoryIds[targetIndex]] = [categoryIds[targetIndex], categoryIds[index]];
-    categoryMutation.mutate({ type: "reorder", categoryIds });
   }
 
   function submit(event: FormEvent) {
@@ -343,55 +253,14 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
         {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
-      <Modal className="ui-modal--medium ui-modal--overflow ui-modal--flush" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("common.labels.manage")}>
-        <div className="ui-manager">
-          <div aria-label={translate("inbox.labels.ledger")} className="ui-manager__list">
-            {snapshot.categories.map((category, index) => {
-              const usageCount = snapshot.expenses.filter((expense) => expense.categoryId === category.id).length;
-              return (
-                <div className="ui-manager__row" key={category.id}>
-                  <i style={{ backgroundColor: category.color }} />
-                  <strong>{category.name}</strong>
-                  <span>{translate("ledger.categories.usageCount", { count: usageCount })}</span>
-                  <div>
-                    <IconButton aria-label={translate("common.action.moveUpLabel", { name: category.name })} disabled={categoryMutation.isPending || index === 0} onClick={() => moveCategory(index, -1)} size="small" title={translate("common.action.moveUp")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                    <IconButton aria-label={translate("common.action.moveDownLabel", { name: category.name })} disabled={categoryMutation.isPending || index === snapshot.categories.length - 1} onClick={() => moveCategory(index, 1)} size="small" title={translate("common.action.moveDown")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                    <IconButton aria-label={translate("common.action.editLabel", { name: category.name })} disabled={categoryMutation.isPending} onClick={() => editCategory(category)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                    <IconButton aria-label={category.id === "other" ? translate("common.action.deleteDisabledLabel", { name: category.name }) : translate("common.action.deleteLabel", { name: category.name })} disabled={categoryMutation.isPending || category.id === "other"} onClick={() => setDeleteCategoryId(category.id)} size="small" title={category.id === "other" ? translate("common.labels.otherDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <form aria-busy={categoryMutation.isPending} className="ui-manager__editor" onSubmit={submitCategory}>
-            <div className="ui-manager__editor-header">
-              <strong>{editingCategoryId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
-              {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("common.action.cancel")}</button>}
-            </div>
-            <div className="ui-manager__controls">
-              <ColorPicker disabled={categoryMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
-              <Input aria-label={translate("common.labels.name")} disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={categoryDraft.name} />
-              <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("common.action.save") : translate("common.action.add")}</Button>
-            </div>
-            {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
-          </form>
-        </div>
-      </Modal>
-
-      <Modal
-        className="ui-modal--small ui-modal--confirm ui-modal--danger"
-        footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("common.action.cancel")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId })} variant="danger">{translate("common.action.delete")}</Button></>}
-        icon="alert"
-        onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
-        open={deleteCategoryId !== null}
-        title={translate("common.labels.deleteTitle")}
-      >
-        <p>{snapshot.expenses.some((expense) => expense.categoryId === deleteCategoryId)
-          ? translate("ledger.deleteCategory.confirmWithMove", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "", fallback: fallbackCategoryName })
-          : translate("ledger.deleteCategory.confirm", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "" })}</p>
-        {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
-      </Modal>
+      <LedgerCategoryManager
+        onCategoryCreated={(categoryId) => setDraft((current) => ({ ...current, categoryId }))}
+        onCategoryDeleted={(categoryId) => setDraft((current) => current.categoryId === categoryId ? { ...current, categoryId: "other" } : current)}
+        onClose={() => setCategoryManagerOpen(false)}
+        open={categoryManagerOpen}
+        repository={repository}
+        snapshot={snapshot}
+      />
     </div>
   );
 }

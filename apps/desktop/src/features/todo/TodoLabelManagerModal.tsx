@@ -1,9 +1,9 @@
 import { translate } from "../../i18n/i18n";
 import { errorMessage } from "../../i18n/error-message";
 import { todoLabelWriteInputSchema, type TodoLabel, type TodoLabelWriteInput, type TodoSnapshot } from "@mono/contracts";
-import { Button, ColorPicker, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
+import { LabelDeleteModal, LabelManagerModal, reorderedIds } from "../../components/LabelManagerModal";
 import { isConflictError } from "../../infrastructure/http/http-client";
 import { resyncConflictVersion } from "../../infrastructure/http/conflict-recovery";
 import type { TodoLabelRepository } from "./todo-repository";
@@ -131,11 +131,8 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabel
   }
 
   function moveLabel(index: number, offset: -1 | 1) {
-    const targetIndex = index + offset;
-    if (targetIndex < 0 || targetIndex >= labels.length) return;
-    const labelIds = labels.map((label) => label.id);
-    [labelIds[index], labelIds[targetIndex]] = [labelIds[targetIndex], labelIds[index]];
-    labelMutation.mutate({ type: "reorder", labelIds });
+    const labelIds = reorderedIds(labels.map((label) => label.id), index, offset);
+    if (labelIds) labelMutation.mutate({ type: "reorder", labelIds });
   }
 
   function openDeleteLabel(labelId: string) {
@@ -148,63 +145,49 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabel
 
   return (
     <>
-      <Modal className="ui-modal--medium ui-modal--overflow ui-modal--flush" icon="label" onClose={close} open={open} title={translate("common.labels.manage")}>
-        <div className="ui-manager">
-          <div aria-label={translate("common.labels.current")} className="ui-manager__list">
-            {labels.map((label, index) => (
-              <div className="ui-manager__row" key={label.id}>
-                <i style={{ backgroundColor: label.color }} />
-                <strong>{label.name}</strong>
-                <span>{usageCountOf?.(label.id) ?? 0}{translate("common.unit.items")}</span>
-                <div>
-                  <IconButton aria-label={translate("common.action.moveUpLabel", { name: label.name })} disabled={labelMutation.isPending || index === 0} onClick={() => moveLabel(index, -1)} size="small" title={translate("common.action.moveUp")} type="button" variant="ghost"><Icon name="arrowUp" size={13} /></IconButton>
-                  <IconButton aria-label={translate("common.action.moveDownLabel", { name: label.name })} disabled={labelMutation.isPending || index === labels.length - 1} onClick={() => moveLabel(index, 1)} size="small" title={translate("common.action.moveDown")} type="button" variant="ghost"><Icon name="arrowDown" size={13} /></IconButton>
-                  <IconButton aria-label={translate("common.action.editLabel", { name: label.name })} disabled={labelMutation.isPending} onClick={() => editLabel(label)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                  <IconButton aria-label={labels.length === 1 ? translate("common.action.deleteDisabledLabel", { name: label.name }) : translate("common.action.deleteLabel", { name: label.name })} disabled={labelMutation.isPending || labels.length === 1} onClick={() => openDeleteLabel(label.id)} size="small" title={labels.length === 1 ? translate("common.labels.lastDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
-                </div>
-              </div>
-            ))}
-            {labels.length === 0 && <div className="ui-manager__empty">{translate("common.labels.empty")}</div>}
-          </div>
-          <form aria-busy={labelMutation.isPending} className="ui-manager__editor" id="todo-label-editor-form" onSubmit={submitLabel}>
-            <div className="ui-manager__editor-header">
-              <strong>{editingLabelId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
-              {editingLabelId && <button disabled={labelMutation.isPending} onClick={() => { setEditingLabelId(null); setLabelDraft(blankLabelDraft); setLabelError(null); }} type="button">{translate("common.action.cancel")}</button>}
-            </div>
-            <div className="ui-manager__controls">
-              <ColorPicker disabled={labelMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setLabelDraft((current) => ({ ...current, color }))} selected value={labelDraft.color} />
-              <Input aria-label={translate("common.labels.name")} autoFocus disabled={labelMutation.isPending} maxLength={100} onChange={(event) => setLabelDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={labelDraft.name} />
-              <Button loading={labelMutation.isPending} type="submit" variant="primary">{editingLabelId ? translate("common.action.save") : translate("common.action.add")}</Button>
-            </div>
-            {labelError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
-          </form>
-        </div>
-      </Modal>
+      <LabelManagerModal
+        busy={labelMutation.isPending}
+        color={labelDraft.color}
+        editing={editingLabelId !== null}
+        emptyMessage={translate("common.labels.empty")}
+        error={labelError}
+        formId="todo-label-editor-form"
+        icon="label"
+        items={labels.map((label) => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          usageLabel: `${usageCountOf?.(label.id) ?? 0}${translate("common.unit.items")}`,
+          deleteDisabledReason: labels.length === 1 ? translate("common.labels.lastDeleteDisabled") : undefined,
+        }))}
+        listLabel={translate("common.labels.current")}
+        name={labelDraft.name}
+        onCancelEdit={() => { setEditingLabelId(null); setLabelDraft(blankLabelDraft); setLabelError(null); }}
+        onClose={close}
+        onColorChange={(color) => setLabelDraft((current) => ({ ...current, color }))}
+        onDelete={openDeleteLabel}
+        onEdit={(labelId) => { const label = labels.find((candidate) => candidate.id === labelId); if (label) editLabel(label); }}
+        onMove={moveLabel}
+        onNameChange={(name) => setLabelDraft((current) => ({ ...current, name }))}
+        onSubmit={submitLabel}
+        open={open}
+      />
 
-      <Modal
-        className="ui-modal--small ui-modal--overflow ui-modal--confirm ui-modal--danger"
-        footer={<><Button disabled={labelMutation.isPending} onClick={() => setDeleteLabelId(null)}>{translate("common.action.cancel")}</Button><Button loading={labelMutation.isPending} onClick={() => deleteLabelId && replacementLabelId && labelMutation.mutate({ type: "delete", labelId: deleteLabelId, replacementLabelId })} variant="danger">{translate("common.action.delete")}</Button></>}
-        icon="alert"
-        onClose={() => { if (!labelMutation.isPending) setDeleteLabelId(null); }}
+      <LabelDeleteModal
+        busy={labelMutation.isPending}
+        error={labelError}
+        message={translate("common.labels.deleteQuestion", { name: labels.find((label) => label.id === deleteLabelId)?.name ?? "" })}
+        move={{
+          label: translate("todo.labels.moveExisting"),
+          description: translate("todo.labels.moveDescription"),
+          options: labels.filter((label) => label.id !== deleteLabelId).map((label) => ({ value: label.id, label: label.name, dotColor: label.color })),
+          value: replacementLabelId,
+          onChange: setReplacementLabelId,
+        }}
+        onCancel={() => setDeleteLabelId(null)}
+        onConfirm={() => deleteLabelId && replacementLabelId && labelMutation.mutate({ type: "delete", labelId: deleteLabelId, replacementLabelId })}
         open={deleteLabelId !== null}
-        title={translate("common.labels.deleteTitle")}
-      >
-        <div className="ui-form">
-          <p>{translate("common.labels.deleteQuestion", { name: labels.find((label) => label.id === deleteLabelId)?.name ?? "" })}</p>
-          <label>
-            <span>{translate("todo.labels.moveExisting")}</span>
-            <Select
-              disabled={labelMutation.isPending}
-              label={translate("common.labels.moveTarget")}
-              onChange={setReplacementLabelId}
-              options={labels.filter((label) => label.id !== deleteLabelId).map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))}
-              value={replacementLabelId}
-            />
-          </label>
-          <small>{translate("todo.labels.moveDescription")}</small>
-          {labelError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
-        </div>
-      </Modal>
+      />
     </>
   );
 }

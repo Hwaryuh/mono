@@ -1,7 +1,7 @@
 import type { ScrapSnapshot } from "@mono/contracts";
-import { Button, Icon, IconButton, Input, Modal, Select } from "@mono/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { LabelDeleteModal, LabelManagerModal } from "../../components/LabelManagerModal";
 import { translate } from "../../i18n/i18n";
 import { errorMessage } from "../../i18n/error-message";
 import { scrapQueryKey, type ScrapRepository } from "./scrap-repository";
@@ -111,56 +111,43 @@ export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRena
 
   return (
     <>
-      <Modal className="ui-modal--medium ui-modal--flush" icon="label" onClose={closeTagManager} open={open} title={translate("common.labels.manage")}>
-        <div className="ui-manager">
-          <div aria-label={translate("common.labels.current")} className="ui-manager__list">
-            {snapshot.tags.map((tag) => (
-              <div className="ui-manager__row" key={tag}>
-                <strong>{tag}</strong>
-                <span>{snapshot.items.filter((item) => item.tag === tag).length}{translate("common.unit.items")}</span>
-                <IconButton aria-label={translate("common.action.editLabel", { name: tag })} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
-                <IconButton aria-label={tag === translate("common.label.other") ? translate("common.action.deleteDisabledLabel", { name: tag }) : translate("common.action.deleteLabel", { name: tag })} disabled={tagSaving || tag === translate("common.label.other")} onClick={() => openDeleteTag(tag)} size="small" title={tag === translate("common.label.other") ? translate("common.labels.otherDeleteDisabled") : translate("common.action.delete")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton>
-              </div>
-            ))}
-          </div>
-          <form aria-busy={tagSaving} className="ui-manager__editor" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
-            <div className="ui-manager__editor-header">
-              <strong>{editingTag ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
-              {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">{translate("common.action.cancel")}</button>}
-            </div>
-            <div className="ui-manager__controls">
-              <Input aria-label={translate("common.labels.name")} autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder={translate("common.labels.name")} value={tagInput} />
-              <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? translate("common.action.save") : translate("common.action.add")}</Button>
-            </div>
-            {tagError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
-          </form>
-        </div>
-      </Modal>
+      <LabelManagerModal
+        busy={tagSaving}
+        editing={editingTag !== null}
+        error={tagError}
+        icon="label"
+        items={snapshot.tags.map((tag) => ({
+          id: tag,
+          name: tag,
+          usageLabel: `${snapshot.items.filter((item) => item.tag === tag).length}${translate("common.unit.items")}`,
+          deleteDisabledReason: tag === translate("common.label.other") ? translate("common.labels.otherDeleteDisabled") : undefined,
+        }))}
+        listLabel={translate("common.labels.current")}
+        name={tagInput}
+        onCancelEdit={() => { setEditingTag(null); setTagInput(""); setTagError(null); }}
+        onClose={closeTagManager}
+        onDelete={openDeleteTag}
+        onEdit={editTag}
+        onNameChange={setTagInput}
+        onSubmit={(event) => { event.preventDefault(); void commitTag(); }}
+        open={open}
+      />
 
-      <Modal
-        className="ui-modal--small ui-modal--overflow ui-modal--confirm ui-modal--danger"
-        footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>{translate("common.action.cancel")}</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">{translate("common.action.delete")}</Button></>}
-        icon="alert"
-        onClose={() => { if (!tagDeletePending) setDeleteTagName(null); }}
+      <LabelDeleteModal
+        busy={tagDeletePending}
+        error={tagDeleteError}
+        message={translate("common.labels.deleteQuestion", { name: deleteTagName ?? "" })}
+        move={{
+          label: translate("scrap.labels.moveExisting"),
+          description: translate("scrap.labels.moveDescription"),
+          options: snapshot.tags.filter((tag) => tag !== deleteTagName).map((tag) => ({ value: tag, label: tag })),
+          value: replacementTag,
+          onChange: setReplacementTag,
+        }}
+        onCancel={() => setDeleteTagName(null)}
+        onConfirm={() => void confirmDeleteTag()}
         open={deleteTagName !== null}
-        title={translate("common.labels.deleteTitle")}
-      >
-        <div className="ui-form">
-          <p>{translate("common.labels.deleteQuestion", { name: deleteTagName ?? "" })}</p>
-          <label>
-            <span>{translate("scrap.labels.moveExisting")}</span>
-            <Select
-              disabled={tagDeletePending}
-              label={translate("common.labels.moveTarget")}
-              onChange={setReplacementTag}
-              options={snapshot.tags.filter((tag) => tag !== deleteTagName).map((tag) => ({ value: tag, label: tag }))}
-              value={replacementTag}
-            />
-          </label>
-          <small>{translate("scrap.labels.moveDescription")}</small>
-          {tagDeleteError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
-        </div>
-      </Modal>
+      />
     </>
   );
 }
