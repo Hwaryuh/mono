@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
   version INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS time_entries_date ON time_entries (date);
+-- Legacy: no longer written or read (recent captures come from inbox_items). Kept so existing databases need no migration.
 CREATE TABLE IF NOT EXISTS dashboard_captures (
   id TEXT PRIMARY KEY,
   seq INTEGER NOT NULL,

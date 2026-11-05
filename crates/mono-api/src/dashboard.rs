@@ -293,7 +293,8 @@ fn get_snapshot(conn: &Connection) -> ApiResult<DashboardSnapshot> {
 
     let recent_captures = conn
         .prepare(
-            "SELECT id, raw, module, confidence FROM dashboard_captures ORDER BY seq DESC LIMIT 3",
+            // Read from the inbox itself, so a discarded item (deleted row) drops out and a re-classified one shows its current target.
+            "SELECT id, raw, target, confidence FROM inbox_items WHERE target IS NOT NULL ORDER BY seq DESC LIMIT 3",
         )?
         .query_map([], |row| {
             Ok(RecentCapture {
@@ -450,14 +451,6 @@ pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResu
     };
 
     let conn = state.db.conn();
-    if let Ok(a) = &analysis {
-        let next: i64 = conn
-            .query_row("SELECT COALESCE(MAX(seq), 0) FROM dashboard_captures", [], |r| r.get(0))?;
-        conn.execute(
-            "INSERT INTO dashboard_captures (id, seq, raw, module, confidence) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![uuid::Uuid::new_v4().to_string(), next + 1, raw, a.target, a.confidence],
-        )?;
-    }
     let next_inbox: i64 =
         conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM inbox_items", [], |r| r.get(0))?;
     conn.execute(
@@ -570,6 +563,27 @@ mod tests {
         assert_eq!(snap.monthly_expense.total, 0);
         assert!(snap.monthly_expense.categories.is_empty());
         assert!(snap.date_label.contains("년"));
+    }
+
+    #[test]
+    fn recent_captures_follow_the_inbox() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        for (seq, id, target) in [(1, "a", Some("todo")), (2, "b", None), (3, "c", Some("scrap")), (4, "d", Some("ledger"))] {
+            conn.execute(
+                "INSERT INTO inbox_items (id, seq, source, raw, target, confidence, status, received_at) \
+                 VALUES (?1, ?2, 'text', ?1, ?3, 0.9, 'pending', 'now')",
+                params![id, seq, target],
+            )
+            .unwrap();
+        }
+        // Discarding deletes the row; an unclassified (failed) item has no target.
+        conn.execute("DELETE FROM inbox_items WHERE id = 'd'", []).unwrap();
+
+        let snap = get_snapshot(&conn).unwrap();
+        let ids: Vec<_> = snap.recent_captures.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["c", "a"]);
+        assert_eq!(snap.recent_captures[0].module, "scrap");
     }
 
     #[test]
@@ -713,9 +727,6 @@ mod tests {
         assert_eq!(status, "pending");
         assert_eq!(pinned, 1);
         assert_eq!(raw, "clip.mp4");
-        let captures: i64 =
-            conn.query_row("SELECT COUNT(*) FROM dashboard_captures", [], |r| r.get(0)).unwrap();
-        assert_eq!(captures, 1);
     }
 
     #[tokio::test]
