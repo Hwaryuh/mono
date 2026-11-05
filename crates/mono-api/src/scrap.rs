@@ -2,7 +2,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -310,9 +310,16 @@ fn get_snapshot(conn: &Connection) -> ApiResult<ScrapSnapshot> {
     Ok(ScrapSnapshot { tags, items })
 }
 
+pub(super) fn scrap_exists(conn: &Connection, id: &str) -> ApiResult<bool> {
+    Ok(conn.query_row("SELECT 1 FROM scrap_items WHERE id = ?1", [id], |_| Ok(())).optional()?.is_some())
+}
+
 fn require_scrap(conn: &Connection, id: &str) -> ApiResult<()> {
-    conn.query_row("SELECT 1 FROM scrap_items WHERE id = ?1", [id], |_| Ok(()))
-        .map_err(|_| ApiError::NotFound(format!("스크랩을 찾을 수 없습니다: {id}")))
+    if scrap_exists(conn, id)? {
+        Ok(())
+    } else {
+        Err(ApiError::NotFound(format!("스크랩을 찾을 수 없습니다: {id}")))
+    }
 }
 
 // Bumps the parent scrap's updated_at so comment activity floats it up in "recently updated" order.
@@ -454,6 +461,19 @@ fn delete_tag(conn: &mut Connection, tag: &str, replacement: &str) -> ApiResult<
     tx.execute("DELETE FROM scrap_tags WHERE tag = ?1", [tag])?;
     tx.commit()?;
     Ok(())
+}
+
+/// Adds a comment from an approved inbox capture. Same validation as the comment API (text up to 2000 chars,
+/// may be empty only with a file; a missing scrap is NotFound). `file` is (media id, name, size).
+pub(super) fn add_capture_comment(conn: &Connection, scrap_id: &str, text: &str, file: Option<(String, String, i64)>) -> ApiResult<()> {
+    if require_scrap(conn, scrap_id).is_err() {
+        return Err(ApiError::NotFound("댓글을 달 스크랩이 삭제되었습니다. 새 스크랩으로 저장하려면 분류를 수정하세요.".into()));
+    }
+    let input = CommentInput {
+        text: text.to_string(),
+        file: file.map(|(media_id, name, size)| CommentFileInput { media_id, name, size }),
+    };
+    add_comment(conn, scrap_id, &input)
 }
 
 fn add_comment(conn: &Connection, scrap_id: &str, input: &CommentInput) -> ApiResult<()> {

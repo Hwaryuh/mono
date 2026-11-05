@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMockCalendarRepository } from "../../infrastructure/mock/mock-calendar-repository";
 import { createMockInboxRepository } from "../../infrastructure/mock/mock-inbox-repository";
 import { createMockLedgerRepository } from "../../infrastructure/mock/mock-ledger-repository";
+import { createMockPlatformState } from "../../infrastructure/mock/mock-platform-state";
 import { createMockScrapRepository } from "../../infrastructure/mock/mock-scrap-repository";
 import { createMockTodoRepository } from "../../infrastructure/mock/mock-todo-repository";
 import type { CalendarRepository } from "../calendar/calendar-repository";
@@ -188,6 +189,34 @@ describe("InboxPage", () => {
     expect(within(await rowFor("오늘 점심값 만육천원")).getByText("생활")).toBeInTheDocument();
     expect(within(await rowFor("오늘 점심값 만육천원")).getByText("₩ 1,234,567")).toBeInTheDocument();
     expect(within(await rowFor("오늘 점심값 만육천원")).getByText("2026-08-06")).toBeInTheDocument();
+  });
+
+  it("saves a scrap capture as a comment on an existing scrap", async () => {
+    const state = createMockPlatformState();
+    const scrapRepository = createMockScrapRepository(state);
+    const before = await scrapRepository.getSnapshot();
+    const target = before.items[0];
+    renderInbox(createMockInboxRepository(state), undefined, undefined, scrapRepository);
+
+    const raw = "https://youtube.com/watch?v=ref-camera-move";
+    fireEvent.click(within(await rowFor(raw)).getByRole("button", { name: "라벨 필드 수정" }));
+    const modal = screen.getByRole("dialog", { name: "필드 수정" });
+    fireEvent.click(within(modal).getByRole("combobox", { name: "저장 위치" }));
+    fireEvent.click(screen.getByRole("option", { name: target.title }));
+    // A comment has no title or label of its own.
+    expect(within(modal).queryByRole("combobox", { name: "스크랩 라벨" })).not.toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "필드 수정" })).not.toBeInTheDocument());
+
+    const row = await rowFor(raw);
+    expect(within(row).getByRole("button", { name: "댓글 대상 필드 수정" })).toHaveTextContent(target.title);
+    fireEvent.click(within(row).getByRole("button", { name: "승인하고 저장" }));
+
+    await waitFor(async () => {
+      const after = await scrapRepository.getSnapshot();
+      expect(after.items).toHaveLength(before.items.length);
+      expect(after.items.find((item) => item.id === target.id)?.comments).toHaveLength(target.comments.length + 1);
+    });
   });
 
   it("manually classifies a classification-failed item in the Modal", async () => {

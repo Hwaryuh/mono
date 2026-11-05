@@ -8,7 +8,9 @@ use serde_json::Value;
 
 use super::db::{Db, DbExt};
 use super::error::{ApiError, ApiResult};
+use super::dashboard::COMMENT_TARGET_FIELD;
 use super::ledger::{self, LedgerWriteInput};
+use super::scrap;
 use super::common::*;
 use super::version::{ensure_versioned_update, expected_version};
 
@@ -319,15 +321,39 @@ fn approve_to_calendar(conn: &Connection, row: &InboxRow, fields: &[InboxField])
     Ok(())
 }
 
-fn first_media_id(images_json: &Option<String>, videos_json: &Option<String>) -> Option<String> {
-    let pick = |j: &Option<String>| -> Option<String> {
+/// Reads the first attached image, or else the first video, through `read`.
+fn first_attachment<T>(images_json: &Option<String>, videos_json: &Option<String>, read: impl Fn(&Value) -> Option<T>) -> Option<T> {
+    let pick = |j: &Option<String>| -> Option<T> {
         let arr: Value = serde_json::from_str(j.as_deref()?).ok()?;
-        arr.get(0)?.get("mediaId")?.as_str().map(String::from)
+        read(arr.get(0)?)
     };
     pick(images_json).or_else(|| pick(videos_json))
 }
 
+fn first_media_id(images_json: &Option<String>, videos_json: &Option<String>) -> Option<String> {
+    first_attachment(images_json, videos_json, |first| first.get("mediaId")?.as_str().map(String::from))
+}
+
+/// The first attachment as (media id, name, size), for a comment's single file slot.
+fn first_media(images_json: &Option<String>, videos_json: &Option<String>) -> Option<(String, String, i64)> {
+    first_attachment(images_json, videos_json, |first| {
+        Some((
+            first.get("mediaId")?.as_str()?.to_string(),
+            first.get("name")?.as_str()?.to_string(),
+            first.get("size")?.as_i64()?,
+        ))
+    })
+}
+
 fn approve_to_scrap(conn: &Connection, row: &InboxRow, fields: &[InboxField]) -> ApiResult<()> {
+    let comment_target = field_value(fields, COMMENT_TARGET_FIELD);
+    if !comment_target.is_empty() {
+        let text = {
+            let m = field_value(fields, "메모");
+            if m.is_empty() { row.raw.clone() } else { m }
+        };
+        return scrap::add_capture_comment(conn, &comment_target, &text, first_media(&row.images_json, &row.videos_json));
+    }
     let tag = {
         let t = label_value(fields);
         if t.is_empty() { "수집".to_string() } else { t }
@@ -401,14 +427,18 @@ fn approve_item(conn: &Connection, id: &str) -> ApiResult<()> {
         return Ok(());
     }
     let fields = parse_fields(&row.fields_json);
+    // The module write and the status change commit together, so a failed status update can't leave a written
+    // item (or comment) behind that a retry would write again.
+    let tx = conn.unchecked_transaction()?;
     match row.target.as_deref() {
-        Some("todo") => approve_to_todo(conn, &row, &fields)?,
-        Some("calendar") => approve_to_calendar(conn, &row, &fields)?,
-        Some("scrap") => approve_to_scrap(conn, &row, &fields)?,
-        Some("ledger") => approve_to_ledger(conn, &row, &fields)?,
+        Some("todo") => approve_to_todo(&tx, &row, &fields)?,
+        Some("calendar") => approve_to_calendar(&tx, &row, &fields)?,
+        Some("scrap") => approve_to_scrap(&tx, &row, &fields)?,
+        Some("ledger") => approve_to_ledger(&tx, &row, &fields)?,
         _ => {}
     }
-    conn.execute("UPDATE inbox_items SET status = 'approved' WHERE id = ?1", [id])?;
+    tx.execute("UPDATE inbox_items SET status = 'approved' WHERE id = ?1", [id])?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -536,6 +566,58 @@ mod tests {
             params![id, source, target, confidence, fields_json],
         )
         .unwrap();
+    }
+
+    fn seed_scrap(conn: &Connection, id: &str) {
+        conn.execute(
+            "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at, updated_at) \
+             VALUES (?1, 1, 'text', '합주실 후보', '', '기타', '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')",
+            [id],
+        )
+        .unwrap();
+    }
+
+    fn count(conn: &Connection, sql: &str) -> i64 {
+        conn.query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn approve_with_comment_target_adds_a_comment_once() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_scrap(&conn, "s1");
+        seed_inbox(&conn, "i1", "text", Some("scrap"), 0.9, r#"[{"label":"메모","value":"2번 합주실이 제일 쌈"},{"label":"댓글 대상","value":"s1"}]"#);
+
+        approve_item(&conn, "i1").unwrap();
+        approve_item(&conn, "i1").unwrap();
+
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM scrap_items"), 1);
+        let text: String = conn.query_row("SELECT text FROM scrap_comments WHERE scrap_id = 's1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(text, "2번 합주실이 제일 쌈");
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM scrap_comments"), 1);
+        let updated: String = conn.query_row("SELECT updated_at FROM scrap_items WHERE id = 's1'", [], |r| r.get(0)).unwrap();
+        assert_ne!(updated, "2026-08-01T00:00:00.000Z");
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM inbox_items WHERE status = 'approved'"), 1);
+    }
+
+    #[test]
+    fn approve_with_missing_comment_target_fails_and_writes_nothing() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_inbox(&conn, "i1", "text", Some("scrap"), 0.9, r#"[{"label":"메모","value":"덧붙임"},{"label":"댓글 대상","value":"gone"}]"#);
+
+        let err = approve_item(&conn, "i1").unwrap_err();
+        assert!(matches!(err, ApiError::NotFound(_)));
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM scrap_comments"), 0);
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM scrap_items"), 0);
+        assert_eq!(count(&conn, "SELECT COUNT(*) FROM inbox_items WHERE status = 'pending'"), 1);
+    }
+
+    #[test]
+    fn comment_carries_the_first_attachment() {
+        let images = Some(r#"[{"name":"a.png","mimeType":"image/png","size":12,"mediaId":"m1"},{"name":"b.png","mimeType":"image/png","size":3,"mediaId":"m2"}]"#.to_string());
+        assert_eq!(first_media(&images, &None), Some(("m1".into(), "a.png".into(), 12)));
+        assert_eq!(first_media(&None, &None), None);
     }
 
     fn todo_titles(conn: &Connection) -> Vec<String> {

@@ -57,7 +57,13 @@ const optionalFieldLabels = new Set([
   translate("inbox.field.due"),
   translate("common.field.location"),
   translate("inbox.field.reminder"),
+  translate("inbox.field.commentTarget"),
 ]);
+
+// A scrap capture with this field becomes a comment on that existing scrap (value = scrap id) instead of a new scrap.
+const commentTargetLabel = translate("inbox.field.commentTarget");
+// Fields that only matter for a new scrap, hidden while a comment target is chosen.
+const newScrapOnlyLabels = new Set([translate("common.field.title"), translate("inbox.field.original"), translate("common.field.label")]);
 
 const fieldLabels: Record<InboxTargetModuleId, string[]> = {
   todo: [translate("common.field.title"), translate("common.field.label"), translate("inbox.field.due"), translate("common.field.note")],
@@ -394,6 +400,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
     scrapQuery.data?.tags ?? [],
     todoQuery.data?.labels ?? [],
   );
+  const scrapTargets = scrapQuery.data?.items.map((scrap) => ({ value: scrap.id, label: scrap.title }));
   const tabs: Array<{ id: InboxTab; label: string; count: number }> = [
     { id: "pending", label: translate("inbox.status.pending"), count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
     { id: "approved", label: translate("inbox.status.approved"), count: items.filter((item) => item.status === "approved").length },
@@ -457,6 +464,7 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
             labelCatalog={labelCatalog}
             onDiscarded={focusCurrentTab}
             repository={repository}
+            scrapTargets={scrapTargets}
           />
         ))}
         {visible.length === 0 && (
@@ -473,12 +481,15 @@ function InboxRow({
   onDiscarded,
   calendarToday,
   labelCatalog,
+  scrapTargets,
 }: {
   item: InboxItem;
   repository: InboxRepository;
   onDiscarded: () => void;
   calendarToday: string;
   labelCatalog: InboxLabelCatalog;
+  /** Existing scraps a capture can comment on; undefined while the scrap list is loading. */
+  scrapTargets: SelectOption[] | undefined;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorVersion, setEditorVersion] = useState(1);
@@ -565,11 +576,32 @@ function InboxRow({
     setFields((current) => current.map((field, fieldIndex) => fieldIndex === index ? { ...field, value } : field));
   }
 
+  function scrapTitleOf(scrapId: string) {
+    if (!scrapTargets) return "";
+    return scrapTargets.find((option) => option.value === scrapId)?.label ?? translate("inbox.commentTarget.missing");
+  }
+
+  const commentTarget = target === "scrap" ? fields.find((field) => field.label === commentTargetLabel)?.value ?? "" : "";
+
+  // "" means a new scrap. Going back to a new scrap restores the title/label fields a comment save dropped.
+  function changeCommentTarget(scrapId: string) {
+    setFields((current) => {
+      const rest = current.filter((field) => field.label !== commentTargetLabel);
+      if (scrapId) return [...rest, { label: commentTargetLabel, value: scrapId }];
+      const missing = defaultFields("scrap", item.raw)
+        .filter((field) => newScrapOnlyLabels.has(field.label) && !rest.some((candidate) => candidate.label === field.label))
+        .map((field) => field.label === translate("common.field.label") ? { ...field, value: labelCatalog.scrap.options[0]?.value ?? "" } : field);
+      return [...rest, ...missing];
+    });
+  }
+
   function submitUpdate(event: FormEvent) {
     event.preventDefault();
     const normalizedFields = fields
       .map((field) => ({ ...field, value: field.value.trim() }))
-      .filter((field) => field.value || !optionalFieldLabels.has(field.label));
+      .filter((field) => field.value || !optionalFieldLabels.has(field.label))
+      // A comment only needs its text and target; the new-scrap fields are hidden, so they are not saved or checked.
+      .filter((field) => !commentTarget || !newScrapOnlyLabels.has(field.label));
     const label = normalizedFields.find((field) => field.label === translate("common.field.label"))?.value;
     if (label !== undefined && !labelCatalog[target].options.some((option) => option.value === label)) {
       setActionError(translate("inbox.validation.labelRequired", { target: moduleMeta[target].name }));
@@ -628,7 +660,7 @@ function InboxRow({
                 const fieldLabel = unifiedFieldLabel(field.label);
                 return (
                 <button aria-label={translate("inbox.action.editFieldLabel", { field: fieldLabel })} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
-                  <span>{fieldLabel}</span><strong>{field.value}</strong>{field.confidence !== undefined && <small className={field.confidence < 0.6 ? "inbox-field--low" : ""}>{Math.round(field.confidence * 100)}%</small>}
+                  <span>{fieldLabel}</span><strong>{fieldLabel === commentTargetLabel ? scrapTitleOf(field.value) : field.value}</strong>{field.confidence !== undefined && <small className={field.confidence < 0.6 ? "inbox-field--low" : ""}>{Math.round(field.confidence * 100)}%</small>}
                   <Icon name="edit" size={12} />
                 </button>
                 );
@@ -661,7 +693,20 @@ function InboxRow({
             ? <div className="inbox-editor__fixed-target"><span>{translate("inbox.target.savedModule")}</span><strong><Icon name="scrap" size={13} />{translate("app.navigation.scrap")}</strong><small>{translate("inbox.classification.videoLockedDescription")}</small></div>
             : <ModuleTargetPicker onChange={changeTarget} value={target} />}
           <div className="ui-form inbox-editor__fields">
+            {target === "scrap" && (
+              <label>
+                <span>{translate("inbox.commentTarget.selectLabel")}</span>
+                <Select
+                  label={translate("inbox.commentTarget.selectLabel")}
+                  onChange={changeCommentTarget}
+                  options={[{ value: "", label: translate("inbox.commentTarget.newScrap") }, ...(scrapTargets ?? [])]}
+                  value={commentTarget}
+                />
+              </label>
+            )}
             {fields.map((field, index) => {
+              if (field.label === commentTargetLabel) return null;
+              if (commentTarget && newScrapOnlyLabels.has(field.label)) return null;
               if (target === "calendar" && field.label === translate("inbox.field.schedule")) {
                 return <InboxScheduleField fallbackDate={calendarToday} field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
               }

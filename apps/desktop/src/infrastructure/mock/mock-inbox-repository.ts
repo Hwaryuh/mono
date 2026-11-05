@@ -76,7 +76,20 @@ function approveItem(state: MockPlatformState, itemId: string) {
     }, ...state.calendar.events];
   }
 
-  if (item.target === "scrap") {
+  const commentTargetId = item.target === "scrap" ? fieldValue(item, "댓글 대상") : "";
+  if (commentTargetId) {
+    // Same as the server: the capture becomes a comment on that scrap instead of a new scrap.
+    const scrap = state.scrap.items.find((candidate) => candidate.id === commentTargetId);
+    if (!scrap) throw new Error("댓글을 달 스크랩이 삭제되었습니다. 새 스크랩으로 저장하려면 분류를 수정하세요.");
+    const media = item.images?.[0] ?? item.videos?.[0];
+    scrap.comments.push({
+      id: `comment-${state.nextScrapCommentId++}`,
+      createdAt: "방금",
+      text: fieldValue(item, "메모") || item.raw,
+      file: media ? { mediaId: media.mediaId, name: media.name, size: media.size } : null,
+    });
+    scrap.updatedAt = "방금";
+  } else if (item.target === "scrap") {
     const tag = labelValue(item) || "수집";
     if (!state.scrap.tags.includes(tag)) state.scrap.tags.push(tag);
     // The original media lives in the media table; only the reference id is handed off here.

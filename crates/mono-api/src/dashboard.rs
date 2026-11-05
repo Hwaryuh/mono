@@ -13,7 +13,7 @@ use super::db::DbExt;
 use super::ai::{self, AnalysisContext, CaptureImage, CaptureVideo};
 use super::error::{ApiError, ApiResult};
 use super::secret::{self, SecretState};
-use super::{routine, todo};
+use super::{routine, scrap, todo};
 use super::common::*;
 
 // getSnapshot, toggleTask, and capture are all native. capture's AI analysis is handled by ai.rs, and
@@ -344,7 +344,33 @@ fn build_context(conn: &Connection) -> ApiResult<AnalysisContext> {
         calendar_categories: names(conn, "SELECT name FROM calendar_categories")?,
         ledger_categories: names(conn, "SELECT name FROM ledger_categories")?,
         scrap_tags: names(conn, "SELECT tag FROM scrap_tags")?,
+        scraps: conn
+            .prepare(
+                "SELECT id, title FROM scrap_items \
+                 ORDER BY CASE WHEN updated_at = '' THEN saved_at ELSE updated_at END DESC, seq DESC LIMIT 30",
+            )?
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?,
     })
+}
+
+/// The inbox field naming an existing scrap: approving the item then adds a comment there instead of a new scrap.
+pub(super) const COMMENT_TARGET_FIELD: &str = "댓글 대상";
+
+/// Drops a "댓글 대상" the AI made up: it only stays on a scrap analysis and only when it names a scrap that exists.
+fn keep_valid_comment_target(conn: &Connection, target: &str, fields: Vec<ai::AnalysisField>) -> ApiResult<Vec<ai::AnalysisField>> {
+    let mut kept = Vec::with_capacity(fields.len());
+    for field in fields {
+        if field.label == COMMENT_TARGET_FIELD {
+            let id = field.value.trim();
+            let exists = target == "scrap" && !id.is_empty() && scrap::scrap_exists(conn, id)?;
+            if !exists {
+                continue;
+            }
+        }
+        kept.push(field);
+    }
+    Ok(kept)
 }
 
 fn field(label: &str, value: &str) -> ai::AnalysisField {
@@ -435,12 +461,13 @@ pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResu
     let images_json = (!images_meta.is_empty()).then(|| strip(&images_meta));
     let videos_json = has_video.then(|| strip(&videos_meta));
 
+    let conn = state.db.conn();
     let (target, confidence, status, fields_json) = match &analysis {
         Ok(a) => (
             Some(a.target.clone()),
             a.confidence,
             "pending",
-            serde_json::to_string(&a.fields).unwrap(),
+            serde_json::to_string(&keep_valid_comment_target(&conn, &a.target, a.fields.clone())?).unwrap(),
         ),
         Err(message) => (
             None,
@@ -450,7 +477,6 @@ pub(super) async fn capture(state: &SecretState, input: CaptureInput) -> ApiResu
         ),
     };
 
-    let conn = state.db.conn();
     let next_inbox: i64 =
         conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM inbox_items", [], |r| r.get(0))?;
     conn.execute(
@@ -563,6 +589,24 @@ mod tests {
         assert_eq!(snap.monthly_expense.total, 0);
         assert!(snap.monthly_expense.categories.is_empty());
         assert!(snap.date_label.contains("년"));
+    }
+
+    #[test]
+    fn comment_target_is_kept_only_for_an_existing_scrap() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        conn.execute(
+            "INSERT INTO scrap_items (id, seq, kind, title, memo, tag, saved_at) VALUES ('s1', 1, 'text', 't', '', '기타', 'now')",
+            [],
+        )
+        .unwrap();
+        let fields = |id: &str| vec![field("메모", "m"), field(COMMENT_TARGET_FIELD, id)];
+        let labels = |kept: Vec<ai::AnalysisField>| kept.into_iter().map(|f| f.label).collect::<Vec<_>>();
+
+        assert_eq!(labels(keep_valid_comment_target(&conn, "scrap", fields("s1")).unwrap()), ["메모", COMMENT_TARGET_FIELD]);
+        assert_eq!(labels(keep_valid_comment_target(&conn, "scrap", fields("made-up")).unwrap()), ["메모"]);
+        assert_eq!(labels(keep_valid_comment_target(&conn, "scrap", fields(" ")).unwrap()), ["메모"]);
+        assert_eq!(labels(keep_valid_comment_target(&conn, "todo", fields("s1")).unwrap()), ["메모"]);
     }
 
     #[test]
