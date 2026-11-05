@@ -111,11 +111,11 @@ export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRena
 
   return (
     <>
-      <Modal className="scrap-label-manager-modal" icon="label" onClose={closeTagManager} open={open} title={translate("common.labels.manage")}>
-        <div className="scrap-label-manager">
-          <div aria-label={translate("common.labels.current")} className="scrap-label-manager__list">
+      <Modal className="ui-modal--medium ui-modal--flush" icon="label" onClose={closeTagManager} open={open} title={translate("common.labels.manage")}>
+        <div className="ui-manager">
+          <div aria-label={translate("common.labels.current")} className="ui-manager__list">
             {snapshot.tags.map((tag) => (
-              <div className="scrap-label-manager__row" key={tag}>
+              <div className="ui-manager__row" key={tag}>
                 <strong>{tag}</strong>
                 <span>{snapshot.items.filter((item) => item.tag === tag).length}{translate("common.unit.items")}</span>
                 <IconButton aria-label={translate("common.action.editLabel", { name: tag })} disabled={tagSaving} onClick={() => editTag(tag)} size="small" title={translate("common.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton>
@@ -123,29 +123,29 @@ export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRena
               </div>
             ))}
           </div>
-          <form aria-busy={tagSaving} className="scrap-label-create" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
-            <div className="scrap-label-create__header">
+          <form aria-busy={tagSaving} className="ui-manager__editor" onSubmit={(event) => { event.preventDefault(); void commitTag(); }}>
+            <div className="ui-manager__editor-header">
               <strong>{editingTag ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
               {editingTag && <button disabled={tagSaving} onClick={() => { setEditingTag(null); setTagInput(""); setTagError(null); }} type="button">{translate("common.action.cancel")}</button>}
             </div>
-            <div className="scrap-label-create__controls">
+            <div className="ui-manager__controls">
               <Input aria-label={translate("common.labels.name")} autoFocus disabled={tagSaving} maxLength={100} onChange={(event) => setTagInput(event.target.value)} placeholder={translate("common.labels.name")} value={tagInput} />
               <Button loading={tagSaving} type="submit" variant="primary">{editingTag ? translate("common.action.save") : translate("common.action.add")}</Button>
             </div>
-            {tagError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
+            {tagError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{tagError}</div>}
           </form>
         </div>
       </Modal>
 
       <Modal
-        className="scrap-label-delete-modal"
+        className="ui-modal--small ui-modal--overflow ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={tagDeletePending} onClick={() => setDeleteTagName(null)}>{translate("common.action.cancel")}</Button><Button loading={tagDeletePending} onClick={() => void confirmDeleteTag()} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!tagDeletePending) setDeleteTagName(null); }}
         open={deleteTagName !== null}
         title={translate("common.labels.deleteTitle")}
       >
-        <div className="scrap-label-delete">
+        <div className="ui-form">
           <p>{translate("common.labels.deleteQuestion", { name: deleteTagName ?? "" })}</p>
           <label>
             <span>{translate("scrap.labels.moveExisting")}</span>
@@ -158,7 +158,7 @@ export function ScrapTagManager({ open, onClose, snapshot, repository, onTagRena
             />
           </label>
           <small>{translate("scrap.labels.moveDescription")}</small>
-          {tagDeleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
+          {tagDeleteError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{tagDeleteError}</div>}
         </div>
       </Modal>
     </>

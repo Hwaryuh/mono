@@ -404,7 +404,7 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       </Drawer>
 
       <Modal
-        className="scrap-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={deleteMutation.isPending} onClick={() => setConfirmDeleteId(null)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => confirmDeleteId && deleteMutation.mutate(confirmDeleteId)} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setConfirmDeleteId(null); }}
@@ -412,23 +412,23 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
         title={translate("scrap.delete.title")}
       >
         <p>{translate("scrap.delete.confirm", { title: snapshot.items.find((item) => item.id === confirmDeleteId)?.title ?? "" })}</p>
-        {deleteError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{deleteError}</div>}
+        {deleteError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{deleteError}</div>}
       </Modal>
 
       <Modal
-        className="scrap-create-modal"
+        className="ui-modal--medium"
         footer={<><Button disabled={createMutation.isPending} onClick={() => closeCreate()}>{translate("common.action.cancel")}</Button><Button form="scrap-create-form" loading={createMutation.isPending} type="submit" variant="primary">{translate("common.action.save")}</Button></>}
         icon="scrap"
         onClose={closeCreate}
         open={createOpen}
         title={translate("app.action.newScrap")}
       >
-        <form aria-busy={createMutation.isPending} className="scrap-create-form" id="scrap-create-form" onSubmit={submitCreate}>
+        <form aria-busy={createMutation.isPending} className="ui-form" id="scrap-create-form" onSubmit={submitCreate}>
           <label><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("scrap.editor.titlePlaceholder")} value={draft.title} /></label>
           <label><span>{translate("common.field.note")}</span><TextArea autoGrow maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, memo: event.target.value }))} placeholder={translate("common.field.notePlaceholder")} rows={3} value={draft.memo} /></label>
           <label><span>{translate("scrap.field.optionalLink")}</span><Input maxLength={2_000} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={draft.url} /></label>
-          <div className="scrap-create-form__photo-field">
-            <span className="scrap-create-form__photo-legend">{translate("scrap.field.optionalPhoto")}</span>
+          <div className="ui-field">
+            <span className="ui-field__header">{translate("scrap.field.optionalPhoto")}</span>
             <input
               aria-label={translate("scrap.photo.filePicker")}
               className="capture-file-input"
@@ -454,11 +454,11 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
               </button>
             )}
           </div>
-          <div className="scrap-create-form__label-field">
-            <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={createMutation.isPending} onClick={() => setTagManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
+          <div className="ui-field">
+            <div className="ui-field__header"><span>{translate("common.field.label")}</span><button className="ui-field__action" disabled={createMutation.isPending} onClick={() => setTagManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
             <Select disabled={createMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setDraft((current) => ({ ...current, tag }))} options={snapshot.tags.map((tag) => ({ value: tag, label: tag }))} value={draft.tag} />
           </div>
-          {formError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
@@ -754,8 +754,8 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onMan
       <label><span>{translate("common.field.title")}</span><Input autoFocus disabled={editMutation.isPending} maxLength={500} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} value={editDraft.title} /></label>
       <label><span>{translate("common.field.note")}</span><TextArea autoGrow disabled={editMutation.isPending} maxLength={4_000} onChange={(event) => setEditDraft((current) => ({ ...current, memo: event.target.value }))} rows={3} value={editDraft.memo} /></label>
       <label><span>{translate("scrap.field.optionalLink")}</span><Input disabled={editMutation.isPending} maxLength={2_000} onChange={(event) => setEditDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" value={editDraft.url} /></label>
-      <div className="scrap-create-form__label-field">
-        <div className="scrap-create-form__label-legend"><span>{translate("common.field.label")}</span><button disabled={editMutation.isPending} onClick={onManageTags} type="button">{translate("common.action.manage")}</button></div>
+      <div className="ui-field">
+        <div className="ui-field__header"><span>{translate("common.field.label")}</span><button className="ui-field__action" disabled={editMutation.isPending} onClick={onManageTags} type="button">{translate("common.action.manage")}</button></div>
         <Select disabled={editMutation.isPending} label={translate("common.field.label")} onChange={(tag) => setEditDraft((current) => ({ ...current, tag }))} options={tags.map((tag) => ({ value: tag, label: tag }))} value={editDraft.tag} />
       </div>
       <div className="scrap-detail__editor-photo">
@@ -790,7 +790,7 @@ function ScrapDetail({ item, repository, tags, urlOpener, onRequestDelete, onMan
         <Button disabled={editMutation.isPending} onClick={cancelEditing} size="small" type="button" variant="ghost">{translate("common.action.cancel")}</Button>
         <Button loading={editMutation.isPending} size="small" type="submit" variant="primary">{translate("common.action.save")}</Button>
       </div>
-      {editError && <div className="scrap-mutation-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
+      {editError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{editError}</div>}
     </form>
   ) : (<>
     <div className="scrap-detail__copy-head"><strong>{item.title}</strong><span className="scrap-detail__tag">{item.tag}</span><IconButton aria-label={translate("scrap.action.edit")} onClick={startEditing} size="small" title={translate("scrap.action.edit")} type="button" variant="ghost"><Icon name="edit" size={13} /></IconButton><IconButton aria-label={translate("scrap.delete.title")} onClick={onRequestDelete} size="small" title={translate("scrap.delete.title")} type="button" variant="ghost"><Icon name="trash" size={13} /></IconButton></div><p>{item.memo}</p>{item.url && <div>{externalUrl ? <a className="scrap-detail__url" href={externalUrl} onClick={openExternalUrl} rel="noreferrer" target="_blank" title={translate("common.link.openNewWindow", { url: item.url })}>{item.url}</a> : <span className="scrap-detail__url" title={item.url}>{item.url}</span>}</div>}</>)}</div><hr /><div className="scrap-detail__comments-title"><strong>{translate("scrap.comment.title")}</strong><span>{item.comments.length}{translate("common.unit.items")}</span></div><div className="scrap-comments">{item.comments.map((comment) => <ScrapCommentRow comment={comment} key={comment.id} onZoom={setLightboxSrc} repository={repository} scrapId={item.id} urlOpener={urlOpener} />)}</div>{lightboxSrc && <ScrapImageLightbox name={item.title} onClose={() => setLightboxSrc(null)} src={lightboxSrc} />}</div>;

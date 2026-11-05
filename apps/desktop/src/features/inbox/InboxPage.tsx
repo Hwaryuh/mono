@@ -271,7 +271,7 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
         {translate("inbox.field.schedule")}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}
       </legend>
       <div className="inbox-editor__schedule-grid">
-        <label>
+        <label className="ui-field">
           <span>{translate("inbox.schedule.startDate")}</span>
           <DatePicker
             label={translate("inbox.schedule.startDate")}
@@ -279,15 +279,15 @@ function InboxScheduleField({ field, fallbackDate, onChange }: { field: InboxFie
             value={draft.startDate}
           />
         </label>
-        <label>
+        <label className="ui-field">
           <span>{translate("inbox.schedule.endDate")}</span>
           <DatePicker align="end" label={translate("inbox.schedule.endDate")} min={draft.startDate} onChange={(endDate) => update({ endDate })} value={draft.endDate} />
         </label>
-        <label>
+        <label className="ui-field">
           <span>{translate("inbox.schedule.startTime")}</span>
           <TimePicker label={translate("inbox.schedule.startTime")} onChange={(startTime) => update({ startTime })} value={draft.startTime} />
         </label>
-        <label>
+        <label className="ui-field">
           <span>{translate("inbox.schedule.endTime")}</span>
           <TimePicker align="end" label={translate("inbox.schedule.endTime")} onChange={(endTime) => update({ endTime })} value={draft.endTime} />
         </label>
@@ -325,11 +325,11 @@ function InboxLedgerAmountDateFields({
 }) {
   return (
     <div className="ledger-expense-form__pair">
-      <label>
+      <label className="ui-field">
         <span>{translate("ledger.field.amount")}{amountField.confidence !== undefined && <small className={amountField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(amountField.confidence * 100) })}</small>}</span>
         <LedgerAmountInput onChange={(value) => onAmountChange(value ? `₩ ${value}` : "")} value={amountField.value} />
       </label>
-      <label>
+      <label className="ui-field">
         <span>{translate("common.field.date")}{dateField.confidence !== undefined && <small className={dateField.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(dateField.confidence * 100) })}</small>}</span>
         <DatePicker align="end" label={translate("common.field.date")} onChange={onDateChange} value={dateField.value} />
       </label>
@@ -648,7 +648,7 @@ function InboxRow({
       )}
 
       <Modal
-        className="inbox-editor"
+        className="ui-modal--large ui-modal--overflow inbox-editor"
         footer={<><Button disabled={updateMutation.isPending} onClick={() => setEditorOpen(false)}>{translate("common.action.cancel")}</Button><Button form={`inbox-editor-${item.id}`} loading={updateMutation.isPending} type="submit" variant="primary">{translate("common.action.save")}</Button></>}
         icon={moduleMeta[target].icon}
         onClose={() => { if (!updateMutation.isPending) setEditorOpen(false); }}
@@ -660,7 +660,7 @@ function InboxRow({
           {videoRoutingLocked
             ? <div className="inbox-editor__fixed-target"><span>{translate("inbox.target.savedModule")}</span><strong><Icon name="scrap" size={13} />{translate("app.navigation.scrap")}</strong><small>{translate("inbox.classification.videoLockedDescription")}</small></div>
             : <ModuleTargetPicker onChange={changeTarget} value={target} />}
-          <div className="inbox-editor__fields">
+          <div className="ui-form inbox-editor__fields">
             {fields.map((field, index) => {
               if (target === "calendar" && field.label === translate("inbox.field.schedule")) {
                 return <InboxScheduleField fallbackDate={calendarToday} field={field} key={`${field.label}-${index}`} onChange={(value) => updateField(index, value)} />;
@@ -694,12 +694,12 @@ function InboxRow({
               );
             })}
           </div>
-          {actionError && <div className="inbox-editor__error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
+          {actionError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
         </form>
       </Modal>
 
       <Modal
-        className="inbox-discard-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button autoFocus disabled={discardMutation.isPending} onClick={() => setDiscardOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={discardMutation.isPending} onClick={() => discardMutation.mutate()} variant="danger">{translate("inbox.action.discard")}</Button></>}
         icon="alert"
         onClose={() => { if (!discardMutation.isPending) setDiscardOpen(false); }}
@@ -708,7 +708,7 @@ function InboxRow({
       >
         <p>{translate("inbox.discard.warning")}</p>
         <blockquote>{item.raw}</blockquote>
-        {actionError && <div className="inbox-editor__error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
+        {actionError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{actionError}</div>}
       </Modal>
     </Card>
   );

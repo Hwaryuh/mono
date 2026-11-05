@@ -252,7 +252,6 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 }
 
 .inbox-item__mutation-error,
-.inbox-editor__error,
 .inbox-bulk-error {
   display: flex;
   align-items: center;
@@ -288,8 +287,6 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
   place-items: center;
 }
 
-.inbox-editor { width: min(520px, 100%); overflow: visible; }
-.inbox-editor .ui-overlay__body { overflow: visible; }
 .inbox-editor form { display: flex; flex-direction: column; gap: 16px; }
 .inbox-editor__source {
   padding: 10px 11px;
@@ -367,14 +364,9 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 }
 .inbox-editor__target-option--selected { background: var(--color-accent-soft); color: var(--color-text); font-weight: 700; }
 .inbox-editor__target-check { margin-left: auto; color: var(--color-accent); }
-.inbox-editor__fields { display: flex; flex-direction: column; gap: 12px; }
-.inbox-editor__fields label { display: flex; flex-direction: column; gap: 5px; }
-.inbox-editor__fields label > span { display: flex; align-items: center; color: var(--color-text-faint); font-size: 10.5px; }
+.inbox-editor__fields label > span { display: flex; align-items: center; }
 .inbox-editor__fields label small { margin-left: auto; color: var(--color-text-faint); font-size: 9.5px; font-weight: 500; }
 .inbox-editor__fields label small.inbox-field--low { color: var(--color-warning); }
-.inbox-editor__fields .ui-select,
-.inbox-editor__fields .ui-date-picker { width: 100%; }
-.inbox-editor__schedule { min-width: 0; margin: 0; padding: 0; border: 0; }
 .inbox-editor__schedule > legend {
   width: 100%;
   margin-bottom: 5px;
@@ -385,19 +377,6 @@ html[data-theme="dark"] .inbox-item__thumbnails img { outline-color: oklch(1 0 0
 }
 .inbox-editor__schedule > legend small { margin-left: auto; color: var(--color-text-faint); font-size: 9.5px; font-weight: 500; }
 .inbox-editor__schedule > legend small.inbox-field--low { color: var(--color-warning); }
-.inbox-editor__schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.inbox-editor__schedule-grid label { min-width: 0; }
+.inbox-editor__schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-form) 10px; }
 .inbox-editor__schedule-grid label > span { font-size: 9.5px; }
 .inbox-editor__field-hint { margin: 1px 0 0 !important; color: var(--color-warning) !important; }
-.inbox-discard-modal { width: min(420px, 100%); }
-.inbox-discard-modal .ui-overlay__header > svg { color: var(--color-danger); }
-.inbox-discard-modal p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.55; }
-.inbox-discard-modal blockquote {
-  margin: 10px 0 0;
-  padding: 9px 11px;
-  border-left: 2px solid var(--color-border-strong);
-  background: var(--color-surface-subtle);
-  color: var(--color-text-faint);
-  font-size: 11px;
-  line-height: 1.5;
-}

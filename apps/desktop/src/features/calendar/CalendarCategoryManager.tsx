@@ -140,13 +140,13 @@ export function CalendarCategoryManager({ open, onClose, snapshot, repository, o
 
   return (
     <>
-      <Modal className="calendar-category-modal" icon="calendar" onClose={closeCategoryManager} open={open} title={translate("common.labels.manage")}>
-        <div className="calendar-category-manager">
-          <div aria-label={translate("inbox.labels.calendar")} className="calendar-category-manager__list">
+      <Modal className="ui-modal--medium ui-modal--overflow ui-modal--flush" icon="calendar" onClose={closeCategoryManager} open={open} title={translate("common.labels.manage")}>
+        <div className="ui-manager">
+          <div aria-label={translate("inbox.labels.calendar")} className="ui-manager__list">
             {snapshot.categories.map((category, index) => {
               const usageCount = snapshot.events.filter((event) => event.categoryId === category.id).length;
               return (
-                <div className="calendar-category-manager__row" key={category.id}>
+                <div className="ui-manager__row" key={category.id}>
                   <i style={{ backgroundColor: category.color }} />
                   <strong>{category.name}</strong>
                   <span>{usageCount}{translate("common.unit.items")}</span>
@@ -160,37 +160,37 @@ export function CalendarCategoryManager({ open, onClose, snapshot, repository, o
               );
             })}
           </div>
-          <form aria-busy={categoryMutation.isPending} className="calendar-category-editor" id="calendar-category-editor" onSubmit={submitCategory}>
-            <div className="calendar-category-editor__header">
+          <form aria-busy={categoryMutation.isPending} className="ui-manager__editor" id="calendar-category-editor" onSubmit={submitCategory}>
+            <div className="ui-manager__editor-header">
               <strong>{editingCategoryId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
               {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("common.action.cancel")}</button>}
             </div>
-            <div className="calendar-category-editor__controls">
+            <div className="ui-manager__controls">
               <ColorPicker disabled={categoryMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
               <Input aria-label={translate("common.labels.name")} autoFocus disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={categoryDraft.name} />
               <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("common.action.save") : translate("common.action.add")}</Button>
             </div>
-            {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
+            {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
           </form>
         </div>
       </Modal>
 
       <Modal
-        className="calendar-category-delete-modal"
+        className="ui-modal--small ui-modal--overflow ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("common.action.cancel")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && replacementCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId, replacementCategoryId })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
         open={deleteCategoryId !== null}
         title={translate("common.labels.deleteTitle")}
       >
-        <div className="calendar-category-delete">
+        <div className="ui-form">
           <p>{translate("common.labels.deleteQuestion", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "" })}</p>
           <label>
             <span>{translate("calendar.labels.moveExisting")}</span>
             <Select disabled={categoryMutation.isPending} label={translate("common.labels.moveTarget")} onChange={setReplacementCategoryId} options={snapshot.categories.filter((category) => category.id !== deleteCategoryId).map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={replacementCategoryId} />
           </label>
           <small>{translate("calendar.labels.moveExistingDescription")}</small>
-          {categoryError && <div className="calendar-category-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
+          {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
         </div>
       </Modal>
     </>

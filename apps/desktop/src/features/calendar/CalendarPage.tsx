@@ -623,7 +623,7 @@ export function CalendarPage({ repository, todoRepository, viewStateStore }: { r
         </div>
       )}
 
-      <Modal className="calendar-day-modal" icon="calendar" onClose={() => setDayDialogDate(null)} open={dayDialogDate !== null} title={<>{dayDialogDate ? formatDay(dayDialogDate) : ""}<small>{translate("calendar.day.eventCount", { count: dayEvents.length })}</small></>}>
+      <Modal className="ui-modal--medium calendar-day-modal" icon="calendar" onClose={() => setDayDialogDate(null)} open={dayDialogDate !== null} title={<>{dayDialogDate ? formatDay(dayDialogDate) : ""}<small>{translate("calendar.day.eventCount", { count: dayEvents.length })}</small></>}>
         <div className="calendar-day-list">
           {dayEvents.map((item) => <AgendaEventButton category={categoryOf(snapshot, item)} event={item} key={item.id} onClick={() => openEditor(item)} />)}
           {dayTodos.map((todo) => <CalendarTodoChip key={todo.id} onClick={() => navigate("/todo")} todo={todo} />)}
@@ -631,9 +631,9 @@ export function CalendarPage({ repository, todoRepository, viewStateStore }: { r
       </Modal>
 
       <Modal
-        className="calendar-event-modal"
+        className="ui-modal--large ui-modal--overflow"
         footer={<>
-          {editingEvent && <Button className="calendar-event-modal__delete" disabled={editorBusy} onClick={requestDelete} variant="ghost">{translate("common.action.delete")}</Button>}
+          {editingEvent && <Button className="ui-overlay__delete" disabled={editorBusy} onClick={requestDelete} variant="ghost">{translate("common.action.delete")}</Button>}
           <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
           <Button form="calendar-event-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
         </>}
@@ -642,7 +642,7 @@ export function CalendarPage({ repository, todoRepository, viewStateStore }: { r
         open={editorItem !== null}
         title={editorItem === "new" ? translate("app.action.newCalendar") : translate("calendar.action.editEvent")}
       >
-        <form aria-busy={editorBusy} className="calendar-event-form" id="calendar-event-form" onSubmit={submit}>
+        <form aria-busy={editorBusy} className="ui-form ui-form--grid calendar-event-form" id="calendar-event-form" onSubmit={submit}>
           <label className="calendar-event-form__title"><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraftField("title", event.target.value)} value={draft.title} /></label>
           <DateTimeFields draft={draft} label={translate("calendar.field.start")} onChange={setStartField} prefix="start" />
           <DateTimeFields draft={draft} label={translate("calendar.field.end")} onChange={setEndField} prefix="end" />
@@ -664,19 +664,19 @@ export function CalendarPage({ repository, todoRepository, viewStateStore }: { r
           />
           <label className="calendar-event-form__location-field"><span>{translate("common.field.location")}</span><div className="calendar-event-form__location"><Icon name="location" size={12} /><Input maxLength={500} onChange={(event) => setDraftField("location", event.target.value)} value={draft.location} /></div></label>
           <fieldset aria-labelledby="calendar-event-category-label" className="calendar-event-form__category">
-            <div className="calendar-event-form__category-header">
+            <div className="ui-field__header">
               <span id="calendar-event-category-label">{translate("common.field.label")}</span>
-              <button disabled={editorBusy} onClick={() => setCategoryManagerOpen(true)} type="button">{translate("common.action.manage")}</button>
+              <button className="ui-field__action" disabled={editorBusy} onClick={() => setCategoryManagerOpen(true)} type="button">{translate("common.action.manage")}</button>
             </div>
             <Select align="end" label={translate("common.field.label")} onChange={(value) => setDraftField("categoryId", value)} options={snapshot.categories.map((category) => ({ value: category.id, label: category.name, dotColor: category.color }))} value={draft.categoryId} />
           </fieldset>
           <label className="calendar-event-form__note"><span>{translate("common.field.note")}</span><TextArea autoGrow maxLength={4_000} onChange={(event) => setDraftField("note", event.target.value)} rows={3} value={draft.note} /></label>
-          {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
       <Modal
-        className="calendar-scope-modal"
+        className="ui-modal--small ui-modal--confirm"
         footer={<Button disabled={editorBusy} onClick={() => setScopePrompt(null)}>{translate("common.action.cancel")}</Button>}
         icon={scopePrompt?.mode === "delete" ? "trash" : "calendar"}
         onClose={() => { if (!editorBusy) setScopePrompt(null); }}
@@ -696,21 +696,21 @@ export function CalendarPage({ repository, todoRepository, viewStateStore }: { r
               <strong>{translate("calendar.scope.allEvents")}</strong><span>{translate("calendar.scope.allDescription")}</span>
             </button>
           </div>
-          {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </div>
       </Modal>
 
       <Modal
-        className="calendar-category-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={deleteMutation.isPending} onClick={() => setDeleteConfirm(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => editingEvent && deleteMutation.mutate({ eventId: editingEvent.id })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteConfirm(false); }}
         open={deleteConfirm}
         title={translate("calendar.delete.title")}
       >
-        <div className="calendar-category-delete">
+        <div className="ui-form">
           <p>{translate("calendar.delete.confirm", { title: editingEvent?.title ?? "" })}</p>
-          {formError && <div className="calendar-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </div>
       </Modal>
 
@@ -839,7 +839,7 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
         <div className="calendar-recurrence">
           {preset === "custom" && (
             <>
-              <label className="calendar-recurrence__interval">
+              <label className="ui-field calendar-recurrence__interval">
                 <span>{translate("calendar.recurrence.interval")}</span>
                 <div>
                   <Input aria-label={translate("calendar.recurrence.intervalLabel")} disabled={disabled} inputMode="numeric" onChange={(event) => patch({ interval: clamp(event.target.value, 1, 999, value.interval) })} value={String(value.interval)} />
@@ -869,7 +869,7 @@ function RecurrenceField({ value, startDate, disabled, onChange }: {
               )}
             </>
           )}
-          <label className="calendar-recurrence__end">
+          <label className="ui-field calendar-recurrence__end">
             <span>{translate("calendar.recurrence.end")}</span>
             <div>
               <Select

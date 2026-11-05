@@ -48,9 +48,6 @@
   width: min(640px, 100%);
 }
 
-.quick-capture-modal .ui-overlay__body {
-  padding: 18px;
-}
 
 .quick-capture-shortcut {
   min-height: 22px;

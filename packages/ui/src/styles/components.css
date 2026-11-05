@@ -553,12 +553,78 @@
 .ui-drawer { width: min(400px, 100%); height: 100%; animation: ui-drawer-in 180ms cubic-bezier(0.2, 0, 0, 1); }
 .ui-modal--closing { animation: ui-modal-out 160ms cubic-bezier(0.2, 0, 0, 1) forwards; }
 .ui-drawer--closing { animation: ui-drawer-out 180ms cubic-bezier(0.2, 0, 0, 1) forwards; }
-.ui-overlay__header { min-height: 52px; flex: none; padding: 0 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); }
+.ui-overlay__header { min-height: 52px; flex: none; padding: 0 var(--space-overlay-x); display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); }
 .ui-overlay__header strong { color: var(--color-text); font-size: 13px; }
 .ui-overlay__header .ui-icon-button { margin-left: auto; }
-.ui-overlay__body { min-height: 0; flex: 1; padding: 14px 16px; overflow-y: auto; }
-.ui-overlay__footer { flex: none; padding: 12px 14px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.ui-overlay__body { min-height: 0; flex: 1; padding: 14px var(--space-overlay-x); overflow-y: auto; }
+.ui-overlay__footer { flex: none; padding: 12px var(--space-overlay-x); display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
 .ui-modal > .ui-overlay__footer { border-end-start-radius: var(--radius-overlay); border-end-end-radius: var(--radius-overlay); }
+
+/* Modal modifiers. Width comes in three steps: small for confirms, medium for short forms and managers, large for full editors. */
+.ui-modal--small { width: min(400px, 100%); }
+.ui-modal--medium { width: min(480px, 100%); }
+.ui-modal--large { width: min(520px, 100%); }
+/* DatePicker/TimePicker/ColorPicker popups render inside the modal, so a modal that hosts them must not clip. */
+.ui-modal--overflow,
+.ui-modal--overflow > .ui-overlay__body { overflow: visible; }
+.ui-modal--flush > .ui-overlay__body { padding: 0; }
+.ui-modal--danger > .ui-overlay__header > svg { color: var(--color-danger); }
+/* The destructive action on an editor footer, pushed to the start, away from save. */
+.ui-overlay__footer > .ui-overlay__delete { margin-right: auto; color: var(--color-danger); }
+
+/* Confirm modals: a sentence, an optional quote of the target, an optional hint. */
+.ui-modal--confirm > .ui-overlay__body { display: flex; flex-direction: column; gap: 10px; }
+.ui-modal--confirm p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.6; }
+.ui-modal--confirm p strong { color: var(--color-text); }
+.ui-modal--confirm blockquote { margin: 0; padding: 9px 11px; border-left: 2px solid var(--color-border-strong); background: var(--color-surface-subtle); color: var(--color-text-faint); font-size: 11px; line-height: 1.5; }
+.ui-modal--confirm small { color: var(--color-text-faint); font-size: 10.5px; line-height: 1.5; }
+
+/* Form layout inside overlays. Direct label/fieldset children are fields; nested ones opt in with .ui-field. */
+.ui-form { min-width: 0; display: flex; flex-direction: column; gap: var(--space-form); }
+.ui-form--grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
+.ui-form > label,
+.ui-form > fieldset,
+.ui-field { min-width: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-field); border: 0; }
+.ui-form label > span,
+.ui-form legend,
+.ui-field__header { color: var(--color-text-faint); font-size: 10.5px; }
+/* A rendered legend sits outside the fieldset's flex box, so the gap does not reach it. */
+.ui-form legend { margin-bottom: var(--space-field); padding: 0; }
+.ui-form .ui-input:not(.ui-textarea) { height: var(--control-height-form); }
+.ui-form .ui-select,
+.ui-form .ui-date-picker,
+.ui-form .ui-time-picker,
+.ui-field > .ui-select,
+.ui-field > .ui-date-picker,
+.ui-field > .ui-time-picker { width: 100%; }
+.ui-form[aria-busy="true"] { opacity: 0.72; }
+.ui-field__header { width: 100%; min-height: 18px; display: flex; align-items: center; gap: 6px; }
+.ui-field__action { appearance: none; margin: -3px -5px -3px auto; padding: 3px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--color-accent); font: inherit; font-size: 10.5px; cursor: pointer; transition-property: background-color, color, scale; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+.ui-field__action:hover:not(:disabled) { background: var(--color-accent-soft); }
+.ui-field__action:active:not(:disabled) { scale: 0.96; }
+.ui-field__action:disabled { cursor: default; opacity: 0.4; }
+.ui-form-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
+
+/* Label/category manager: a scrolling list of rows above an add/edit form. Pair with .ui-modal--flush. */
+.ui-manager { min-width: 0; }
+.ui-manager__list { max-height: min(330px, 42vh); padding: 14px var(--space-overlay-x); display: flex; flex-direction: column; gap: 7px; overflow-y: auto; }
+.ui-manager__row { min-height: 42px; padding: 5px 7px 5px 11px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+.ui-manager__row > i { width: 10px; height: 10px; flex: none; border-radius: 3px; }
+.ui-manager__row > strong { min-width: 0; flex: 1; overflow: hidden; font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ui-manager__row > span { flex: none; color: var(--color-text-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.ui-manager__row > div { flex: none; display: flex; gap: 1px; }
+.ui-manager__row .ui-icon-button { width: 28px; height: 28px; flex: none; }
+.ui-manager__row .ui-icon-button:last-child:not(:disabled):hover { color: var(--color-danger); }
+.ui-manager__empty { padding: 24px 0; color: var(--color-text-faint); font-size: 11px; text-align: center; }
+.ui-manager__editor { padding: 12px var(--space-overlay-x) 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.ui-manager__editor[aria-busy="true"] { opacity: 0.68; }
+.ui-manager__editor-header { min-height: 18px; display: flex; align-items: center; gap: 8px; }
+.ui-manager__editor-header > strong { color: var(--color-text-faint); font-size: 10.5px; }
+.ui-manager__editor-header > button { margin-left: auto; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--color-text-faint); font: inherit; font-size: 10px; cursor: pointer; }
+.ui-manager__editor-header > button:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
+.ui-manager__controls { display: flex; align-items: center; gap: 8px; }
+.ui-manager__controls > .ui-input { min-width: 0; height: 32px; flex: 1; font-size: 11.5px; }
+.ui-manager__controls > .ui-button { height: 32px; flex: none; }
 @keyframes ui-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } }
 @keyframes ui-drawer-in { from { opacity: 0; transform: translateX(24px); } }
 @keyframes ui-modal-out { to { opacity: 0; transform: translateY(8px) scale(0.99); } }

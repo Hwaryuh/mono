@@ -463,117 +463,16 @@
 .todo-empty .ui-button { margin-top: 4px; }
 .todo-state { height: 100%; display: grid; place-items: center; align-content: center; gap: 8px; color: var(--color-danger); }
 
-.todo-editor-modal { width: min(500px, 100%); }
-.todo-editor-modal,
-.todo-editor-modal .ui-overlay__body { overflow: visible; }
-.todo-editor { display: flex; flex-direction: column; gap: 13px; }
-.todo-editor > label,
-.todo-editor__due label { display: flex; flex-direction: column; gap: 5px; }
-.todo-editor label > span,
-.todo-editor legend { color: var(--color-text-faint); font-size: 10.5px; }
 .todo-editor label > span b { color: var(--color-accent); font-size: 9px; }
-.todo-editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.todo-editor legend { margin-bottom: 6px; }
-.todo-editor__field { min-width: 0; }
-.todo-editor__label-legend {
-  width: 100%;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  color: var(--color-text-faint);
-  font-size: 10.5px;
-}
-.todo-editor__label-legend > button {
-  appearance: none;
-  min-height: 24px;
-  margin: -5px 0 -5px auto;
-  padding: 0 5px;
-  border: 0;
-  border-radius: 4px;
-  box-shadow: none;
-  background: transparent;
-  color: var(--color-text-faint);
-  font: inherit;
-  font-size: 10px;
-  cursor: pointer;
-  transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out;
-}
-.todo-editor__label-legend > button:hover { background: var(--color-hover); color: var(--color-text-muted); }
-.todo-editor__label-legend > button:active { scale: 0.96; }
-.todo-editor__field > .ui-select { width: 100%; }
-.todo-editor__due { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 8px; }
-.todo-editor__stars-legend { display: block; margin-bottom: 4px; color: var(--color-text-faint); font-size: 10.5px; }
+.todo-editor__due { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 10px; }
 .todo-editor__stars { display: inline-flex; align-items: center; gap: 2px; margin-left: -6px; }
 .todo-editor__star { appearance: none; width: 26px; height: 26px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 6px; box-shadow: none; background: transparent; color: var(--color-text-faint); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out, scale 100ms ease-out; }
 .todo-editor__star:hover { background: var(--color-hover); color: var(--color-text-muted); }
 .todo-editor__star:active { scale: 0.85; }
 .todo-editor__star--active { color: var(--color-accent); }
 .todo-editor__star--active:hover { background: var(--color-accent-soft); color: var(--color-accent); }
-.todo-editor__delete { margin-right: auto; color: var(--color-danger); }
-.todo-mutation-error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
-.todo-delete-modal { width: min(420px, 100%); }
-.todo-delete-modal .ui-overlay__header > svg { color: var(--color-danger); }
-.todo-delete-modal p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.55; }
-.todo-delete-modal blockquote { margin: 10px 0 0; padding: 9px 11px; border-left: 2px solid var(--color-border-strong); background: var(--color-surface-subtle); color: var(--color-text-faint); font-size: 11px; line-height: 1.5; }
-.todo-delete-modal__cascade { margin: 10px 0 0; display: flex; align-items: center; gap: 5px; color: var(--color-warning); font-size: 10.5px; }
+.todo-delete-modal .todo-delete-modal__cascade { display: flex; align-items: center; gap: 5px; color: var(--color-warning); font-size: 10.5px; }
 .todo-delete-modal__cascade > svg { flex: none; }
-.todo-label-modal { width: min(470px, 100%); }
-.todo-label-modal,
-.todo-label-modal .ui-overlay__body { overflow: visible; }
-.todo-label-modal .ui-overlay__body { padding: 0; }
-.todo-label-manager { min-width: 0; }
-.todo-label-manager__list {
-  max-height: min(330px, 42vh);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  overflow-y: auto;
-}
-.todo-label-manager__row {
-  min-height: 42px;
-  padding: 5px 7px 5px 11px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-subtle);
-}
-.todo-label-manager__row > i { width: 10px; height: 10px; flex: none; border-radius: 3px; }
-.todo-label-manager__row > strong { min-width: 0; flex: 1; overflow: hidden; font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.todo-label-manager__row > span { flex: none; color: var(--color-text-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.todo-label-manager__row > div { flex: none; display: flex; gap: 1px; }
-.todo-label-manager__row .ui-icon-button { width: 28px; height: 28px; }
-.todo-label-manager__row .ui-icon-button:last-child:not(:disabled):hover { color: var(--color-danger); }
-.todo-label-manager__empty { padding: 24px 0; color: var(--color-text-faint); font-size: 11px; text-align: center; }
-.todo-label-create {
-  padding: 12px 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
-}
-.todo-label-create__header { min-height: 18px; display: flex; align-items: center; gap: 8px; }
-.todo-label-create__header > strong { color: var(--color-text-faint); font-size: 10.5px; }
-.todo-label-create__header > button { margin-left: auto; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--color-text-faint); font: inherit; font-size: 10px; cursor: pointer; }
-.todo-label-create__header > button:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
-.todo-label-create__controls { display: flex; align-items: center; gap: 8px; }
-.todo-label-create__controls > .ui-input { min-width: 0; height: 32px; flex: 1; font-size: 11.5px; }
-.todo-label-create__controls > .ui-button { height: 32px; flex: none; }
-.todo-label-create__error { display: flex; align-items: center; gap: 5px; color: var(--color-danger); font-size: 10.5px; }
-.todo-label-create[aria-busy="true"] { opacity: 0.68; }
-.todo-label-delete-modal { width: min(400px, 100%); }
-.todo-label-delete-modal,
-.todo-label-delete-modal .ui-overlay__body { overflow: visible; }
-.todo-label-delete-modal .ui-overlay__header > svg { color: var(--color-danger); }
-.todo-label-delete { display: flex; flex-direction: column; gap: 11px; }
-.todo-label-delete > p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.6; }
-.todo-label-delete > p strong { color: var(--color-text); }
-.todo-label-delete > label { display: flex; flex-direction: column; gap: 5px; color: var(--color-text-faint); font-size: 10.5px; }
-.todo-label-delete > label .ui-select { width: 100%; }
-.todo-label-delete > small { color: var(--color-text-faint); font-size: 10.5px; line-height: 1.5; }
 .todo-page--loading .todo-list { padding-top: 12px; }
 .todo-item--skeleton { min-height: 62px; animation: skeleton-pulse 1.2s ease-in-out infinite; background: var(--color-surface-subtle); }
 
@@ -609,6 +508,8 @@
   transition-timing-function: ease-out;
 }
 .scrap-mention-input--multiline { min-height: 72px; }
+/* Inside a modal form the single-line variant matches the form control height. */
+.ui-form .scrap-mention-input:not(.scrap-mention-input--multiline) { min-height: var(--control-height-form); padding-block: 7px; }
 .scrap-mention-input:hover { border-color: color-mix(in srgb, var(--color-border-strong) 72%, var(--color-text-faint)); }
 .scrap-mention-input:focus { border-color: var(--color-accent); background: var(--color-surface); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .scrap-mention-input:empty::before {

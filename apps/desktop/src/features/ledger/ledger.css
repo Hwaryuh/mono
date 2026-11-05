@@ -57,102 +57,14 @@
 .ledger-skeleton { min-height: 116px; animation: skeleton-pulse 1.2s ease-in-out infinite; background: var(--color-surface-subtle); }
 .ledger-list-card.ledger-skeleton { min-height: 220px; }
 
-.ledger-expense-modal { width: min(440px, 100%); border: 1px solid var(--color-border-strong); }
-/* Lets the DatePicker popup overflow outside the modal — so it isn't clipped by the scroll container. Same as the calendar/todo modals. */
-.ledger-expense-modal,
-.ledger-expense-modal .ui-overlay__body { overflow: visible; }
-.ledger-expense-modal .ui-overlay__header { min-height: 0; padding: 13px 16px; }
-.ledger-expense-modal .ui-overlay__footer { padding: 12px 16px; }
-.ledger-expense-modal__delete { margin-right: auto; color: var(--color-danger); }
-.ledger-expense-form { display: flex; flex-direction: column; gap: 12px; }
-.ledger-expense-form > label,
-.ledger-expense-form__pair > label { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.ledger-expense-form label > span { color: var(--color-text-faint); font-size: 10.5px; }
-.ledger-expense-form label > span small { margin-left: 3px; color: var(--color-text-faint); font-size: 9.5px; }
-.ledger-expense-form .ui-input { height: 34px; }
 .ledger-expense-form > label:first-child .ui-input { font-size: 12.5px; }
+.ledger-expense-form label > span small { margin-left: 3px; color: var(--color-text-faint); font-size: 9.5px; }
+/* Also used by the inbox editor's amount/date pair. */
 .ledger-expense-form__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.ledger-amount-input { height: 34px; padding: 0 10px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+.ledger-amount-input { height: var(--control-height-form); padding: 0 10px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
 .ledger-amount-input > b { color: var(--color-text-faint); font-size: 12px; font-weight: 500; pointer-events: none; }
-.ledger-amount-input .ui-input { height: 32px; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.ledger-expense-form__field { min-width: 0; }
-.ledger-expense-form__category-legend {
-  width: 100%;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  color: var(--color-text-faint);
-  font-size: 10.5px;
-}
-.ledger-expense-form__category-legend > button {
-  appearance: none;
-  margin-left: auto;
-  padding: 2px 5px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-accent);
-  font: inherit;
-  font-size: 10.5px;
-  cursor: pointer;
-}
-.ledger-expense-form__category-legend > button:hover:not(:disabled) { background: var(--color-accent-soft); }
-.ledger-expense-form__category-legend > button:disabled { cursor: default; opacity: 0.4; }
-.ledger-expense-form__field > .ui-select { width: 100%; }
-.ledger-category-option:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.ledger-expense-form[aria-busy="true"] { opacity: 0.72; }
-.ledger-mutation-status,
-.ledger-mutation-error { display: flex; align-items: center; gap: 5px; font-size: 10.5px; }
-.ledger-mutation-status { color: var(--color-text-muted); }
+/* The wrapper draws the border, so the inner input fills it; .ui-form sets a taller input height that must not apply here. */
+.ledger-amount-input .ui-input,
+.ui-form .ledger-amount-input .ui-input { height: calc(var(--control-height-form) - 2px); padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ledger-mutation-status { display: flex; align-items: center; gap: 5px; color: var(--color-text-muted); font-size: 10.5px; }
 .ledger-mutation-status > svg { animation: ui-spin 900ms linear infinite; }
-.ledger-mutation-error { color: var(--color-danger); }
-
-.ledger-category-manager-modal { width: min(470px, 100%); }
-.ledger-category-manager-modal,
-.ledger-category-manager-modal .ui-overlay__body { overflow: visible; }
-.ledger-category-manager-modal .ui-overlay__body { padding: 0; }
-.ledger-category-manager { min-width: 0; }
-.ledger-category-manager__list {
-  max-height: min(330px, 42vh);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  overflow-y: auto;
-}
-.ledger-category-manager__row {
-  min-height: 42px;
-  padding: 5px 7px 5px 11px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-subtle);
-}
-.ledger-category-manager__row > i { width: 10px; height: 10px; flex: none; border-radius: 3px; }
-.ledger-category-manager__row > strong { min-width: 0; flex: 1; overflow: hidden; font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.ledger-category-manager__row > span { flex: none; color: var(--color-text-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.ledger-category-manager__row > div { flex: none; display: flex; gap: 1px; }
-.ledger-category-manager__row .ui-icon-button { width: 28px; height: 28px; }
-.ledger-category-manager__row .ui-icon-button:last-child:not(:disabled):hover { color: var(--color-danger); }
-.ledger-category-editor {
-  padding: 12px 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
-}
-.ledger-category-editor__header { min-height: 18px; display: flex; align-items: center; gap: 8px; }
-.ledger-category-editor__header > strong { color: var(--color-text-faint); font-size: 10.5px; }
-.ledger-category-editor__header > button { margin-left: auto; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; color: var(--color-text-faint); font: inherit; font-size: 10px; cursor: pointer; }
-.ledger-category-editor__header > button:hover:not(:disabled) { background: var(--color-hover); color: var(--color-text); }
-.ledger-category-editor__controls { display: flex; align-items: center; gap: 8px; }
-.ledger-category-editor__controls > .ui-input { height: 32px; flex: 1; font-size: 11.5px; }
-.ledger-category-editor__controls > .ui-button { height: 32px; flex: none; }
-.ledger-category-editor[aria-busy="true"] { opacity: 0.68; }
-.ledger-category-delete-modal { width: min(400px, 100%); }
-.ledger-category-delete-modal .ui-overlay__header > svg { color: var(--color-danger); }
-.ledger-category-delete-modal p { margin: 0; color: var(--color-text-muted); font-size: 11.5px; line-height: 1.6; }
-.ledger-category-delete-modal p strong { color: var(--color-text); }

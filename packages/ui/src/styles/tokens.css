@@ -35,6 +35,10 @@
   --radius-control: 6px;
   --radius-card: 8px;
   --radius-overlay: 10px;
+  --space-overlay-x: 16px;
+  --space-form: 12px;
+  --space-field: 5px;
+  --control-height-form: 34px;
   --shadow-border: 0 0 0 1px oklch(0.222 0.002 106.554 / 6%), 0 1px 2px -1px oklch(0.222 0.002 106.554 / 7%), 0 2px 4px oklch(0.222 0.002 106.554 / 4%);
   --shadow-border-hover: 0 0 0 1px oklch(0.222 0.002 106.554 / 9%), 0 1px 2px -1px oklch(0.222 0.002 106.554 / 8%), 0 2px 5px oklch(0.222 0.002 106.554 / 7%);
   --shadow-overlay: 0 20px 60px oklch(0.169 0.018 5.951 / 22%);

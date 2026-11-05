@@ -297,9 +297,9 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
       </section>
 
       <Modal
-        className="ledger-expense-modal"
+        className="ui-modal--medium ui-modal--overflow"
         footer={<>
-          {editingExpenseId && <Button className="ledger-expense-modal__delete" disabled={editorBusy} onClick={() => setDeleteExpenseId(editingExpenseId)} variant="ghost">{translate("common.action.delete")}</Button>}
+          {editingExpenseId && <Button className="ui-overlay__delete" disabled={editorBusy} onClick={() => setDeleteExpenseId(editingExpenseId)} variant="ghost">{translate("common.action.delete")}</Button>}
           <Button disabled={editorBusy} onClick={() => closeModal()}>{translate("common.action.cancel")}</Button>
           <Button form="ledger-expense-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{translate("common.action.save")}</Button>
         </>}
@@ -308,14 +308,14 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
         open={open}
         title={editingExpenseId ? translate("ledger.action.editExpense") : translate("app.action.newLedger")}
       >
-        <form aria-busy={editorBusy} className="ledger-expense-form" id="ledger-expense-form" onSubmit={submit}>
+        <form aria-busy={editorBusy} className="ui-form ledger-expense-form" id="ledger-expense-form" onSubmit={submit}>
           <label><span>{translate("ledger.field.item")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("ledger.editor.titlePlaceholder")} value={draft.title} /></label>
           <div className="ledger-expense-form__pair">
-            <label><span>{translate("ledger.field.amount")}</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
-            <label><span>{translate("common.field.date")}</span><DatePicker align="end" label={translate("common.field.date")} onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
+            <label className="ui-field"><span>{translate("ledger.field.amount")}</span><LedgerAmountInput onChange={(amountWon) => setDraft((current) => ({ ...current, amountWon }))} value={draft.amountWon} /></label>
+            <label className="ui-field"><span>{translate("common.field.date")}</span><DatePicker align="end" label={translate("common.field.date")} onChange={(date) => setDraft((current) => ({ ...current, date }))} value={draft.date} /></label>
           </div>
-          <div className="ledger-expense-form__field">
-            <div className="ledger-expense-form__category-legend"><span>{translate("common.field.label")}</span><button disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("common.action.manage")}</button></div>
+          <div className="ui-field">
+            <div className="ui-field__header"><span>{translate("common.field.label")}</span><button className="ui-field__action" disabled={editorBusy} onClick={openCategoryManager} type="button">{translate("common.action.manage")}</button></div>
             <Select
               align="end"
               disabled={editorBusy}
@@ -327,12 +327,12 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
           </div>
           <label><span>{translate("ledger.field.note")} <small>{translate("ledger.field.optional")}</small></span><Input maxLength={4_000} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} value={draft.note} /></label>
           {(createMutation.isPending || updateMutation.isPending) && <div className="ledger-mutation-status" role="status"><Icon name="sync" size={13} />{translate("ledger.status.saving")}</div>}
-          {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
       <Modal
-        className="ledger-category-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={deleteExpenseMutation.isPending} onClick={() => setDeleteExpenseId(null)}>{translate("common.action.cancel")}</Button><Button loading={deleteExpenseMutation.isPending} onClick={() => deleteExpenseId && deleteExpenseMutation.mutate(deleteExpenseId)} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteExpenseMutation.isPending) setDeleteExpenseId(null); }}
@@ -340,16 +340,16 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
         title={translate("ledger.deleteExpense.title")}
       >
         <p>{translate("ledger.deleteExpense.confirm", { title: snapshot.expenses.find((expense) => expense.id === deleteExpenseId)?.title ?? "" })}</p>
-        {formError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+        {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
-      <Modal className="ledger-category-manager-modal" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("common.labels.manage")}>
-        <div className="ledger-category-manager">
-          <div aria-label={translate("inbox.labels.ledger")} className="ledger-category-manager__list">
+      <Modal className="ui-modal--medium ui-modal--overflow ui-modal--flush" icon="wallet" onClose={closeCategoryManager} open={categoryManagerOpen} title={translate("common.labels.manage")}>
+        <div className="ui-manager">
+          <div aria-label={translate("inbox.labels.ledger")} className="ui-manager__list">
             {snapshot.categories.map((category, index) => {
               const usageCount = snapshot.expenses.filter((expense) => expense.categoryId === category.id).length;
               return (
-                <div className="ledger-category-manager__row" key={category.id}>
+                <div className="ui-manager__row" key={category.id}>
                   <i style={{ backgroundColor: category.color }} />
                   <strong>{category.name}</strong>
                   <span>{translate("ledger.categories.usageCount", { count: usageCount })}</span>
@@ -364,23 +364,23 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
             })}
           </div>
 
-          <form aria-busy={categoryMutation.isPending} className="ledger-category-editor" onSubmit={submitCategory}>
-            <div className="ledger-category-editor__header">
+          <form aria-busy={categoryMutation.isPending} className="ui-manager__editor" onSubmit={submitCategory}>
+            <div className="ui-manager__editor-header">
               <strong>{editingCategoryId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
               {editingCategoryId && <button disabled={categoryMutation.isPending} onClick={() => { setEditingCategoryId(null); setCategoryDraft(blankCategoryDraft); setCategoryError(null); }} type="button">{translate("common.action.cancel")}</button>}
             </div>
-            <div className="ledger-category-editor__controls">
+            <div className="ui-manager__controls">
               <ColorPicker disabled={categoryMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setCategoryDraft((current) => ({ ...current, color }))} selected value={categoryDraft.color} />
               <Input aria-label={translate("common.labels.name")} disabled={categoryMutation.isPending} maxLength={100} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={categoryDraft.name} />
               <Button loading={categoryMutation.isPending} type="submit" variant="primary">{editingCategoryId ? translate("common.action.save") : translate("common.action.add")}</Button>
             </div>
-            {categoryError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
+            {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
           </form>
         </div>
       </Modal>
 
       <Modal
-        className="ledger-category-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={categoryMutation.isPending} onClick={() => setDeleteCategoryId(null)}>{translate("common.action.cancel")}</Button><Button loading={categoryMutation.isPending} onClick={() => deleteCategoryId && categoryMutation.mutate({ type: "delete", categoryId: deleteCategoryId })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!categoryMutation.isPending) setDeleteCategoryId(null); }}
@@ -390,7 +390,7 @@ export function LedgerPage({ repository, viewStateStore }: { repository: LedgerR
         <p>{snapshot.expenses.some((expense) => expense.categoryId === deleteCategoryId)
           ? translate("ledger.deleteCategory.confirmWithMove", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "", fallback: fallbackCategoryName })
           : translate("ledger.deleteCategory.confirm", { name: snapshot.categories.find((category) => category.id === deleteCategoryId)?.name ?? "" })}</p>
-        {categoryError && <div className="ledger-mutation-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
+        {categoryError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{categoryError}</div>}
       </Modal>
     </div>
   );

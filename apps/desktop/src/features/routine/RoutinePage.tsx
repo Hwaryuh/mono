@@ -202,9 +202,9 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
       </div>
 
       <Modal
-        className="routine-editor-modal"
+        className="ui-modal--large ui-modal--overflow routine-editor-modal"
         footer={<>
-          {editorItem && editorItem !== "new" && <Button className="routine-editor__delete" disabled={editorBusy} onClick={() => { setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
+          {editorItem && editorItem !== "new" && <Button className="ui-overlay__delete" disabled={editorBusy} onClick={() => { setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
           <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
           <Button form="routine-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
         </>}
@@ -213,27 +213,27 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
         open={editorItem !== null}
         title={editorItem === "new" ? translate("app.action.newRoutine") : translate("routine.action.edit")}
       >
-        <form className="routine-editor" id="routine-editor-form" onSubmit={submit}>
+        <form className="ui-form routine-editor" id="routine-editor-form" onSubmit={submit}>
           <label><span>{translate("common.field.title")}</span><Input autoFocus maxLength={500} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder={translate("routine.editor.titlePlaceholder")} value={draft.title} /></label>
-          <div className="routine-editor__group">
-            <div className="routine-editor__group-title"><span>{translate("routine.editor.daysSummaryLabel")}</span><small>{draft.days.length === 7 ? translate("routine.recurrence.daily") : selectedDays.join(" · ") || translate("routine.editor.daysPlaceholder")}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">{translate("routine.recurrence.daily")}</Button></div>
+          <div className="ui-field">
+            <div className="ui-field__header routine-editor__group-title"><span>{translate("routine.editor.daysSummaryLabel")}</span><small>{draft.days.length === 7 ? translate("routine.recurrence.daily") : selectedDays.join(" · ") || translate("routine.editor.daysPlaceholder")}</small><Button onClick={() => setDraft((current) => ({ ...current, days: [0, 1, 2, 3, 4, 5, 6] }))} size="small" type="button" variant="text">{translate("routine.recurrence.daily")}</Button></div>
             <div className="routine-editor__days" role="group" aria-label={translate("routine.field.days")}>{dayNames.map((name, day) => <button aria-pressed={draft.days.includes(day)} className={draft.days.includes(day) ? "routine-editor__day routine-editor__day--selected" : "routine-editor__day"} key={name} onClick={() => toggleDay(day)} type="button">{name}</button>)}</div>
           </div>
-          <div className="routine-editor__group">
-            <div className="routine-editor__group-title">{translate("routine.field.period")}</div>
+          <div className="ui-field">
+            <div className="ui-field__header routine-editor__group-title">{translate("routine.field.period")}</div>
             <div className="routine-editor__period" role="radiogroup" aria-label={translate("routine.field.period")}><button aria-checked={draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: true }))} role="radio" type="button">∞</button><button aria-checked={!draft.endless} onClick={() => setDraft((current) => ({ ...current, endless: false }))} role="radio" type="button">{translate("routine.period.endDateOption")}</button></div>
             {!draft.endless && <div className="routine-editor__end"><DatePicker align="end" label={translate("routine.field.endDate")} min={editorItem === "new" ? snapshot.today : undefined} onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))} value={draft.endDate} /><span>{translate("routine.period.endDateDescription")}</span></div>}
           </div>
-          <div className="routine-editor__label-field">
-            <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={() => setLabelManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
+          <div className="ui-field">
+            <div className="ui-field__header"><span>{translate("common.field.label")}</span><button className="ui-field__action" onClick={() => setLabelManagerOpen(true)} type="button">{translate("common.action.manage")}</button></div>
             <Select label={translate("common.field.label")} onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))} options={snapshot.labels.map((label) => ({ value: label.id, label: label.name, dotColor: label.color }))} value={draft.labelId} />
           </div>
-          {formError && !deleteOpen && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && !deleteOpen && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
       <Modal
-        className="routine-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger"
         footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeRoutine && deleteMutation.mutate(activeRoutine.id)} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteOpen(false); }}
@@ -242,7 +242,7 @@ export function RoutinePage({ repository, todoRepository }: RoutinePageProps) {
       >
         <p>{translate("routine.delete.warning")}</p>
         <blockquote>{activeRoutine?.title}</blockquote>
-        {formError && <div className="routine-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+        {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
       <TodoLabelManagerModal

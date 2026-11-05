@@ -437,9 +437,9 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       </section>
 
       <Modal
-        className="todo-editor-modal"
+        className="ui-modal--large ui-modal--overflow"
         footer={<>
-          {activeEditorItem && <Button className="todo-editor__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
+          {activeEditorItem && <Button className="ui-overlay__delete" disabled={editorBusy} onClick={(event) => { event.currentTarget.focus(); setFormError(null); setDeleteOpen(true); }} variant="ghost">{translate("common.action.delete")}</Button>}
           <Button disabled={editorBusy} onClick={() => closeEditor()}>{translate("common.action.cancel")}</Button>
           <Button form="todo-editor-form" loading={createMutation.isPending || updateMutation.isPending} type="submit" variant="primary">{editorItem === "new" ? translate("routine.action.create") : translate("common.action.save")}</Button>
         </>}
@@ -448,10 +448,10 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
         open={editorItem !== null}
         title={editorItem === "new" ? translate("app.action.newTodo") : translate("todo.action.edit")}
       >
-        <form className="todo-editor" id="todo-editor-form" onSubmit={submit}>
+        <form className="ui-form todo-editor" id="todo-editor-form" onSubmit={submit}>
           <label><span>{translate("todo.field.title")} <b>{translate("todo.field.required")}</b></span><ScrapMentionInput ariaLabel={translate("todo.field.title")} autoFocus maxLength={500} onChange={(title) => setDraft((current) => ({ ...current, title }))} onNavigateMention={navigateToScrap} scraps={scraps} value={draft.title} /></label>
-          <div className="todo-editor__field">
-            <div className="todo-editor__label-legend"><span>{translate("common.field.label")}</span><button onClick={openLabelManager} type="button">{translate("common.action.manage")}</button></div>
+          <div className="ui-field">
+            <div className="ui-field__header"><span>{translate("common.field.label")}</span><button className="ui-field__action" onClick={openLabelManager} type="button">{translate("common.action.manage")}</button></div>
             <Select
               label={translate("common.field.label")}
               onChange={(labelId) => setDraft((current) => ({ ...current, labelId }))}
@@ -460,11 +460,11 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
             />
           </div>
           <div className="todo-editor__due">
-            <fieldset><legend>{translate("todo.field.dueDate")}</legend><DatePicker label={translate("todo.field.dueDate")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
-            <label><span>{translate("todo.field.time")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.field.dueTime")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
+            <fieldset className="ui-field"><legend>{translate("todo.field.dueDate")}</legend><DatePicker label={translate("todo.field.dueDate")} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate, dueTime: dueDate ? current.dueTime : "" }))} value={draft.dueDate} /></fieldset>
+            <label className="ui-field"><span>{translate("todo.field.time")}</span><TimePicker disabled={!draft.dueDate} label={translate("todo.field.dueTime")} onChange={(dueTime) => setDraft((current) => ({ ...current, dueTime }))} value={draft.dueTime} /></label>
           </div>
-          <div className="todo-editor__field">
-            <span className="todo-editor__stars-legend">{translate("todo.field.priority")}</span>
+          <div className="ui-field">
+            <span className="ui-field__header">{translate("todo.field.priority")}</span>
             <div aria-label={translate("todo.field.priority")} className="todo-editor__stars" role="group">
               {[1, 2, 3].map((level) => (
                 <button
@@ -481,7 +481,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
             </div>
           </div>
           <label><span>{translate("common.field.note")}</span><ScrapMentionInput ariaLabel={translate("common.field.note")} maxLength={4000} multiline onChange={(note) => setDraft((current) => ({ ...current, note }))} onNavigateMention={navigateToScrap} placeholder={translate("common.field.notePlaceholder")} scraps={scraps} value={draft.note} /></label>
-          {formError && !deleteOpen && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+          {formError && !deleteOpen && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
         </form>
       </Modal>
 
@@ -503,7 +503,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       />
 
       <Modal
-        className="todo-delete-modal"
+        className="ui-modal--small ui-modal--confirm ui-modal--danger todo-delete-modal"
         footer={<><Button autoFocus disabled={deleteMutation.isPending} onClick={() => setDeleteOpen(false)}>{translate("common.action.cancel")}</Button><Button loading={deleteMutation.isPending} onClick={() => activeEditorItem && deleteMutation.mutate(activeEditorItem.id)} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!deleteMutation.isPending) setDeleteOpen(false); }}
@@ -515,11 +515,11 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
         {activeEditorItem && (subtasksByParent.get(activeEditorItem.id)?.length ?? 0) > 0 && (
           <p className="todo-delete-modal__cascade"><Icon name="alert" size={12} />{translate("todo.delete.withSubtasks", { count: subtasksByParent.get(activeEditorItem.id)!.length })}</p>
         )}
-        {formError && <div className="todo-mutation-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
+        {formError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{formError}</div>}
       </Modal>
 
       <Modal
-        className="todo-delete-modal"
+        className="ui-modal--small ui-modal--confirm"
         footer={<>
           <Button autoFocus onClick={() => setPendingMention(null)}>{translate("common.action.cancel")}</Button>
           <Button
@@ -543,7 +543,7 @@ export function TodoPage({ repository, scrapRepository, viewStateStore }: { repo
       </Modal>
 
       <Modal
-        className="todo-delete-modal"
+        className="ui-modal--small ui-modal--confirm"
         footer={<>
           <Button autoFocus disabled={reparentMutation.isPending} onClick={() => setPendingReparent(null)}>{translate("common.action.cancel")}</Button>
           <Button

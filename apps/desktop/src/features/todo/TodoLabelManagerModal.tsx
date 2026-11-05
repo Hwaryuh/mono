@@ -148,11 +148,11 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabel
 
   return (
     <>
-      <Modal className="todo-label-modal" icon="label" onClose={close} open={open} title={translate("common.labels.manage")}>
-        <div className="todo-label-manager">
-          <div aria-label={translate("common.labels.current")} className="todo-label-manager__list">
+      <Modal className="ui-modal--medium ui-modal--overflow ui-modal--flush" icon="label" onClose={close} open={open} title={translate("common.labels.manage")}>
+        <div className="ui-manager">
+          <div aria-label={translate("common.labels.current")} className="ui-manager__list">
             {labels.map((label, index) => (
-              <div className="todo-label-manager__row" key={label.id}>
+              <div className="ui-manager__row" key={label.id}>
                 <i style={{ backgroundColor: label.color }} />
                 <strong>{label.name}</strong>
                 <span>{usageCountOf?.(label.id) ?? 0}{translate("common.unit.items")}</span>
@@ -164,32 +164,32 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabel
                 </div>
               </div>
             ))}
-            {labels.length === 0 && <div className="todo-label-manager__empty">{translate("common.labels.empty")}</div>}
+            {labels.length === 0 && <div className="ui-manager__empty">{translate("common.labels.empty")}</div>}
           </div>
-          <form aria-busy={labelMutation.isPending} className="todo-label-create" id="todo-label-editor-form" onSubmit={submitLabel}>
-            <div className="todo-label-create__header">
+          <form aria-busy={labelMutation.isPending} className="ui-manager__editor" id="todo-label-editor-form" onSubmit={submitLabel}>
+            <div className="ui-manager__editor-header">
               <strong>{editingLabelId ? translate("common.labels.edit") : translate("common.labels.new")}</strong>
               {editingLabelId && <button disabled={labelMutation.isPending} onClick={() => { setEditingLabelId(null); setLabelDraft(blankLabelDraft); setLabelError(null); }} type="button">{translate("common.action.cancel")}</button>}
             </div>
-            <div className="todo-label-create__controls">
+            <div className="ui-manager__controls">
               <ColorPicker disabled={labelMutation.isPending} label={translate("common.labels.color")} onChange={(color) => setLabelDraft((current) => ({ ...current, color }))} selected value={labelDraft.color} />
               <Input aria-label={translate("common.labels.name")} autoFocus disabled={labelMutation.isPending} maxLength={100} onChange={(event) => setLabelDraft((current) => ({ ...current, name: event.target.value }))} placeholder={translate("common.labels.name")} value={labelDraft.name} />
               <Button loading={labelMutation.isPending} type="submit" variant="primary">{editingLabelId ? translate("common.action.save") : translate("common.action.add")}</Button>
             </div>
-            {labelError && <div className="todo-label-create__error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
+            {labelError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
           </form>
         </div>
       </Modal>
 
       <Modal
-        className="todo-label-delete-modal"
+        className="ui-modal--small ui-modal--overflow ui-modal--confirm ui-modal--danger"
         footer={<><Button disabled={labelMutation.isPending} onClick={() => setDeleteLabelId(null)}>{translate("common.action.cancel")}</Button><Button loading={labelMutation.isPending} onClick={() => deleteLabelId && replacementLabelId && labelMutation.mutate({ type: "delete", labelId: deleteLabelId, replacementLabelId })} variant="danger">{translate("common.action.delete")}</Button></>}
         icon="alert"
         onClose={() => { if (!labelMutation.isPending) setDeleteLabelId(null); }}
         open={deleteLabelId !== null}
         title={translate("common.labels.deleteTitle")}
       >
-        <div className="todo-label-delete">
+        <div className="ui-form">
           <p>{translate("common.labels.deleteQuestion", { name: labels.find((label) => label.id === deleteLabelId)?.name ?? "" })}</p>
           <label>
             <span>{translate("todo.labels.moveExisting")}</span>
@@ -202,7 +202,7 @@ export function TodoLabelManagerModal({ labels, onClose, onLabelCreated, onLabel
             />
           </label>
           <small>{translate("todo.labels.moveDescription")}</small>
-          {labelError && <div className="todo-label-create__error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
+          {labelError && <div className="ui-form-error" role="alert"><Icon name="alert" size={13} />{labelError}</div>}
         </div>
       </Modal>
     </>
