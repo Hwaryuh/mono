@@ -46,14 +46,29 @@
   cursor: col-resize;
   touch-action: none;
   background: transparent;
-  transition: background 120ms ease;
 }
 
-.sidebar__resize:hover,
-.sidebar__resize:focus-visible {
-  outline: none;
-  background: color-mix(in srgb, var(--color-accent) 55%, transparent);
+/* The 7px strip stays the grab area; only a 2px line on its outer edge is drawn on hover. */
+.sidebar__resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--sidebar-resize-line, oklch(1 0 0));
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
+
+/* A white line would vanish on the light theme's white sidebar, so light uses the text color. */
+:root:not([data-theme="dark"]) .sidebar__resize { --sidebar-resize-line: var(--color-text); }
+
+.sidebar__resize:hover,
+.sidebar__resize:focus-visible { outline: none; }
+
+.sidebar__resize:hover::after,
+.sidebar__resize:focus-visible::after { opacity: 1; }
 
 .sidebar__brand {
   height: 52px;
