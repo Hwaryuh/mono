@@ -322,7 +322,10 @@ export function Modal({ open, title, icon, onClose, children, footer, className 
   );
 }
 
-export function Drawer({ open, title, icon, onClose, children, footer, className }: OverlayProps) {
+/** Drag-and-drop on the whole panel, so a drop target isn't limited to one inner field. */
+type DrawerDropProps = Pick<HTMLAttributes<HTMLElement>, "onDragOver" | "onDragLeave" | "onDrop">;
+
+export function Drawer({ open, title, icon, onClose, children, footer, className, onDragOver, onDragLeave, onDrop }: OverlayProps & DrawerDropProps) {
   const panelRef = useRef<HTMLElement>(null);
   const titleId = useId();
   useOverlayLifecycle(open, onClose, panelRef);
@@ -330,7 +333,7 @@ export function Drawer({ open, title, icon, onClose, children, footer, className
   if (!present) return null;
   return (
     <div aria-labelledby={titleId} aria-modal="true" className={classes("ui-overlay", "ui-overlay--end", closing && "ui-overlay--closing")} onMouseDown={onClose} role="dialog">
-      <aside className={classes("ui-drawer", closing && "ui-drawer--closing", className)} onMouseDown={(event) => event.stopPropagation()} ref={panelRef} tabIndex={-1}>
+      <aside className={classes("ui-drawer", closing && "ui-drawer--closing", className)} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop} onMouseDown={(event) => event.stopPropagation()} ref={panelRef} tabIndex={-1}>
         <OverlayHeader icon={icon} onClose={onClose} title={title} titleId={titleId} />
         <div className="ui-overlay__body">{children}</div>
         {footer && <footer className="ui-overlay__footer">{footer}</footer>}

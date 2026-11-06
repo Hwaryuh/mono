@@ -655,6 +655,23 @@ describe("ScrapPage", () => {
     expect(await within(drawer).findByText("dropped.pdf")).toBeInTheDocument();
   });
 
+  it("takes a file dropped anywhere on the detail panel as a comment attachment", async () => {
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "drop", kind: "text", title: "드롭 영역", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),
+      "/scrap?detail=drop",
+    );
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    const panel = drawer.querySelector(".scrap-detail-drawer")!;
+    const body = drawer.querySelector(".ui-overlay__body")!;
+    const file = new File(["x"], "anywhere.pdf", { type: "application/pdf" });
+
+    fireEvent.dragOver(body, { dataTransfer: { files: [file], items: [], types: ["Files"] } });
+    expect(panel).toHaveClass("scrap-detail-drawer--dragging");
+    fireEvent.drop(body, { dataTransfer: { files: [file], items: [], types: ["Files"] } });
+    expect(await within(drawer).findByText("anywhere.pdf")).toBeInTheDocument();
+    expect(panel).not.toHaveClass("scrap-detail-drawer--dragging");
+  });
+
   it("has a label-management button in scrap edit mode too", async () => {
     renderPage(
       repositoryOf({ tags: ["수집", "기타"], items: [{ id: "edit-tag", kind: "text", title: "편집 라벨", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [] }] }),

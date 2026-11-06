@@ -369,12 +369,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       )}
 
       <Drawer
-        className="scrap-detail-drawer"
+        className={commentDragging ? "scrap-detail-drawer scrap-detail-drawer--dragging" : "scrap-detail-drawer"}
+        // A file dropped anywhere on the detail panel goes to the comment form, not only onto the form itself.
+        onDragLeave={(event: DragEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCommentDragging(false); }}
+        onDragOver={(event: DragEvent<HTMLElement>) => { if (detail && commentBusyId !== detail.id && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setCommentDragging(true); } }}
+        onDrop={(event: DragEvent<HTMLElement>) => { event.preventDefault(); setCommentDragging(false); if (detail && commentBusyId !== detail.id) chooseCommentFile(firstFileFrom(event.dataTransfer.files, event.dataTransfer.items)); }}
         footer={detail ? <form
           className={commentDragging ? "scrap-comment-form scrap-comment-form--dragging" : "scrap-comment-form"}
-          onDragOver={(event: DragEvent<HTMLFormElement>) => { if (commentBusyId !== detail.id && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setCommentDragging(true); } }}
-          onDragLeave={(event: DragEvent<HTMLFormElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCommentDragging(false); }}
-          onDrop={(event: DragEvent<HTMLFormElement>) => { event.preventDefault(); setCommentDragging(false); if (commentBusyId !== detail.id) chooseCommentFile(firstFileFrom(event.dataTransfer.files, event.dataTransfer.items)); }}
           onSubmit={submitComment}
         >
           <input aria-label={translate("scrap.comment.filePicker")} className="capture-file-input" disabled={commentBusyId === detail.id} onChange={(event) => chooseCommentFile(event.currentTarget.files?.[0])} ref={commentFileInputRef} tabIndex={-1} type="file" />

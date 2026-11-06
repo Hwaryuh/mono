@@ -302,6 +302,8 @@
 
 /* Comment attachment: drag-over / drop hint / image preview thumbnail */
 .scrap-comment-form--dragging { outline: 2px dashed var(--color-accent); outline-offset: 3px; border-radius: var(--radius-control); }
+/* The whole detail panel accepts the drop; a faint inset outline shows that, the comment form hint shows where it lands. */
+.scrap-detail-drawer--dragging { box-shadow: var(--shadow-overlay), inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 45%, transparent); }
 .scrap-comment-form__drop {
   position: absolute;
   inset: 0;
