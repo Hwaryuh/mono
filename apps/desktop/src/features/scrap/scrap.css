@@ -151,7 +151,9 @@
   -webkit-mask-image: none;
   mask-image: none;
 }
-.scrap-list-card__body { width: 100%; min-width: 0; min-height: 108px; padding: 11px 12px; align-self: stretch; display: flex; flex-direction: column; gap: 7px; }
+/* Fixed rows (title, memo, footer): a text card has no memo line — its words sit in the media band —
+   but keeps the empty row, so every card in the grid is the same height. */
+.scrap-list-card__body { width: 100%; min-width: 0; padding: 11px 12px; align-self: stretch; display: grid; grid-template-rows: 34px 32px auto; row-gap: 7px; }
 .scrap-list-card__body > strong {
   height: 34px;
   overflow: hidden;
@@ -165,7 +167,7 @@
   overflow-wrap: anywhere;
 }
 .scrap-list-card__body > p { height: 32px; margin: 0; overflow: hidden; color: var(--color-text-muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.scrap-list-card__footer { width: 100%; min-width: 0; margin-top: auto; padding-top: 2px; align-self: stretch; display: flex; align-items: center; gap: 7px; }
+.scrap-list-card__footer { grid-row: 3; width: 100%; min-width: 0; padding-top: 2px; align-self: stretch; display: flex; align-items: center; gap: 7px; }
 .scrap-list-card__footer > span:first-child { flex: none; padding: 1px 8px; border: 1px solid var(--color-border); border-radius: 20px; color: var(--color-text-faint); font-size: 10px; }
 .scrap-list-card__comment-count { margin-left: auto; flex: none; display: flex; align-items: center; gap: 4px; color: var(--color-text-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
 
@@ -175,7 +177,7 @@
 .scrap-empty span { font-size: 10.5px; }
 .scrap-empty .ui-button { margin-top: 4px; }
 .scrap-state { height: 100%; display: grid; place-items: center; align-content: center; gap: 8px; color: var(--color-danger); }
-.scrap-list-card--skeleton { min-height: 226px; animation: skeleton-pulse 1.2s ease-in-out infinite; background: var(--color-surface-subtle); }
+.scrap-list-card--skeleton { min-height: 241px; animation: skeleton-pulse 1.2s ease-in-out infinite; background: var(--color-surface-subtle); }
 
 .scrap-detail-drawer { width: min(520px, 100%); }
 .scrap-detail-title { display: flex; align-items: baseline; gap: 8px; }
