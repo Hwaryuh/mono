@@ -666,10 +666,10 @@ describe("ScrapPage", () => {
     const file = new File(["x"], "anywhere.pdf", { type: "application/pdf" });
 
     fireEvent.dragOver(body, { dataTransfer: { files: [file], items: [], types: ["Files"] } });
-    expect(panel).toHaveClass("scrap-detail-drawer--dragging");
+    expect(panel.querySelector(".scrap-detail-drawer__drop")).toHaveTextContent("여기에 놓아 첨부");
     fireEvent.drop(body, { dataTransfer: { files: [file], items: [], types: ["Files"] } });
     expect(await within(drawer).findByText("anywhere.pdf")).toBeInTheDocument();
-    expect(panel).not.toHaveClass("scrap-detail-drawer--dragging");
+    expect(panel.querySelector(".scrap-detail-drawer__drop")).toBeNull();
   });
 
   it("has a label-management button in scrap edit mode too", async () => {

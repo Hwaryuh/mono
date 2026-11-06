@@ -369,13 +369,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
       )}
 
       <Drawer
-        className={commentDragging ? "scrap-detail-drawer scrap-detail-drawer--dragging" : "scrap-detail-drawer"}
+        className="scrap-detail-drawer"
         // A file dropped anywhere on the detail panel goes to the comment form, not only onto the form itself.
         onDragLeave={(event: DragEvent<HTMLElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCommentDragging(false); }}
         onDragOver={(event: DragEvent<HTMLElement>) => { if (detail && commentBusyId !== detail.id && event.dataTransfer.types.includes("Files")) { event.preventDefault(); setCommentDragging(true); } }}
         onDrop={(event: DragEvent<HTMLElement>) => { event.preventDefault(); setCommentDragging(false); if (detail && commentBusyId !== detail.id) chooseCommentFile(firstFileFrom(event.dataTransfer.files, event.dataTransfer.items)); }}
         footer={detail ? <form
-          className={commentDragging ? "scrap-comment-form scrap-comment-form--dragging" : "scrap-comment-form"}
+          className="scrap-comment-form"
           onSubmit={submitComment}
         >
           <input aria-label={translate("scrap.comment.filePicker")} className="capture-file-input" disabled={commentBusyId === detail.id} onChange={(event) => chooseCommentFile(event.currentTarget.files?.[0])} ref={commentFileInputRef} tabIndex={-1} type="file" />
@@ -394,13 +394,13 @@ export function ScrapPage({ repository, urlOpener = externalUrlOpener, viewState
             <Button aria-label={translate("scrap.comment.title")} loading={commentBusyId === detail.id} title={translate("scrap.comment.submit")} type="submit" variant="primary">{commentBusyId !== detail.id && <Icon name="send" size={14} strokeWidth={1.8} />}</Button>
           </div>
           {commentErrors[detail.id] && <span className="scrap-comment-error" role="alert">{commentErrors[detail.id]}</span>}
-          {commentDragging && <div className="scrap-comment-form__drop" aria-hidden="true"><Icon name="download" size={16} />{translate("scrap.comment.dropHint")}</div>}
         </form> : undefined}
         icon="scrap"
         onClose={() => { if (!commentBusyId) { setDetailId(null); setCommentText(""); setCommentFile(null); setCommentDragging(false); if (searchParams.has("detail")) setSearchParams({}, { replace: true }); } }}
         open={detail !== null}
         title={<span className="scrap-detail-title">{translate("app.navigation.scrap")}{detail && <small>{formatTimestamp(detail.savedAt)}</small>}</span>}
       >
+        {commentDragging && <div className="scrap-detail-drawer__drop" aria-hidden="true"><Icon name="download" size={18} />{translate("scrap.comment.dropHint")}</div>}
         {detail && <ScrapDetail item={detail} onManageTags={() => setTagManagerOpen(true)} onRequestDelete={() => { setDeleteError(null); setConfirmDeleteId(detail.id); }} repository={repository} tags={snapshot.tags} urlOpener={urlOpener} />}
       </Drawer>
 

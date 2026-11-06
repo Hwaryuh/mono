@@ -303,21 +303,23 @@
 .scrap-photo-preview > .ui-icon-button { width: 28px; height: 28px; flex: none; color: var(--color-text-faint); }
 
 /* Comment attachment: drag-over / drop hint / image preview thumbnail */
-.scrap-comment-form--dragging { outline: 2px dashed var(--color-accent); outline-offset: 3px; border-radius: var(--radius-control); }
-/* The whole detail panel accepts the drop; a faint inset outline shows that, the comment form hint shows where it lands. */
-.scrap-detail-drawer--dragging { box-shadow: var(--shadow-overlay), inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 45%, transparent); }
-.scrap-comment-form__drop {
+/* The whole detail panel accepts the drop, so the hint covers the whole panel. It is rendered in the drawer body but
+   positioned against the panel, so the body scroll neither moves nor clips it; pointer-events: none keeps the drag
+   events on the panel underneath. */
+.scrap-detail-drawer { position: relative; }
+.scrap-detail-drawer__drop {
   position: absolute;
-  inset: 0;
-  z-index: 2;
+  inset: 6px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: var(--radius-control);
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-overlay);
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   color: var(--color-accent);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   pointer-events: none;
 }
