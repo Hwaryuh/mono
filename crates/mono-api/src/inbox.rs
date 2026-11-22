@@ -465,13 +465,14 @@ fn update(conn: &Connection, id: &str, input: InboxUpdateInput, expected: Option
         return Err(ApiError::BadRequest("영상은 스크랩 모듈로만 저장할 수 있습니다.".into()));
     }
     let scored: Vec<f64> = input.fields.iter().filter_map(|f| f.confidence).collect();
-    let confidence = if scored.is_empty() {
-        0.9
+    // An edit without per-field scores keeps the AI's original confidence; it must not reset to a made-up value.
+    let confidence: Option<f64> = if scored.is_empty() {
+        None
     } else {
-        scored.iter().sum::<f64>() / scored.len() as f64
+        Some(scored.iter().sum::<f64>() / scored.len() as f64)
     };
     let changed = conn.execute(
-        "UPDATE inbox_items SET target = ?1, fields_json = ?2, confidence = ?3, status = 'pending', \
+        "UPDATE inbox_items SET target = ?1, fields_json = ?2, confidence = COALESCE(?3, confidence), status = 'pending', \
          pinned = ?4, version = version + 1 WHERE id = ?5 AND (?6 IS NULL OR version = ?6)",
         params![
             input.target,
@@ -853,6 +854,25 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, ApiError::BadRequest(m) if m.contains("영상은 스크랩")));
+    }
+
+    #[test]
+    fn update_without_field_scores_keeps_existing_confidence() {
+        let db = db::open_memory();
+        let conn = db.lock().unwrap();
+        seed_inbox(&conn, "i1", "url", Some("scrap"), 0.72, r#"[]"#);
+        update(
+            &conn,
+            "i1",
+            InboxUpdateInput {
+                target: "scrap".into(),
+                fields: vec![InboxField { label: "제목".into(), value: "직접 수정".into(), confidence: None }],
+            },
+            None,
+        )
+        .unwrap();
+        let confidence: f64 = conn.query_row("SELECT confidence FROM inbox_items WHERE id = 'i1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(confidence, 0.72);
     }
 
     #[test]

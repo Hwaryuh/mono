@@ -156,7 +156,7 @@ class MockInboxRepository implements InboxRepository {
     const scoredFields = parsed.fields.filter((field) => field.confidence !== undefined);
     const confidence = scoredFields.length > 0
       ? scoredFields.reduce((sum, field) => sum + field.confidence!, 0) / scoredFields.length
-      : 0.9;
+      : itemToUpdate.confidence;
 
     this.state.inbox.items = this.state.inbox.items.map((item) =>
       item.id === itemId
