@@ -400,7 +400,11 @@ export function InboxPage({ repository, calendarRepository, ledgerRepository, sc
     scrapQuery.data?.tags ?? [],
     todoQuery.data?.labels ?? [],
   );
-  const scrapTargets = scrapQuery.data?.items.map((scrap) => ({ value: scrap.id, label: scrap.title }));
+  // Most recently touched scrap first (edit or comment); older servers omit updatedAt, so fall back to savedAt.
+  const scrapTargets = scrapQuery.data?.items
+    .map((scrap) => ({ value: scrap.id, label: scrap.title, touchedAt: scrap.updatedAt || scrap.savedAt }))
+    .sort((a, b) => (a.touchedAt < b.touchedAt ? 1 : a.touchedAt > b.touchedAt ? -1 : 0))
+    .map(({ value, label }) => ({ value, label }));
   const tabs: Array<{ id: InboxTab; label: string; count: number }> = [
     { id: "pending", label: translate("inbox.status.pending"), count: items.filter((item) => item.status === "pending" || item.status === "processing").length },
     { id: "approved", label: translate("inbox.status.approved"), count: items.filter((item) => item.status === "approved").length },
@@ -583,6 +587,10 @@ function InboxRow({
 
   const commentTarget = target === "scrap" ? fields.find((field) => field.label === commentTargetLabel)?.value ?? "" : "";
 
+  // With a comment target the note is posted as a comment, so show it as "댓글" (the stored label stays "메모").
+  const noteAsComment = (label: string, hasTarget: boolean) => (hasTarget && label === translate("common.field.note") ? translate("inbox.field.comment") : label);
+  const itemCommentsOnScrap = item.target === "scrap" && item.fields.some((field) => field.label === commentTargetLabel);
+
   // "" means a new scrap. Going back to a new scrap restores the title/label fields a comment save dropped.
   function changeCommentTarget(scrapId: string) {
     setFields((current) => {
@@ -657,7 +665,7 @@ function InboxRow({
             </div>
             <div className="inbox-fields">
               {item.fields.map((field, index) => {
-                const fieldLabel = unifiedFieldLabel(field.label);
+                const fieldLabel = noteAsComment(unifiedFieldLabel(field.label), itemCommentsOnScrap);
                 return (
                 <button aria-label={translate("inbox.action.editFieldLabel", { field: fieldLabel })} disabled={busy} key={`${field.label}-${index}`} onClick={openEditor} type="button">
                   <span>{fieldLabel}</span><strong>{fieldLabel === commentTargetLabel ? scrapTitleOf(field.value) : field.value}</strong>{field.confidence !== undefined && <small className={field.confidence < 0.6 ? "inbox-field--low" : ""}>{Math.round(field.confidence * 100)}%</small>}
@@ -731,7 +739,7 @@ function InboxRow({
               const multiline = field.label === translate("common.field.note") || field.label === translate("inbox.field.original") || field.label === translate("common.field.reason");
               return (
                 <label key={`${field.label}-${index}`}>
-                  <span>{field.label}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
+                  <span>{noteAsComment(field.label, Boolean(commentTarget))}{field.confidence !== undefined && <small className={field.confidence < 0.7 ? "inbox-field--low" : ""}>{translate("inbox.confidence.aiLabel", { percent: Math.round(field.confidence * 100) })}</small>}</span>
                   {multiline
                     ? <TextArea autoGrow autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} rows={3} value={field.value} />
                     : <Input autoFocus={index === 0} onChange={(event) => updateField(index, event.target.value)} value={field.value} />}

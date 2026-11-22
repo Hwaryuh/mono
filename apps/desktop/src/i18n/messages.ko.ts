@@ -371,6 +371,7 @@ export const koMessages = {
   "common.field.location": "장소",
   "inbox.field.original": "원문",
   "inbox.field.commentTarget": "댓글 대상",
+  "inbox.field.comment": "댓글",
   "inbox.commentTarget.selectLabel": "저장 위치",
   "inbox.commentTarget.newScrap": "새 스크랩으로 저장",
   "inbox.commentTarget.missing": "삭제된 스크랩",
