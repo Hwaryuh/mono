@@ -248,6 +248,20 @@ describe("ScrapPage", () => {
     await waitFor(() => expect(updateComment).toHaveBeenCalledWith("edit-keyboard", "edit-keyboard-comment", { text: "수정 첫 줄\n수정 둘째 줄" }, 1));
   });
 
+  it("copies a comment's text to the clipboard", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderPage(
+      repositoryOf({ tags: ["수집"], items: [{ id: "copy-comment", kind: "text", title: "댓글 복사", memo: "", tag: "수집", savedAt: "오늘", url: null, mediaId: null, fileName: null, fileSize: null, comments: [{ id: "copy-comment-1", createdAt: "오늘", text: "복사할 내용\n둘째 줄", file: null }] }] }),
+      "/scrap?detail=copy-comment",
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: /스크랩/ });
+    fireEvent.click(within(drawer).getByRole("button", { name: "댓글 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("복사할 내용\n둘째 줄"));
+    await waitFor(() => expect(within(drawer).getByRole("button", { name: "댓글 복사" })).toHaveAttribute("title", "복사됨"));
+  });
+
   it("re-reads the original comment after the mutation succeeds and returns focus to the detail entry point", async () => {
     renderPage();
     const card = await screen.findByRole("button", { name: /카메라 무빙 레퍼런스/ });

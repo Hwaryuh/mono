@@ -224,6 +224,8 @@ export const koMessages = {
   "scrap.comment.placeholder": "새 댓글...",
   "scrap.comment.title": "댓글",
   "scrap.comment.submit": "댓글 등록",
+  "scrap.comment.copy": "댓글 복사",
+  "scrap.comment.copied": "복사됨",
   "scrap.comment.filePicker": "댓글 파일 선택",
   "scrap.comment.fileAttach": "파일 첨부",
   "scrap.comment.fileRemove": "첨부 제거",

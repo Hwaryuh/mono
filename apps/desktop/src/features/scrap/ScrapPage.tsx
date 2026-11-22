@@ -814,6 +814,19 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
   const [editError, setEditError] = useState<string | null>(null);
   const [editingVersion, setEditingVersion] = useState(comment.version ?? 1);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(comment.text);
+    } catch {
+      return;
+    }
+    setCopied(true);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
+  }
   const editButtonDomId = `scrap-comment-edit-${comment.id}`;
   const deleteButtonDomId = `scrap-comment-delete-${comment.id}`;
   const queryClient = useQueryClient();
@@ -880,6 +893,7 @@ function ScrapCommentRow({ comment, repository, scrapId, urlOpener, onZoom }: { 
         <time>{formatTimestamp(comment.createdAt)}</time>
         {!editing && !confirmingDelete && (
           <div className="scrap-comment__actions">
+            {comment.text && <IconButton aria-label={translate("scrap.comment.copy")} onClick={() => void copyText()} size="small" title={translate(copied ? "scrap.comment.copied" : "scrap.comment.copy")} type="button" variant="ghost"><Icon name={copied ? "check" : "copy"} size={12} /></IconButton>}
             <IconButton aria-label={translate("scrap.comment.editLabel", { date: comment.text })} id={editButtonDomId} onClick={startEditing} size="small" title={translate("scrap.comment.edit")} type="button" variant="ghost"><Icon name="edit" size={12} /></IconButton>
             <IconButton aria-label={translate("scrap.comment.deleteLabel", { date: comment.text })} id={deleteButtonDomId} onClick={() => { setDeleteError(null); setConfirmingDelete(true); }} size="small" title={translate("scrap.comment.delete")} type="button" variant="ghost"><Icon name="trash" size={12} /></IconButton>
           </div>

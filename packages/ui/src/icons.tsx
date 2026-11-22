@@ -41,6 +41,7 @@ const paths = {
   panelExpand: "M4 4h16v16H4zM9 4v16M12 9l3 3-3 3",
   message: "M4 5h16v11H9l-5 4z",
   location: "M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM12 8a2.5 2.5 0 100 5 2.5 2.5 0 000-5z",
+  copy: "M9 9h11v11H9zM5 15V4h11",
   edit: "M5 19h14M7 15l9-9 2 2-9 9H7z",
   trash: "M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13M10 11v5M14 11v5",
   sync: "M4 12a8 8 0 0113.7-5.7M20 12a8 8 0 01-13.7 5.7",
