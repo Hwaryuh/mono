@@ -107,7 +107,8 @@ const FIELD_CONTRACT: &str = "각 모듈은 아래 필드명을 정확히 그대
 \"알림\"은 일정 시작 몇 분 전에 알릴지 숫자(분 단위)만 써라(예: \"10\", \"1440\"). 명시적으로 알림을 요청하지 않았으면 생략하라.\n\
 \"메모\"·\"마감\"·\"장소\"는 선택 필드다. 입력에 근거가 있을 때만 쓰고, 없으면 생략하라. 제목을 메모에 되풀이하지 마라.\n\
 \"댓글 대상\"은 입력이 아래 기존 스크랩 중 하나에 덧붙이는 내용(그 스크랩에 대한 추가 메모, 후기, 진행 상황)이 분명할 때만 \
-그 스크랩의 id를 그대로 쓴다. 애매하면 생략해 새 스크랩으로 둔다. 댓글 대상을 쓰면 \"메모\"를 반드시 쓰고, 거기에 댓글로 남길 내용만 쓴다.\n\
+그 스크랩의 id를 그대로 쓴다. 애매하면 생략해 새 스크랩으로 둔다. \
+특히 링크·이미지처럼 모아 두는 자료가 들어왔고 함께 적힌 말이 아래 기존 스크랩 제목과 같거나 그 주제·모음 이름에 해당하면(예: 제목 \"숏폼 레퍼런스 모음\"에 \"숏폼 레퍼런스\"와 함께 링크), 새 스크랩을 만들지 말고 그 스크랩을 댓글 대상으로 하고 링크를 \"메모\"에 쓴다. 댓글 대상을 쓰면 \"메모\"를 반드시 쓰고, 거기에 댓글로 남길 내용만 쓴다.\n\
 \"스크랩에 넣기\", \"할 일로\", \"~에 댓글로 달아줘\"처럼 저장 위치나 분류를 지시하는 말은 분류에만 쓰고 제목·메모에는 넣지 마라.\n";
 
 // Few-shot examples. Dates are written as placeholders so the static prefix stays identical every day (prompt-cache friendly).
@@ -118,6 +119,7 @@ const EXAMPLES: &str = "예시(라벨은 아래 목록에서 고른다):\n\
 - \"9월 30일 오후 3시 치과 예약, 30분 전에 알려줘\" → calendar. 제목: 치과 예약 / 일시: 올해 9월 30일의 YYYY-MM-DD 15:00 / 알림: 30\n\
 - \"스타벅스 5,800원\" → ledger. 항목: 스타벅스 / 금액: 5800\n\
 - \"https://example.com/post 나중에 읽을 글\" → scrap. 제목: 나중에 읽을 글 / 메모: https://example.com/post\n\
+- \"https://example.com/v/1 숏폼 레퍼런스\" (기존 스크랩 id s3이 \"숏폼 레퍼런스 모음\"일 때) → scrap. 댓글 대상: s3 / 메모: https://example.com/v/1\n\
 - \"합주실 후보에 댓글로: 2번 합주실이 제일 쌈\" (기존 스크랩 id s7이 \"합주실 후보\"일 때) → scrap. 댓글 대상: s7 / 메모: 2번 합주실이 제일 쌈\n";
 
 const TAIL: &str = "confidence는 0~1이다. fields는 최대 12개다.\n\
@@ -165,6 +167,27 @@ pub(super) fn build_analysis_instruction(context: Option<&AnalysisContext>) -> S
 
 // ---------- Validation (capture-analysis-validation.ts + captureAnalysisResultSchema) ----------
 
+/// Models sometimes answer with English field names (title, memo, ...). Everything downstream keys on the Korean
+/// names from FIELD_CONTRACT, so map the common English ones back; anything unknown is left as the model wrote it.
+fn normalize_label(target: &str, label: &str) -> String {
+    let key: String = label.trim().to_lowercase().replace(['_', '-'], " ");
+    let mapped = match (target, key.as_str()) {
+        ("ledger", "title" | "item" | "name") => "항목",
+        (_, "title" | "name") => "제목",
+        (_, "memo" | "note" | "notes") => "메모",
+        (_, "label" | "category" | "tag") => "라벨",
+        ("scrap", "comment target" | "comment on" | "target scrap") => "댓글 대상",
+        ("todo", "due" | "due date" | "deadline") => "마감",
+        ("calendar", "date" | "datetime" | "date time" | "when" | "time" | "start") => "일시",
+        ("calendar", "location" | "place") => "장소",
+        ("calendar", "reminder" | "alert") => "알림",
+        ("ledger", "amount" | "price" | "cost") => "금액",
+        ("ledger", "date") => "날짜",
+        _ => return label.to_string(),
+    };
+    mapped.to_string()
+}
+
 fn schema_parse(value: &Value, provider_label: &str) -> AiResult<CaptureAnalysisResult> {
     let violated = || format!("{provider_label} 분석 결과가 스키마를 위반했습니다.");
     let target = value.get("target").and_then(Value::as_str).ok_or_else(violated)?;
@@ -181,7 +204,7 @@ fn schema_parse(value: &Value, provider_label: &str) -> AiResult<CaptureAnalysis
                 || f.get("value").and_then(Value::as_str).is_some_and(|v| !v.trim().is_empty())
         })
         .map(|f| AnalysisField {
-            label: f.get("label").and_then(Value::as_str).unwrap_or("").to_string(),
+            label: normalize_label(target, f.get("label").and_then(Value::as_str).unwrap_or("")),
             value: f.get("value").and_then(Value::as_str).unwrap_or("").to_string(),
             confidence: f.get("confidence").and_then(Value::as_f64),
         })
@@ -725,7 +748,24 @@ mod tests {
         // Routing phrases steer the classification but must not end up in the saved text.
         assert!(text.contains("분류에만 쓰고 제목·메모에는 넣지 마라"));
         assert!(text.contains("댓글 대상: s7 / 메모: 2번 합주실이 제일 쌈"));
+        assert!(text.contains("댓글 대상: s3 / 메모: https://example.com/v/1"));
         assert!(text.contains("- s1: 합주실 후보 정리\n- s2: 레시피\n"));
+    }
+
+    #[test]
+    fn english_field_names_are_mapped_to_korean() {
+        let value = serde_json::json!({
+            "target": "scrap", "confidence": 0.9,
+            "fields": [
+                {"label": "title", "value": "a"}, {"label": "Memo", "value": "b"},
+                {"label": "label", "value": "c"}, {"label": "comment_target", "value": "s1"},
+                {"label": "제목2", "value": "d"}
+            ]
+        });
+        let labels: Vec<String> = schema_parse(&value, "x").unwrap().fields.into_iter().map(|f| f.label).collect();
+        assert_eq!(labels, ["제목", "메모", "라벨", "댓글 대상", "제목2"]);
+        assert_eq!(normalize_label("ledger", "title"), "항목");
+        assert_eq!(normalize_label("todo", "due_date"), "마감");
     }
 
     #[test]
